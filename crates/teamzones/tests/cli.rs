@@ -134,3 +134,27 @@ golden! { status_block:
 fn the_cli_spec_has_two_status_blocks() {
     assert_eq!(status_blocks().len(), 2);
 }
+
+/// The two example lines the `groups` row of the CLI spec gives.
+fn groups_examples() -> Vec<String> {
+    let rows = table_rows(CLI_SPEC, "# Headless CLI");
+    let row = rows
+        .iter()
+        .find(|row| row[0] == "`teamzones groups`")
+        .unwrap();
+    backticked(&row[1])
+        .into_iter()
+        .map(str::to_owned)
+        .collect()
+}
+
+#[test]
+fn groups_prints_one_line_per_group_in_the_form_the_spec_shows() {
+    let output = teamzones().arg("groups").assert().success();
+    let stdout = String::from_utf8(output.get_output().stdout.clone()).unwrap();
+    let lines: Vec<&str> = stdout.lines().collect();
+    let examples = groups_examples();
+    assert_eq!(lines.len(), 4, "{stdout}");
+    assert_eq!(lines[0], examples[0]);
+    assert_eq!(lines[2], examples[1]);
+}

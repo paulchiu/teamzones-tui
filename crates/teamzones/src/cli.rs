@@ -6,11 +6,11 @@ use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
 use clap::{Args, Parser, Subcommand};
 use teamzones_core::clock::Clock;
-use teamzones_core::config::Config;
+use teamzones_core::config::{Config, Group, Roster, Rule};
 use teamzones_core::copy::{Clause, Variant, say_line};
 use teamzones_core::expr::{ExprError, parse_expr};
 use teamzones_core::fit::resolve;
-use teamzones_core::question::Marks;
+use teamzones_core::question::{Marks, Question};
 use teamzones_core::status::status_lines;
 use teamzones_core::time::Moment;
 use thiserror::Error;
@@ -38,6 +38,8 @@ enum Command {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true, value_name = "EXPR | @place")]
         words: Vec<String>,
     },
+    /// Print one line per group: its members and the question it asks.
+    Groups,
 }
 
 #[derive(Debug, Args)]
@@ -153,6 +155,7 @@ pub fn run(cli: Cli, io: &mut Io) -> Result<(), Failure> {
     match cli.command {
         Some(Command::Say(args)) => say(&args, now, io),
         Some(Command::Status { words: tokens }) => status(&tokens, now, io),
+        Some(Command::Groups) => groups(io),
         None => Err(usage(
             "teamzones needs a command for now: try teamzones --help",
         )),
@@ -239,5 +242,63 @@ fn status(tokens: &[String], now: DateTime<Utc>, io: &mut Io) -> Result<(), Fail
     lines
         .iter()
         .try_for_each(|line| writeln!(io.out, "{line}"))
+        .map_err(output)
+}
+
+/// The word for what a group's places count as.
+fn rule_word(rule: Rule) -> &'static str {
+    match rule {
+        Rule::OffPeak | Rule::Context => "off-peak",
+        Rule::Quiet => "quiet",
+    }
+}
+
+/// `1 team: Priya, Sam, Thandi, Johan  asks who`; groups past the ninth get no number.
+fn group_line(roster: &Roster, index: usize, group: &Group) -> String {
+    let number = if index < 9 {
+        (index + 1).to_string()
+    } else {
+        " ".to_owned()
+    };
+    let aliases = if group.aliases.is_empty() {
+        String::new()
+    } else {
+        format!(" ({})", group.aliases.join(", "))
+    };
+    let members: Vec<String> = group
+        .people
+        .iter()
+        .map(|id| roster.person(*id).name.clone())
+        .chain(
+            group
+                .places
+                .iter()
+                .map(|id| format!("@{}", roster.place(*id).name)),
+        )
+        .collect();
+    let asks = match Marks::of_group(group).question() {
+        Some(Question::Who) => "who".to_owned(),
+        Some(Question::Where) => rule_word(group.rule).to_owned(),
+        Some(Question::Both) => format!("who and {}", rule_word(group.rule)),
+        None => "nothing".to_owned(),
+    };
+    format!(
+        "{number} {}{aliases}: {}  asks {asks}",
+        group.name,
+        members.join(", ")
+    )
+}
+
+fn groups(io: &mut Io) -> Result<(), Failure> {
+    let config = load(io)?;
+    let roster = &config.roster;
+    if roster.groups.is_empty() {
+        return Err(Failure::Nothing("there are no groups in config".to_owned()));
+    }
+    roster
+        .groups
+        .iter()
+        .enumerate()
+        .try_for_each(|(index, group)| writeln!(io.out, "{}", group_line(roster, index, group)))
         .map_err(output)
 }
