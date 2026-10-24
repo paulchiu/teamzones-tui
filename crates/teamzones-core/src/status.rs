@@ -89,7 +89,7 @@ fn next_opening(trading: &Trading, date: NaiveDate, minute: u32) -> Option<(Naiv
 }
 
 /// What comes next for a place: the peak in progress or coming up today, or when it opens.
-fn place_next(trading: &Trading, tz: Tz, level: Level, now: DateTime<Utc>) -> String {
+pub fn place_next(trading: &Trading, tz: Tz, level: Level, now: DateTime<Utc>) -> String {
     let local = now.with_timezone(&tz);
     let (today, minute) = (local.date_naive(), local.hour() * 60 + local.minute());
     let trading_day = trading.on(local.weekday());
