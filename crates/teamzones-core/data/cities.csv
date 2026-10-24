@@ -1,0 +1,717 @@
+name,ascii,country,tz,lat,lon
+Aba,Aba,NG,Africa/Lagos,5.10658,7.36667
+Abidjan,Abidjan,CI,Africa/Abidjan,5.35444,-4.00167
+Abobo,Abobo,CI,Africa/Abidjan,5.41613,-4.0159
+Abu Dhabi,Abu Dhabi,AE,Asia/Dubai,24.45118,54.39696
+Abuja,Abuja,NG,Africa/Lagos,9.05785,7.49508
+Accra,Accra,GH,Africa/Accra,5.55602,-0.1969
+Adamstown,Adamstown,PN,Pacific/Pitcairn,-25.06597,-130.10147
+Adana,Adana,TR,Europe/Istanbul,36.98615,35.32531
+Addis Ababa,Addis Ababa,ET,Africa/Addis_Ababa,9.02497,38.74689
+Adelaide,Adelaide,AU,Australia/Adelaide,-34.92866,138.59863
+Aden,Aden,YE,Asia/Aden,12.77957,45.03852
+Agra,Agra,IN,Asia/Kolkata,27.18333,78.01667
+Ahmedabad,Ahmedabad,IN,Asia/Kolkata,23.02579,72.58727
+Al Mawşil al Jadīdah,Al Mawsil al Jadidah,IQ,Asia/Baghdad,36.33271,43.10555
+Aleppo,Aleppo,SY,Asia/Damascus,36.20124,37.16117
+Alexandria,Alexandria,EG,Africa/Cairo,31.20176,29.91582
+Algiers,Algiers,DZ,Africa/Algiers,36.73225,3.08746
+Almaty,Almaty,KZ,Asia/Almaty,43.25249,76.9115
+Alofi,Alofi,NU,Pacific/Niue,-19.05294,-169.91957
+Amman,Amman,JO,Asia/Amman,31.95522,35.94503
+Amritsar,Amritsar,IN,Asia/Kolkata,31.62234,74.87534
+Amsterdam,Amsterdam,NL,Europe/Amsterdam,52.37403,4.88969
+Andorra la Vella,Andorra la Vella,AD,Europe/Andorra,42.50779,1.52109
+Ankara,Ankara,TR,Europe/Istanbul,39.91987,32.85427
+Anshan,Anshan,CN,Asia/Shanghai,41.12361,122.99
+Antalya,Antalya,TR,Europe/Istanbul,36.90812,30.69556
+Antananarivo,Antananarivo,MG,Indian/Antananarivo,-18.91368,47.53613
+Anyang,Anyang,CN,Asia/Shanghai,36.096,114.38278
+Apia,Apia,WS,Pacific/Apia,-13.83333,-171.76666
+Arequipa,Arequipa,PE,America/Lima,-16.39899,-71.53747
+Ashgabat,Ashgabat,TM,Asia/Ashgabat,37.95,58.38333
+Asmara,Asmara,ER,Africa/Asmara,15.33805,38.93184
+Astana,Astana,KZ,Asia/Almaty,51.1801,71.44598
+Asunción,Asuncion,PY,America/Asuncion,-25.28646,-57.647
+Athens,Athens,GR,Europe/Athens,37.98376,23.72784
+Auckland,Auckland,NZ,Pacific/Auckland,-36.84853,174.76349
+Aurangabad,Aurangabad,IN,Asia/Kolkata,19.87757,75.34226
+Austin,Austin,US,America/Chicago,30.26715,-97.74306
+Avarua,Avarua,CK,Pacific/Rarotonga,-21.2075,-159.77546
+Baghdad,Baghdad,IQ,Asia/Baghdad,33.34058,44.40088
+Baku,Baku,AZ,Asia/Baku,40.37767,49.89201
+Bamako,Bamako,ML,Africa/Bamako,12.60915,-7.97522
+Bandar Lampung,Bandar Lampung,ID,Asia/Jakarta,-5.42917,105.26111
+Bandar Seri Begawan,Bandar Seri Begawan,BN,Asia/Brunei,4.89035,114.94006
+Bandung,Bandung,ID,Asia/Jakarta,-6.92222,107.60694
+Bangkok,Bangkok,TH,Asia/Bangkok,13.75398,100.50144
+Bangui,Bangui,CF,Africa/Bangui,4.36122,18.55496
+Banjul,Banjul,GM,Africa/Banjul,13.45274,-16.57803
+Bannu,Bannu,PK,Asia/Karachi,32.98527,70.60403
+Bao'an,Bao'an,CN,Asia/Shanghai,22.55213,113.88288
+Baoding,Baoding,CN,Asia/Shanghai,38.87288,115.46246
+Baoji,Baoji,CN,Asia/Shanghai,34.36775,107.23705
+Baoshan,Baoshan,CN,Asia/Shanghai,31.40845,121.48956
+Baotou,Baotou,CN,Asia/Shanghai,40.6516,109.84389
+Barcelona,Barcelona,ES,Europe/Madrid,41.38879,2.15899
+Barquisimeto,Barquisimeto,VE,America/Caracas,10.0647,-69.35703
+Barranquilla,Barranquilla,CO,America/Bogota,10.96854,-74.78132
+Basrah,Basrah,IQ,Asia/Baghdad,30.50852,47.7804
+Basse-Terre,Basse-Terre,GP,America/Guadeloupe,15.99714,-61.73214
+Basseterre,Basseterre,KN,America/St_Kitts,17.2955,-62.72499
+Batam,Batam,ID,Asia/Jakarta,1.14937,104.02491
+Bayan Nur,Bayan Nur,CN,Asia/Shanghai,40.74143,107.38599
+Bazhong,Bazhong,CN,Asia/Shanghai,31.8694,106.74432
+Beijing,Beijing,CN,Asia/Shanghai,39.9075,116.39723
+Beirut,Beirut,LB,Asia/Beirut,33.89332,35.50157
+Bekasi,Bekasi,ID,Asia/Jakarta,-6.2349,106.9896
+Belém,Belem,BR,America/Belem,-1.45583,-48.50444
+Belgrade,Belgrade,RS,Europe/Belgrade,44.80401,20.46513
+Belmopan,Belmopan,BZ,America/Belize,17.25376,-88.76401
+Belo Horizonte,Belo Horizonte,BR,America/Sao_Paulo,-19.92083,-43.93778
+Bengaluru,Bengaluru,IN,Asia/Kolkata,12.97194,77.59369
+Benin City,Benin City,NG,Africa/Lagos,6.33815,5.62575
+Berlin,Berlin,DE,Europe/Berlin,52.52437,13.41053
+Bern,Bern,CH,Europe/Zurich,46.94809,7.44744
+Bhopal,Bhopal,IN,Asia/Kolkata,23.25469,77.40289
+Biên Hòa,Bien Hoa,VN,Asia/Ho_Chi_Minh,10.94469,106.82432
+Bijie,Bijie,CN,Asia/Shanghai,27.30193,105.28627
+Birmingham,Birmingham,GB,Europe/London,52.48142,-1.89983
+Bishkek,Bishkek,KG,Asia/Bishkek,42.87,74.59
+Bissau,Bissau,GW,Africa/Bissau,11.86357,-15.59767
+Bogor,Bogor,ID,Asia/Jakarta,-6.59444,106.78917
+Bogotá,Bogota,CO,America/Bogota,4.60971,-74.08175
+Bozhou,Bozhou,CN,Asia/Shanghai,33.87722,115.77028
+Brasília,Brasilia,BR,America/Sao_Paulo,-15.77972,-47.92972
+Bratislava,Bratislava,SK,Europe/Bratislava,48.14816,17.10674
+Brazzaville,Brazzaville,CG,Africa/Brazzaville,-4.26613,15.28318
+Bridgetown,Bridgetown,BB,America/Barbados,13.10732,-59.62021
+Brisbane,Brisbane,AU,Australia/Brisbane,-27.46794,153.02809
+Brooklyn,Brooklyn,US,America/New_York,40.6501,-73.94958
+Brussels,Brussels,BE,Europe/Brussels,50.85045,4.34878
+Bucharest,Bucharest,RO,Europe/Bucharest,44.43225,26.10626
+Budapest,Budapest,HU,Europe/Budapest,47.49835,19.04045
+Budta,Budta,PH,Asia/Manila,7.20417,124.43972
+Buenos Aires,Buenos Aires,AR,America/Argentina/Buenos_Aires,-34.61315,-58.37723
+Bursa,Bursa,TR,Europe/Istanbul,40.19559,29.06013
+Busan,Busan,KR,Asia/Seoul,35.10168,129.03004
+Cairo,Cairo,EG,Africa/Cairo,30.06263,31.24967
+Calgary,Calgary,CA,America/Edmonton,51.05011,-114.08529
+Cali,Cali,CO,America/Bogota,3.43054,-76.5199
+Callao,Callao,PE,America/Lima,-12.05162,-77.13452
+Caloocan,Caloocan,PH,Asia/Manila,14.64953,120.96788
+Camayenne,Camayenne,GN,Africa/Conakry,9.535,-13.68778
+Campinas,Campinas,BR,America/Sao_Paulo,-22.90556,-47.06083
+Cần Thơ,Can Tho,VN,Asia/Ho_Chi_Minh,10.03711,105.78825
+Canberra,Canberra,AU,Australia/Sydney,-35.28346,149.12807
+Cape Town,Cape Town,ZA,Africa/Johannesburg,-33.92584,18.42322
+Caracas,Caracas,VE,America/Caracas,10.48801,-66.87919
+Casablanca,Casablanca,MA,Africa/Casablanca,33.58831,-7.61138
+Castries,Castries,LC,America/St_Lucia,13.9957,-61.00614
+Cayenne,Cayenne,GF,America/Cayenne,4.9381,-52.33455
+Changchun,Changchun,CN,Asia/Shanghai,43.88,125.32278
+Changde,Changde,CN,Asia/Shanghai,29.03205,111.69844
+Changsha,Changsha,CN,Asia/Shanghai,28.19874,112.97087
+Changshu,Changshu,CN,Asia/Shanghai,31.64615,120.74221
+Changwon,Changwon,KR,Asia/Seoul,35.22806,128.68111
+Changzhi,Changzhi,CN,Asia/Shanghai,36.18389,113.10528
+Changzhou,Changzhou,CN,Asia/Shanghai,31.77359,119.95401
+Chaozhou,Chaozhou,CN,Asia/Shanghai,23.65396,116.62262
+Charlotte Amalie,Charlotte Amalie,VI,America/St_Thomas,18.3419,-64.9307
+Chattogram,Chattogram,BD,Asia/Dhaka,22.3384,91.83168
+Chelyabinsk,Chelyabinsk,RU,Asia/Yekaterinburg,55.1611,61.42877
+Chengdu,Chengdu,CN,Asia/Shanghai,30.66667,104.06667
+Chengtangcun,Chengtangcun,CN,Asia/Shanghai,35.08357,117.19071
+Chennai,Chennai,IN,Asia/Kolkata,13.08784,80.27847
+Chicago,Chicago,US,America/Chicago,41.85003,-87.65005
+Chisinau,Chisinau,MD,Europe/Chisinau,47.00902,28.85938
+Chongqing,Chongqing,CN,Asia/Shanghai,29.56026,106.55771
+Ciudad de la Paz,Ciudad de la Paz,GQ,Africa/Malabo,1.5925,10.82361
+Ciudad Juárez,Ciudad Juarez,MX,America/Ciudad_Juarez,31.72024,-106.46084
+Ciudad Nezahualcoyotl,Ciudad Nezahualcoyotl,MX,America/Mexico_City,19.40061,-99.01483
+Cixi,Cixi,CN,Asia/Shanghai,30.1764,121.2457
+Cockburn Town,Cockburn Town,TC,America/Grand_Turk,21.46122,-71.14188
+Coimbatore,Coimbatore,IN,Asia/Kolkata,11.00555,76.96612
+Colombo,Colombo,LK,Asia/Colombo,6.93548,79.84868
+Conakry,Conakry,GN,Africa/Conakry,9.53795,-13.67729
+Copenhagen,Copenhagen,DK,Europe/Copenhagen,55.67594,12.56553
+Córdoba,Cordoba,AR,America/Argentina/Cordoba,-31.40648,-64.18853
+Curitiba,Curitiba,BR,America/Sao_Paulo,-25.42778,-49.27306
+Da Nang,Da Nang,VN,Asia/Ho_Chi_Minh,16.06778,108.22083
+Daegu,Daegu,KR,Asia/Seoul,35.87102,128.60121
+Daejeon,Daejeon,KR,Asia/Seoul,36.35022,127.3848
+Dakar,Dakar,SN,Africa/Dakar,14.6937,-17.44406
+Dalian,Dalian,CN,Asia/Shanghai,38.91222,121.60222
+Dallas,Dallas,US,America/Chicago,32.78306,-96.80667
+Damascus,Damascus,SY,Asia/Damascus,33.5102,36.29128
+Dammam,Dammam,SA,Asia/Riyadh,26.43442,50.10326
+Daqing,Daqing,CN,Asia/Shanghai,46.58333,125
+Dar es Salaam,Dar es Salaam,TZ,Africa/Dar_es_Salaam,-6.82349,39.26951
+Datong,Datong,CN,Asia/Shanghai,40.09361,113.29139
+Davao,Davao,PH,Asia/Manila,7.07306,125.61278
+Dazhou,Dazhou,CN,Asia/Shanghai,31.2106,107.46308
+Delhi,Delhi,IN,Asia/Kolkata,28.65195,77.23149
+Depok,Depok,ID,Asia/Jakarta,-6.4,106.81861
+Dhaka,Dhaka,BD,Asia/Dhaka,23.7104,90.40744
+Dhanbad,Dhanbad,IN,Asia/Kolkata,23.79759,86.42992
+Dili,Dili,TL,Asia/Dili,-8.55861,125.57361
+Diyarbakır,Diyarbakir,TR,Europe/Istanbul,37.91363,40.21721
+Djibouti,Djibouti,DJ,Africa/Djibouti,11.58901,43.14503
+Dodoma,Dodoma,TZ,Africa/Dar_es_Salaam,-6.17221,35.73947
+Doha,Doha,QA,Asia/Qatar,25.28545,51.53096
+Dombivali,Dombivali,IN,Asia/Kolkata,19.21667,73.08333
+Dongguan,Dongguan,CN,Asia/Shanghai,23.01797,113.74866
+Douala,Douala,CM,Africa/Douala,4.04827,9.70428
+Douglas,Douglas,IM,Europe/Isle_of_Man,54.15,-4.48333
+Dubai,Dubai,AE,Asia/Dubai,25.07725,55.30927
+Dublin,Dublin,IE,Europe/Dublin,53.33306,-6.24889
+Durban,Durban,ZA,Africa/Johannesburg,-29.8579,31.0292
+Dushanbe,Dushanbe,TJ,Asia/Dushanbe,38.53575,68.77905
+Ecatepec de Morelos,Ecatepec de Morelos,MX,America/Mexico_City,19.60006,-99.04855
+Edmonton,Edmonton,CA,America/Edmonton,53.55014,-113.46871
+Erbil,Erbil,IQ,Asia/Baghdad,36.19117,44.00943
+Faisalabad,Faisalabad,PK,Asia/Karachi,31.41554,73.08969
+Faridabad,Faridabad,IN,Asia/Kolkata,28.41124,77.31316
+Fengxiang,Fengxiang,CN,Asia/Shanghai,30.85841,121.46779
+Fes,Fes,MA,Africa/Casablanca,34.03313,-5.00028
+Flying Fish Cove,Flying Fish Cove,CX,Indian/Christmas,-10.42172,105.67912
+Fort Worth,Fort Worth,US,America/Chicago,32.72541,-97.32085
+Fort-de-France,Fort-de-France,MQ,America/Martinique,14.60365,-61.07418
+Fortaleza,Fortaleza,BR,America/Fortaleza,-3.71722,-38.54306
+Foshan,Foshan,CN,Asia/Shanghai,23.02677,113.13148
+Freetown,Freetown,SL,Africa/Freetown,8.48714,-13.2356
+Fukuoka,Fukuoka,JP,Asia/Tokyo,33.6,130.41667
+Funafuti,Funafuti,TV,Pacific/Funafuti,-8.52425,179.19417
+Fushun,Fushun,CN,Asia/Shanghai,41.88669,123.94363
+Fuyang,Fuyang,CN,Asia/Shanghai,32.9,115.81667
+Fuzhou,Fuzhou,CN,Asia/Shanghai,26.06139,119.30611
+Gaborone,Gaborone,BW,Africa/Gaborone,-24.65451,25.90859
+Ganzhou,Ganzhou,CN,Asia/Shanghai,25.84664,114.9326
+Gaziantep,Gaziantep,TR,Europe/Istanbul,37.05944,37.3825
+Gazipur,Gazipur,BD,Asia/Dhaka,23.99844,90.42234
+George Town,George Town,KY,America/Cayman,19.2866,-81.37436
+Georgetown,Georgetown,GY,America/Guyana,6.80448,-58.15527
+Ghāziābād,Ghaziabad,IN,Asia/Kolkata,28.66535,77.43915
+Gibraltar,Gibraltar,GI,Europe/Gibraltar,36.14474,-5.35257
+Gitega,Gitega,BI,Africa/Bujumbura,-3.42708,29.92463
+Giza,Giza,EG,Africa/Cairo,30.00944,31.20861
+Goiânia,Goiania,BR,America/Sao_Paulo,-16.67861,-49.25389
+Goyang-si,Goyang-si,KR,Asia/Seoul,37.65639,126.835
+Gqeberha,Gqeberha,ZA,Africa/Johannesburg,-33.96109,25.61494
+Grytviken,Grytviken,GS,Atlantic/South_Georgia,-54.28111,-36.5092
+Guadalajara,Guadalajara,MX,America/Mexico_City,20.67738,-103.34749
+Guangzhou,Guangzhou,CN,Asia/Shanghai,23.11667,113.25
+Guankou,Guankou,CN,Asia/Shanghai,28.15861,113.62709
+Guarulhos,Guarulhos,BR,America/Sao_Paulo,-23.46278,-46.53333
+Guatemala City,Guatemala City,GT,America/Guatemala,14.64072,-90.51327
+Guayaquil,Guayaquil,EC,America/Guayaquil,-2.19616,-79.88621
+Guigang,Guigang,CN,Asia/Shanghai,23.11603,109.59472
+Guilin,Guilin,CN,Asia/Shanghai,25.28022,110.29639
+Guiyang,Guiyang,CN,Asia/Shanghai,26.58333,106.71667
+Gujranwala,Gujranwala,PK,Asia/Karachi,32.15567,74.18705
+Gustavia,Gustavia,BL,America/St_Barthelemy,17.89618,-62.84978
+Gustavo Adolfo Madero,Gustavo Adolfo Madero,MX,America/Mexico_City,19.49392,-99.11075
+Gwalior,Gwalior,IN,Asia/Kolkata,26.22983,78.17337
+Gwangju,Gwangju,KR,Asia/Seoul,35.15472,126.91556
+Hagåtña,Hagatna,GU,Pacific/Guam,13.47567,144.74886
+Haikou,Haikou,CN,Asia/Shanghai,20.03421,110.34651
+Haiphong,Haiphong,VN,Asia/Bangkok,20.86481,106.68345
+Hamburg,Hamburg,DE,Europe/Berlin,53.55073,9.99302
+Hamilton,Hamilton,BM,Atlantic/Bermuda,32.2949,-64.78303
+Handan,Handan,CN,Asia/Shanghai,36.60999,114.48764
+Hangzhou,Hangzhou,CN,Asia/Shanghai,30.29365,120.16142
+Hanoi,Hanoi,VN,Asia/Bangkok,21.0245,105.84117
+Hanzhong,Hanzhong,CN,Asia/Shanghai,33.07507,107.02214
+Harare,Harare,ZW,Africa/Harare,-17.82772,31.05337
+Harbin,Harbin,CN,Asia/Shanghai,45.75,126.65
+Havana,Havana,CU,America/Havana,23.13302,-82.38304
+Hefei,Hefei,CN,Asia/Shanghai,31.86389,117.28083
+Helsinki,Helsinki,FI,Europe/Helsinki,60.16952,24.93545
+Hengyang,Hengyang,CN,Asia/Shanghai,26.88946,112.61888
+Heshan,Heshan,CN,Asia/Shanghai,28.56938,112.34733
+Heze,Heze,CN,Asia/Shanghai,35.23929,115.47358
+Hezhou,Hezhou,CN,Asia/Shanghai,24.40357,111.56675
+Hiroshima,Hiroshima,JP,Asia/Tokyo,34.4,132.45
+Ho Chi Minh City,Ho Chi Minh City,VN,Asia/Ho_Chi_Minh,10.82302,106.62965
+Hohhot,Hohhot,CN,Asia/Shanghai,40.81056,111.65222
+Hong Kong,Hong Kong,HK,Asia/Hong_Kong,22.27832,114.17469
+Hong Kong Island,Hong Kong Island,HK,Asia/Hong_Kong,22.26302,114.18419
+Honiara,Honiara,SB,Pacific/Guadalcanal,-9.43333,159.95
+Houston,Houston,US,America/Chicago,29.76328,-95.36327
+Howrah,Howrah,IN,Asia/Kolkata,22.57688,88.31857
+Huai'an,Huai'an,CN,Asia/Shanghai,33.58861,119.01917
+Huaibei,Huaibei,CN,Asia/Shanghai,33.97444,116.79167
+Huainan,Huainan,CN,Asia/Shanghai,32.62639,116.99694
+Huế,Hue,VN,Asia/Bangkok,16.4619,107.59546
+Huizhou,Huizhou,CN,Asia/Shanghai,23.11147,114.41523
+Huzhou,Huzhou,CN,Asia/Shanghai,30.8703,120.0933
+Hyderabad,Hyderabad,IN,Asia/Kolkata,17.38405,78.45636
+Hyderabad,Hyderabad,PK,Asia/Karachi,25.39689,68.37718
+Ibadan,Ibadan,NG,Africa/Lagos,7.37756,3.90591
+Ilorin,Ilorin,NG,Africa/Lagos,8.49664,4.54214
+Incheon,Incheon,KR,Asia/Seoul,37.45646,126.70515
+Indore,Indore,IN,Asia/Kolkata,22.71792,75.8333
+Isfahan,Isfahan,IR,Asia/Tehran,32.65246,51.67462
+Islamabad,Islamabad,PK,Asia/Karachi,33.72148,73.04329
+Istanbul,Istanbul,TR,Europe/Istanbul,41.01384,28.94966
+İzmir,Izmir,TR,Europe/Istanbul,38.41273,27.13838
+Iztapalapa,Iztapalapa,MX,America/Mexico_City,19.35529,-99.06224
+Jabalpur,Jabalpur,IN,Asia/Kolkata,23.16697,79.95006
+Jacksonville,Jacksonville,US,America/New_York,30.33218,-81.65565
+Jaipur,Jaipur,IN,Asia/Kolkata,26.91962,75.78781
+Jakarta,Jakarta,ID,Asia/Jakarta,-6.21462,106.84513
+Jamestown,Jamestown,SH,Atlantic/St_Helena,-15.92488,-5.71816
+Jamshedpur,Jamshedpur,IN,Asia/Kolkata,22.80278,86.18545
+Jeddah,Jeddah,SA,Asia/Riyadh,21.49012,39.18624
+Jepara,Jepara,ID,Asia/Jakarta,-6.5924,110.671
+Jiading,Jiading,CN,Asia/Shanghai,31.38575,121.24465
+Jiangmen,Jiangmen,CN,Asia/Shanghai,22.58333,113.08333
+Jiangyin,Jiangyin,CN,Asia/Shanghai,31.91102,120.26302
+Jiaxing,Jiaxing,CN,Asia/Shanghai,30.7522,120.75
+Jieyang,Jieyang,CN,Asia/Shanghai,23.5418,116.36581
+Jilin,Jilin,CN,Asia/Shanghai,43.84652,126.5608
+Jinan,Jinan,CN,Asia/Shanghai,36.66833,116.99722
+Jingzhou,Jingzhou,CN,Asia/Shanghai,30.35028,112.19028
+Jinhua,Jinhua,CN,Asia/Shanghai,29.10678,119.64421
+Jining,Jining,CN,Asia/Shanghai,35.405,116.58139
+Jinjiang,Jinjiang,CN,Asia/Shanghai,24.81978,118.57415
+Jinzhong,Jinzhong,CN,Asia/Shanghai,37.68403,112.75471
+Jinzhou,Jinzhou,CN,Asia/Shanghai,41.10778,121.14167
+Jiujiang,Jiujiang,CN,Asia/Shanghai,29.70475,116.00206
+Jodhpur,Jodhpur,IN,Asia/Kolkata,26.26841,73.00594
+Johannesburg,Johannesburg,ZA,Africa/Johannesburg,-26.20227,28.04363
+Jos,Jos,NG,Africa/Lagos,9.92849,8.89212
+Juba,Juba,SS,Africa/Juba,4.85165,31.58247
+Kabul,Kabul,AF,Asia/Kabul,34.52813,69.17233
+Kaduna,Kaduna,NG,Africa/Lagos,10.52641,7.43879
+Kaifeng,Kaifeng,CN,Asia/Shanghai,34.7986,114.30742
+Kakamega,Kakamega,KE,Africa/Nairobi,0.28422,34.75229
+Kallakurichi,Kallakurichi,IN,Asia/Kolkata,11.73379,78.95925
+Kalyān,Kalyan,IN,Asia/Kolkata,19.2437,73.13554
+Kampala,Kampala,UG,Africa/Kampala,0.31628,32.58219
+Kananga,Kananga,CD,Africa/Lubumbashi,-5.89624,22.41659
+Kano,Kano,NG,Africa/Lagos,12.00012,8.51672
+Kanpur,Kanpur,IN,Asia/Kolkata,26.46523,80.34975
+Kaohsiung,Kaohsiung,TW,Asia/Taipei,22.61626,120.31333
+Karachi,Karachi,PK,Asia/Karachi,24.8608,67.0104
+Karaj,Karaj,IR,Asia/Tehran,35.83266,50.99155
+Karbala,Karbala,IQ,Asia/Baghdad,32.61603,44.02488
+Kathmandu,Kathmandu,NP,Asia/Kathmandu,27.70169,85.3206
+Kawasaki,Kawasaki,JP,Asia/Tokyo,35.52056,139.71722
+Kayseri,Kayseri,TR,Europe/Istanbul,38.73222,35.48528
+Kazan,Kazan,RU,Europe/Moscow,55.78874,49.12214
+Kharkiv,Kharkiv,UA,Europe/Kyiv,49.98177,36.25475
+Khartoum,Khartoum,SD,Africa/Khartoum,15.55177,32.53241
+Khartoum North,Khartoum North,SD,Africa/Khartoum,15.64925,32.53458
+Khulna,Khulna,BD,Asia/Dhaka,22.80979,89.56439
+Kigali,Kigali,RW,Africa/Kigali,-1.94995,30.05885
+Kingston,Kingston,JM,America/Jamaica,17.99702,-76.79358
+Kingston,Kingston,NF,Pacific/Norfolk,-29.05459,167.96628
+Kingstown,Kingstown,VC,America/St_Vincent,13.15527,-61.22742
+Kinshasa,Kinshasa,CD,Africa/Kinshasa,-4.32758,15.31357
+Kirkuk,Kirkuk,IQ,Asia/Baghdad,35.46806,44.39222
+Kisangani,Kisangani,CD,Africa/Lubumbashi,0.51528,25.19099
+Kobe,Kobe,JP,Asia/Tokyo,34.6913,135.183
+Köln,Koeln,DE,Europe/Berlin,50.93333,6.95
+Kolkata,Kolkata,IN,Asia/Kolkata,22.56263,88.36304
+Konya,Konya,TR,Europe/Istanbul,37.87135,32.48464
+Kota,Kota,IN,Asia/Kolkata,25.18254,75.83907
+Kowloon,Kowloon,HK,Asia/Hong_Kong,22.31667,114.18333
+Kralendijk,Kralendijk,BQ,America/Kralendijk,12.15,-68.26667
+Krasnoyarsk,Krasnoyarsk,RU,Asia/Krasnoyarsk,56.03742,92.93136
+Kuala Lumpur,Kuala Lumpur,MY,Asia/Kuala_Lumpur,3.1412,101.68653
+Kumasi,Kumasi,GH,Africa/Accra,6.68848,-1.62443
+Kunming,Kunming,CN,Asia/Shanghai,25.03889,102.71833
+Kunshan,Kunshan,CN,Asia/Shanghai,31.37762,120.95431
+Kuwait City,Kuwait City,KW,Asia/Kuwait,29.367,47.97429
+Kyiv,Kyiv,UA,Europe/Kyiv,50.45466,30.5238
+Kyoto,Kyoto,JP,Asia/Tokyo,35.02107,135.75385
+La Paz,La Paz,BO,America/La_Paz,-16.5,-68.15
+Lagos,Lagos,NG,Africa/Lagos,6.45407,3.39467
+Lahore,Lahore,PK,Asia/Karachi,31.558,74.35071
+Lanzhou,Lanzhou,CN,Asia/Shanghai,36.05701,103.83987
+León de los Aldama,Leon de los Aldama,MX,America/Mexico_City,21.12183,-101.68253
+Lianjiang,Lianjiang,CN,Asia/Shanghai,21.64673,110.28172
+Lianyungang,Lianyungang,CN,Asia/Shanghai,34.59845,119.21556
+Liaocheng,Liaocheng,CN,Asia/Shanghai,36.45064,116.00247
+Libreville,Libreville,GA,Africa/Libreville,0.39241,9.45356
+Lilongwe,Lilongwe,MW,Africa/Blantyre,-13.96692,33.78725
+Lima,Lima,PE,America/Lima,-12.04318,-77.02824
+Linyi,Linyi,CN,Asia/Shanghai,35.06306,118.34278
+Lisbon,Lisbon,PT,Europe/Lisbon,38.72509,-9.1498
+Liupanshui,Liupanshui,CN,Asia/Shanghai,26.59444,104.83333
+Liuzhou,Liuzhou,CN,Asia/Shanghai,24.32405,109.40698
+Ljubljana,Ljubljana,SI,Europe/Ljubljana,46.05108,14.50513
+Lomé,Lome,TG,Africa/Lome,6.12874,1.22154
+London,London,GB,Europe/London,51.50853,-0.12574
+Longyan,Longyan,CN,Asia/Shanghai,25.07485,117.01775
+Longyearbyen,Longyearbyen,SJ,Arctic/Longyearbyen,78.22334,15.64689
+Los Angeles,Los Angeles,US,America/Los_Angeles,34.05223,-118.24368
+Lu’an,Lu'an,CN,Asia/Shanghai,31.73561,116.51688
+Luanda,Luanda,AO,Africa/Luanda,-8.83682,13.23432
+Lubumbashi,Lubumbashi,CD,Africa/Lubumbashi,-11.66089,27.47938
+Lucknow,Lucknow,IN,Asia/Kolkata,26.83928,80.92313
+Ludhiana,Ludhiana,IN,Asia/Kolkata,30.91204,75.85379
+Lüliang,Lueliang,CN,Asia/Shanghai,37.5192,111.14436
+Luohe,Luohe,CN,Asia/Shanghai,33.57424,114.03261
+Luohu District,Luohu District,CN,Asia/Shanghai,22.54721,114.13149
+Luoyang,Luoyang,CN,Asia/Shanghai,34.67345,112.43684
+Lusaka,Lusaka,ZM,Africa/Lusaka,-15.40669,28.28713
+Luxembourg,Luxembourg,LU,Europe/Luxembourg,49.60982,6.13268
+Macau,Macau,MO,Asia/Macau,22.20056,113.54611
+Maceió,Maceio,BR,America/Maceio,-9.66583,-35.73528
+Madinah,Madinah,SA,Asia/Riyadh,24.46861,39.61417
+Madrid,Madrid,ES,Europe/Madrid,40.4165,-3.70256
+Madurai,Madurai,IN,Asia/Kolkata,9.919,78.11953
+Maiduguri,Maiduguri,NG,Africa/Lagos,11.84692,13.15712
+Majuro,Majuro,MH,Pacific/Majuro,7.08971,171.38027
+Makassar,Makassar,ID,Asia/Makassar,-5.14861,119.43194
+Makkah,Makkah,SA,Asia/Riyadh,21.42664,39.82563
+Male,Male,MV,Indian/Maldives,4.17521,73.50916
+Malingao,Malingao,PH,Asia/Manila,7.16083,124.475
+Mamoudzou,Mamoudzou,YT,Indian/Mayotte,-12.78234,45.22878
+Managua,Managua,NI,America/Managua,12.13282,-86.2504
+Manama,Manama,BH,Asia/Bahrain,26.22787,50.58565
+Manaus,Manaus,BR,America/Manaus,-3.10194,-60.025
+Mandalay,Mandalay,MM,Asia/Yangon,21.97473,96.08359
+Manhattan,Manhattan,US,America/New_York,40.78343,-73.96625
+Manila,Manila,PH,Asia/Manila,14.6042,120.9822
+Maoming,Maoming,CN,Asia/Shanghai,21.66625,110.91364
+Maputo,Maputo,MZ,Africa/Maputo,-25.96553,32.58322
+Maracaibo,Maracaibo,VE,America/Caracas,10.64232,-71.61089
+Mariehamn,Mariehamn,AX,Europe/Mariehamn,60.09726,19.93481
+Marigot,Marigot,MF,America/Marigot,18.06819,-63.08302
+Maseru,Maseru,LS,Africa/Maseru,-29.31667,27.48333
+Mashhad,Mashhad,IR,Asia/Tehran,36.29807,59.60567
+Mata-Utu,Mata-Utu,WF,Pacific/Wallis,-13.28163,-176.17453
+Matola,Matola,MZ,Africa/Maputo,-25.96222,32.45889
+Mbabane,Mbabane,SZ,Africa/Mbabane,-26.31667,31.13333
+Mbuji-Mayi,Mbuji-Mayi,CD,Africa/Lubumbashi,-6.13603,23.58979
+Medan,Medan,ID,Asia/Jakarta,3.58333,98.66667
+Medellín,Medellin,CO,America/Bogota,6.245,-75.57151
+Meerut,Meerut,IN,Asia/Kolkata,28.98002,77.70636
+Meishan,Meishan,CN,Asia/Shanghai,30.04392,103.83696
+Melbourne,Melbourne,AU,Australia/Melbourne,-37.814,144.96332
+Mérida,Merida,MX,America/Merida,20.967,-89.62318
+Mexicali,Mexicali,MX,America/Tijuana,32.62781,-115.45446
+Mexico City,Mexico City,MX,America/Mexico_City,19.42847,-99.12766
+Mianyang,Mianyang,CN,Asia/Shanghai,31.46784,104.68168
+Milan,Milan,IT,Europe/Rome,45.46427,9.18951
+Minhang,Minhang,CN,Asia/Shanghai,31.10881,121.37471
+Minsk,Minsk,BY,Europe/Minsk,53.90019,27.56653
+Mogadishu,Mogadishu,SO,Africa/Mogadishu,2.03711,45.34375
+Mombasa,Mombasa,KE,Africa/Nairobi,-4.05466,39.66359
+Monaco,Monaco,MC,Europe/Monaco,43.73718,7.42145
+Monrovia,Monrovia,LR,Africa/Monrovia,6.30054,-10.7969
+Monterrey,Monterrey,MX,America/Monterrey,25.68435,-100.31721
+Montevideo,Montevideo,UY,America/Montevideo,-34.90328,-56.18816
+Montréal,Montreal,CA,America/Toronto,45.50884,-73.58781
+Moroni,Moroni,KM,Indian/Comoro,-11.70216,43.25506
+Moscow,Moscow,RU,Europe/Moscow,55.75204,37.61781
+Mosul,Mosul,IQ,Asia/Baghdad,36.335,43.11889
+Multan,Multan,PK,Asia/Karachi,30.19679,71.47824
+Mumbai,Mumbai,IN,Asia/Kolkata,19.07283,72.88261
+Munich,Munich,DE,Europe/Berlin,48.13743,11.57549
+Muscat,Muscat,OM,Asia/Muscat,23.58413,58.40778
+Mwanza,Mwanza,TZ,Africa/Dar_es_Salaam,-2.51667,32.9
+N'Djamena,N'Djamena,TD,Africa/Ndjamena,12.10672,15.0444
+Nagoya,Nagoya,JP,Asia/Tokyo,35.18147,136.90641
+Nagpur,Nagpur,IN,Asia/Kolkata,21.14631,79.08491
+Nairobi,Nairobi,KE,Africa/Nairobi,-1.28333,36.81667
+Najafgarh,Najafgarh,IN,Asia/Kolkata,28.60922,76.97982
+Nanchang,Nanchang,CN,Asia/Shanghai,28.68396,115.85306
+Nanchong,Nanchong,CN,Asia/Shanghai,30.79508,106.08473
+Nanhai,Nanhai,CN,Asia/Shanghai,23.02193,113.14278
+Nanjing,Nanjing,CN,Asia/Shanghai,32.06167,118.77778
+Nanning,Nanning,CN,Asia/Shanghai,22.81667,108.31667
+Nantong,Nantong,CN,Asia/Shanghai,32.03028,120.87472
+Nanyang,Nanyang,CN,Asia/Shanghai,33.00524,112.54659
+Nashik,Nashik,IN,Asia/Kolkata,19.99727,73.79096
+Nassau,Nassau,BS,America/Nassau,25.05823,-77.34306
+Navi Mumbai,Navi Mumbai,IN,Asia/Kolkata,19.03681,73.01582
+Nay Pyi Taw,Nay Pyi Taw,MM,Asia/Yangon,19.745,96.12972
+Neijiang,Neijiang,CN,Asia/Shanghai,29.58354,105.06216
+New Delhi,New Delhi,IN,Asia/Kolkata,28.62137,77.2148
+New Taipei City,New Taipei City,TW,Asia/Taipei,25.06199,121.45703
+New Territories,New Territories,HK,Asia/Hong_Kong,22.42441,114.11095
+New York City,New York City,US,America/New_York,40.71427,-74.00597
+Ngerulmud,Ngerulmud,PW,Pacific/Palau,7.50077,134.6238
+Niamey,Niamey,NE,Africa/Niamey,13.51366,2.1098
+Nicosia,Nicosia,CY,Asia/Nicosia,35.17284,33.35397
+Ningbo,Ningbo,CN,Asia/Shanghai,29.87819,121.54945
+Nizhniy Novgorod,Nizhniy Novgorod,RU,Europe/Moscow,56.32867,44.00205
+Nouakchott,Nouakchott,MR,Africa/Nouakchott,18.08581,-15.9785
+Nouméa,Noumea,NC,Pacific/Noumea,-22.27407,166.44884
+Novosibirsk,Novosibirsk,RU,Asia/Novosibirsk,55.02259,82.93175
+Nowrangapur,Nowrangapur,IN,Asia/Kolkata,19.23114,82.54826
+Nuku‘alofa,Nuku'alofa,TO,Pacific/Tongatapu,-21.13683,-175.20114
+Nuuk,Nuuk,GL,America/Nuuk,64.18347,-51.72157
+Odesa,Odesa,UA,Europe/Kyiv,46.48572,30.74383
+Omdurman,Omdurman,SD,Africa/Khartoum,15.64453,32.47773
+Omsk,Omsk,RU,Asia/Omsk,54.99244,73.36859
+Onitsha,Onitsha,NG,Africa/Lagos,6.14978,6.78569
+Oranjestad,Oranjestad,AW,America/Aruba,12.52398,-70.02703
+Ordos,Ordos,CN,Asia/Shanghai,39.6086,109.78157
+Osaka,Osaka,JP,Asia/Tokyo,34.69379,135.50107
+Oslo,Oslo,NO,Europe/Oslo,59.91273,10.74609
+Ottawa,Ottawa,CA,America/Toronto,45.41117,-75.69812
+Ouagadougou,Ouagadougou,BF,Africa/Ouagadougou,12.36566,-1.53388
+Pago Pago,Pago Pago,AS,Pacific/Pago_Pago,-14.27806,-170.7025
+Palembang,Palembang,ID,Asia/Jakarta,-2.91673,104.7458
+Palikir,Palikir,FM,Pacific/Pohnpei,6.92477,158.16109
+Panama City,Panama City,PA,America/Panama,8.9936,-79.51973
+Panjin,Panjin,CN,Asia/Shanghai,41.121,122.0739
+Papeete,Papeete,PF,Pacific/Tahiti,-17.5347,-149.56843
+Paramaribo,Paramaribo,SR,America/Paramaribo,5.86638,-55.16682
+Paris,Paris,FR,Europe/Paris,48.85341,2.3488
+Patna,Patna,IN,Asia/Kolkata,25.59408,85.13563
+Pekanbaru,Pekanbaru,ID,Asia/Jakarta,0.51667,101.44167
+Perth,Perth,AU,Australia/Perth,-31.95224,115.8614
+Peshawar,Peshawar,PK,Asia/Karachi,34.008,71.57849
+Pest,Pest,HU,Europe/Budapest,47.5,19.08333
+Philadelphia,Philadelphia,US,America/New_York,39.95238,-75.16362
+Philipsburg,Philipsburg,SX,America/Lower_Princes,18.026,-63.04582
+Phnom Penh,Phnom Penh,KH,Asia/Phnom_Penh,11.56245,104.91601
+Phoenix,Phoenix,US,America/Phoenix,33.44838,-112.07404
+Pikine,Pikine,SN,Africa/Dakar,14.76457,-17.39071
+Pimpri,Pimpri,IN,Asia/Kolkata,18.62292,73.80696
+Pimpri-Chinchwad,Pimpri-Chinchwad,IN,Asia/Kolkata,18.61867,73.80375
+Plymouth,Plymouth,MS,America/Montserrat,16.70555,-62.21292
+Podgorica,Podgorica,ME,Europe/Podgorica,42.44124,19.26309
+Pointe-Noire,Pointe-Noire,CG,Africa/Brazzaville,-4.77609,11.86352
+Port Harcourt,Port Harcourt,NG,Africa/Lagos,4.77742,7.0134
+Port Louis,Port Louis,MU,Indian/Mauritius,-20.16194,57.49889
+Port Moresby,Port Moresby,PG,Pacific/Port_Moresby,-9.47723,147.15089
+Port of Spain,Port of Spain,TT,America/Port_of_Spain,10.66668,-61.51889
+Port-au-Prince,Port-au-Prince,HT,America/Port-au-Prince,18.54349,-72.33881
+Port-aux-Français,Port-aux-Francais,TF,Indian/Kerguelen,-49.34916,70.21937
+Port-Vila,Port-Vila,VU,Pacific/Efate,-17.73648,168.31366
+Porto Alegre,Porto Alegre,BR,America/Sao_Paulo,-30.03283,-51.23019
+Porto-Novo,Porto-Novo,BJ,Africa/Porto-Novo,6.49646,2.60359
+Prague,Prague,CZ,Europe/Prague,50.08804,14.42076
+Praia,Praia,CV,Atlantic/Cape_Verde,14.93152,-23.51254
+Prayagraj,Prayagraj,IN,Asia/Kolkata,25.44478,81.84322
+Pretoria,Pretoria,ZA,Africa/Johannesburg,-25.74486,28.18783
+Pristina,Pristina,XK,Europe/Belgrade,42.67272,21.16688
+Pudong,Pudong,CN,Asia/Shanghai,31.23995,121.50094
+Puebla,Puebla,MX,America/Mexico_City,19.04778,-98.20723
+Pune,Pune,IN,Asia/Kolkata,18.51957,73.85535
+Puning,Puning,CN,Asia/Shanghai,23.31072,116.16869
+Putian,Putian,CN,Asia/Shanghai,25.43944,119.01028
+Putuo,Putuo,CN,Asia/Shanghai,31.251,121.3897
+Puxi,Puxi,CN,Asia/Shanghai,31.24414,121.46592
+Puyang,Puyang,CN,Asia/Shanghai,29.45679,119.88872
+Pyongyang,Pyongyang,KP,Asia/Pyongyang,39.03385,125.75432
+Qingdao,Qingdao,CN,Asia/Shanghai,36.06488,120.38042
+Qingpu,Qingpu,CN,Asia/Shanghai,31.15394,121.11408
+Qingyang,Qingyang,CN,Asia/Shanghai,35.70976,107.64455
+Qingyuan,Qingyuan,CN,Asia/Shanghai,23.7,113.03333
+Qinzhou,Qinzhou,CN,Asia/Shanghai,21.98247,108.65061
+Quanzhou,Quanzhou,CN,Asia/Shanghai,24.91389,118.58583
+Queens,Queens,US,America/New_York,40.68149,-73.83652
+Quetta,Quetta,PK,Asia/Karachi,30.18414,67.00141
+Quezon City,Quezon City,PH,Asia/Manila,14.6488,121.0509
+Quito,Quito,EC,America/Guayaquil,-0.22985,-78.52495
+Qujing,Qujing,CN,Asia/Shanghai,25.48333,103.78333
+Ra’s Bayrūt,Ra's Bayrut,LB,Asia/Beirut,33.9,35.48333
+Rabat,Rabat,MA,Africa/Casablanca,34.01325,-6.83255
+Raipur,Raipur,IN,Asia/Kolkata,21.23333,81.63333
+Rājkot,Rajkot,IN,Asia/Kolkata,22.29161,70.79322
+Ranchi,Ranchi,IN,Asia/Kolkata,23.34316,85.3094
+Rangpur,Rangpur,BD,Asia/Dhaka,25.74664,89.25166
+Rasapūdipalem,Rasapudipalem,IN,Asia/Kolkata,17.73308,83.31622
+Rawalpindi,Rawalpindi,PK,Asia/Karachi,33.59733,73.0479
+Recife,Recife,BR,America/Recife,-8.05389,-34.88111
+Reykjavík,Reykjavik,IS,Atlantic/Reykjavik,64.13548,-21.89541
+Riga,Riga,LV,Europe/Riga,56.946,24.10589
+Rio de Janeiro,Rio de Janeiro,BR,America/Sao_Paulo,-22.90642,-43.18223
+Riyadh,Riyadh,SA,Asia/Riyadh,24.68773,46.72185
+Road Town,Road Town,VG,America/Tortola,18.42693,-64.62079
+Rome,Rome,IT,Europe/Rome,41.89193,12.51133
+Roseau,Roseau,DM,America/Dominica,15.30174,-61.38808
+Rostov-on-Don,Rostov-on-Don,RU,Europe/Moscow,47.21997,39.70769
+Rui’an,Rui'an,CN,Asia/Shanghai,27.77605,120.65859
+Sadr City,Sadr City,IQ,Asia/Baghdad,33.3889,44.4583
+Saint George's,Saint George's,GD,America/Grenada,12.05288,-61.75226
+Saint Helier,Saint Helier,JE,Europe/Jersey,49.18804,-2.10491
+Saint John’s,Saint John's,AG,America/Antigua,17.12096,-61.84329
+Saint Peter Port,Saint Peter Port,GG,Europe/Guernsey,49.45981,-2.53527
+Saint Petersburg,Saint Petersburg,RU,Europe/Moscow,59.93863,30.31413
+Saint-Denis,Saint-Denis,RE,Indian/Reunion,-20.88231,55.4504
+Saint-Pierre,Saint-Pierre,PM,America/Miquelon,46.77914,-56.1773
+Saipan,Saipan,MP,Pacific/Saipan,15.21233,145.7545
+Saitama,Saitama,JP,Asia/Tokyo,35.90807,139.65657
+Salvador,Salvador,BR,America/Bahia,-12.97563,-38.49096
+Samara,Samara,RU,Europe/Samara,53.20767,50.13553
+San Antonio,San Antonio,US,America/Chicago,29.42412,-98.49363
+San Diego,San Diego,US,America/Los_Angeles,32.71571,-117.16472
+San José,San Jose,CR,America/Costa_Rica,9.93388,-84.08489
+San Juan,San Juan,PR,America/Puerto_Rico,18.46633,-66.10572
+San Marino,San Marino,SM,Europe/San_Marino,43.93667,12.44639
+San Salvador,San Salvador,SV,America/El_Salvador,13.68935,-89.18718
+Sanaa,Sanaa,YE,Asia/Aden,15.35452,44.20646
+Santa Cruz de la Sierra,Santa Cruz de la Sierra,BO,America/La_Paz,-17.78629,-63.18117
+Santiago,Santiago,CL,America/Santiago,-33.45694,-70.64827
+Santiago de los Caballeros,Santiago de los Caballeros,DO,America/Santo_Domingo,19.45036,-70.69085
+Santiago de Querétaro,Santiago de Queretaro,MX,America/Mexico_City,20.58806,-100.38806
+Santo Domingo,Santo Domingo,DO,America/Santo_Domingo,18.47186,-69.89232
+Sanya,Sanya,CN,Asia/Shanghai,18.25435,109.50947
+São Paulo,Sao Paulo,BR,America/Sao_Paulo,-23.5475,-46.63611
+São Tomé,Sao Tome,ST,Africa/Sao_Tome,0.33756,6.7299
+Sapporo,Sapporo,JP,Asia/Tokyo,43.06667,141.35
+Sarajevo,Sarajevo,BA,Europe/Sarajevo,43.84864,18.35644
+Semarang,Semarang,ID,Asia/Jakarta,-6.99306,110.42083
+Sendai,Sendai,JP,Asia/Tokyo,38.26667,140.86667
+Seoul,Seoul,KR,Asia/Seoul,37.566,126.9784
+Shanghai,Shanghai,CN,Asia/Shanghai,31.22222,121.45806
+Shangqiu,Shangqiu,CN,Asia/Shanghai,34.4143,115.65613
+Shangrao,Shangrao,CN,Asia/Shanghai,28.45179,117.94287
+Shantou,Shantou,CN,Asia/Shanghai,23.35489,116.67876
+Shaoguan,Shaoguan,CN,Asia/Shanghai,24.8,113.58333
+Shaoxing,Shaoxing,CN,Asia/Shanghai,30.00237,120.57864
+Sharjah,Sharjah,AE,Asia/Dubai,25.3342,55.41221
+Shenyang,Shenyang,CN,Asia/Shanghai,41.79222,123.43278
+Shenzhen,Shenzhen,CN,Asia/Shanghai,22.54554,114.0683
+Shijiazhuang,Shijiazhuang,CN,Asia/Shanghai,38.04139,114.47861
+Shiraz,Shiraz,IR,Asia/Tehran,29.61031,52.53113
+Shivaji Nagar,Shivaji Nagar,IN,Asia/Kolkata,18.53017,73.85263
+Shiyan,Shiyan,CN,Asia/Shanghai,32.6475,110.77806
+Shubrā al Khaymah,Shubra al Khaymah,EG,Africa/Cairo,30.12511,31.25053
+Shymkent,Shymkent,KZ,Asia/Almaty,42.30988,69.60042
+Singapore,Singapore,SG,Asia/Singapore,1.28967,103.85007
+Skopje,Skopje,MK,Europe/Skopje,41.99646,21.43141
+Sofia,Sofia,BG,Europe/Sofia,42.69751,23.32415
+Sokoto,Sokoto,NG,Africa/Lagos,13.06269,5.24322
+Songjiang,Songjiang,CN,Asia/Shanghai,31.03443,121.22326
+South Tangerang,South Tangerang,ID,Asia/Jakarta,-6.28862,106.71789
+Soweto,Soweto,ZA,Africa/Johannesburg,-26.26781,27.85849
+Srinagar,Srinagar,IN,Asia/Kolkata,34.08565,74.80555
+Stanley,Stanley,FK,Atlantic/Stanley,-51.69382,-57.85701
+Stockholm,Stockholm,SE,Europe/Stockholm,59.32938,18.06871
+Sucre,Sucre,BO,America/La_Paz,-19.03332,-65.26274
+Suqian,Suqian,CN,Asia/Shanghai,33.94917,118.29583
+Surabaya,Surabaya,ID,Asia/Jakarta,-7.24917,112.75083
+Surat,Surat,IN,Asia/Kolkata,21.19594,72.83023
+Suva,Suva,FJ,Pacific/Fiji,-18.13683,178.42531
+Suwon,Suwon,KR,Asia/Seoul,37.27818,127.03164
+Suzhou,Suzhou,CN,Asia/Shanghai,31.30408,120.59538
+Sydney,Sydney,AU,Australia/Sydney,-33.86785,151.20732
+Tabriz,Tabriz,IR,Asia/Tehran,38.08,46.2919
+Taguig,Taguig,PH,Asia/Manila,14.5243,121.0792
+Tai’an,Tai'an,CN,Asia/Shanghai,36.18528,117.12
+Taichung,Taichung,TW,Asia/Taipei,24.1469,120.6839
+Tainan,Tainan,TW,Asia/Taipei,22.99259,120.20507
+Taipei,Taipei,TW,Asia/Taipei,25.05306,121.52639
+Taiyuan,Taiyuan,CN,Asia/Shanghai,37.86944,112.56028
+Taizhou,Taizhou,CN,Asia/Shanghai,32.49069,119.90812
+Tallinn,Tallinn,EE,Europe/Tallinn,59.43696,24.75353
+Tangerang,Tangerang,ID,Asia/Jakarta,-6.17806,106.63
+Tangier,Tangier,MA,Africa/Casablanca,35.76727,-5.79975
+Tangshan,Tangshan,CN,Asia/Shanghai,39.64381,118.18319
+Tarawa,Tarawa,KI,Pacific/Tarawa,1.3278,172.97696
+Tashkent,Tashkent,UZ,Asia/Tashkent,41.26465,69.21627
+Tbilisi,Tbilisi,GE,Asia/Tbilisi,41.69143,44.83412
+Tegucigalpa,Tegucigalpa,HN,America/Tegucigalpa,14.0818,-87.20681
+Tehran,Tehran,IR,Asia/Tehran,35.69439,51.42151
+Teni,Teni,IN,Asia/Kolkata,10.01115,77.47772
+Thāne,Thane,IN,Asia/Kolkata,19.19704,72.96355
+The Bronx,The Bronx,US,America/New_York,40.84985,-73.86641
+The Valley,The Valley,AI,America/Anguilla,18.21704,-63.05783
+Thimphu,Thimphu,BT,Asia/Thimphu,27.46609,89.64191
+Tianjin,Tianjin,CN,Asia/Shanghai,39.14222,117.17667
+Tianshui,Tianshui,CN,Asia/Shanghai,34.57952,105.74238
+Tijuana,Tijuana,MX,America/Tijuana,32.5027,-117.00371
+Tirana,Tirana,AL,Europe/Tirane,41.32744,19.81866
+Tiruchirappalli,Tiruchirappalli,IN,Asia/Kolkata,10.8155,78.69651
+Tirunelveli,Tirunelveli,IN,Asia/Kolkata,8.72742,77.6838
+Tokyo,Tokyo,JP,Asia/Tokyo,35.6895,139.69171
+Toronto,Toronto,CA,America/Toronto,43.70643,-79.39864
+Tórshavn,Torshavn,FO,Atlantic/Faroe,62.00973,-6.77164
+Touba,Touba,SN,Africa/Dakar,14.86229,-15.87532
+Tripoli,Tripoli,LY,Africa/Tripoli,32.88743,13.18733
+Trujillo,Trujillo,PE,America/Lima,-8.11599,-79.02998
+Tunis,Tunis,TN,Africa/Tunis,36.81897,10.16579
+Ürümqi,UEruemqi,CN,Asia/Urumqi,43.80096,87.60046
+Ufa,Ufa,RU,Asia/Yekaterinburg,54.74306,55.96779
+Ulan Bator,Ulan Bator,MN,Asia/Ulaanbaatar,47.90771,106.88324
+Ulsan,Ulsan,KR,Asia/Seoul,35.53917,129.31239
+Vadodara,Vadodara,IN,Asia/Kolkata,22.29941,73.20812
+Vaduz,Vaduz,LI,Europe/Vaduz,47.14151,9.52154
+Valencia,Valencia,VE,America/Caracas,10.16153,-68.00044
+Valletta,Valletta,MT,Europe/Malta,35.89968,14.5148
+Varanasi,Varanasi,IN,Asia/Kolkata,25.31668,83.01041
+Vatican City,Vatican City,VA,Europe/Vatican,41.90268,12.45414
+Victoria,Victoria,SC,Indian/Mahe,-4.62001,55.45501
+Vienna,Vienna,AT,Europe/Vienna,48.20849,16.37208
+Vientiane,Vientiane,LA,Asia/Vientiane,17.96667,102.6
+Vijayawada,Vijayawada,IN,Asia/Kolkata,16.50745,80.6466
+Vilnius,Vilnius,LT,Europe/Vilnius,54.68916,25.2798
+Virār,Virar,IN,Asia/Kolkata,19.45591,72.81136
+Visakhapatnam,Visakhapatnam,IN,Asia/Kolkata,17.68009,83.20161
+Volgograd,Volgograd,RU,Europe/Volgograd,48.71378,44.4976
+Voronezh,Voronezh,RU,Europe/Moscow,51.66833,39.19204
+Wanzhou,Wanzhou,CN,Asia/Shanghai,30.76451,108.39586
+Warsaw,Warsaw,PL,Europe/Warsaw,52.22977,21.01178
+Washington,Washington,US,America/New_York,38.89511,-77.03637
+Weifang,Weifang,CN,Asia/Shanghai,36.71,119.10194
+Weinan,Weinan,CN,Asia/Shanghai,34.50355,109.50891
+Wellington,Wellington,NZ,Pacific/Auckland,-41.28664,174.77557
+Wenzhou,Wenzhou,CN,Asia/Shanghai,27.99942,120.66682
+West Island,West Island,CC,Indian/Cocos,-12.15681,96.82251
+Willemstad,Willemstad,CW,America/Curacao,12.12246,-68.88641
+Windhoek,Windhoek,NA,Africa/Windhoek,-22.55941,17.08323
+Wuchang,Wuchang,CN,Asia/Shanghai,30.54314,114.30068
+Wuhan,Wuhan,CN,Asia/Shanghai,30.58333,114.26667
+Wuhu,Wuhu,CN,Asia/Shanghai,31.35259,118.42947
+Wuwei,Wuwei,CN,Asia/Shanghai,37.92672,102.63202
+Wuxi,Wuxi,CN,Asia/Shanghai,31.56887,120.28857
+Wuzhong,Wuzhong,CN,Asia/Shanghai,37.9867,106.201
+Xi’an,Xi'an,CN,Asia/Shanghai,34.25833,108.92861
+Xiamen,Xiamen,CN,Asia/Shanghai,24.47979,118.08187
+Xiangyang,Xiangyang,CN,Asia/Shanghai,32.0422,112.14479
+Xianyang,Xianyang,CN,Asia/Shanghai,34.33778,108.70261
+Xining,Xining,CN,Asia/Shanghai,36.62554,101.75739
+Xinxiang,Xinxiang,CN,Asia/Shanghai,35.19033,113.80151
+Xinyang,Xinyang,CN,Asia/Shanghai,32.12278,114.06556
+Xinyi,Xinyi,CN,Asia/Shanghai,22.37303,110.94746
+Xuchang,Xuchang,CN,Asia/Shanghai,34.03189,113.86299
+Xuhui,Xuhui,CN,Asia/Shanghai,31.19594,121.44709
+Xuzhou,Xuzhou,CN,Asia/Shanghai,34.20442,117.28386
+Yamoussoukro,Yamoussoukro,CI,Africa/Abidjan,6.82055,-5.27674
+Yancheng,Yancheng,CN,Asia/Shanghai,33.3575,120.1573
+Yangjiang,Yangjiang,CN,Asia/Shanghai,21.85563,111.96272
+Yangon,Yangon,MM,Asia/Yangon,16.80528,96.15611
+Yangpu,Yangpu,CN,Asia/Shanghai,31.26193,121.51904
+Yangzhou,Yangzhou,CN,Asia/Shanghai,32.39722,119.43583
+Yantai,Yantai,CN,Asia/Shanghai,37.47649,121.44081
+Yaoundé,Yaounde,CM,Africa/Douala,3.86667,11.51667
+Yaren,Yaren,NR,Pacific/Nauru,-0.55085,166.9252
+Yekaterinburg,Yekaterinburg,RU,Asia/Yekaterinburg,56.85733,60.61529
+Yerevan,Yerevan,AM,Asia/Yerevan,40.17765,44.5126
+Yichang,Yichang,CN,Asia/Shanghai,30.71444,111.28472
+Yichun,Yichun,CN,Asia/Shanghai,27.83333,114.4
+Yinchuan,Yinchuan,CN,Asia/Shanghai,38.46806,106.27306
+Yishui,Yishui,CN,Asia/Shanghai,35.78472,118.62806
+Yiwu,Yiwu,CN,Asia/Shanghai,29.31506,120.07676
+Yixing,Yixing,CN,Asia/Shanghai,31.36059,119.82016
+Yokohama,Yokohama,JP,Asia/Tokyo,35.43333,139.65
+Yongzhou,Yongzhou,CN,Asia/Shanghai,26.42389,111.61306
+Yulin,Yulin,CN,Asia/Shanghai,22.6305,110.14686
+Yunfu,Yunfu,CN,Asia/Shanghai,22.92787,112.03809
+Zagreb,Zagreb,HR,Europe/Zagreb,45.81444,15.97798
+Zamboanga,Zamboanga,PH,Asia/Manila,6.91028,122.07389
+Zaozhuang,Zaozhuang,CN,Asia/Shanghai,34.86472,117.55417
+Zapopan,Zapopan,MX,America/Mexico_City,20.72111,-103.38742
+Zhangjiagang,Zhangjiagang,CN,Asia/Shanghai,31.865,120.53889
+Zhanjiang,Zhanjiang,CN,Asia/Shanghai,21.23391,110.38749
+Zhaoqing,Zhaoqing,CN,Asia/Shanghai,23.04893,112.46091
+Zhengzhou,Zhengzhou,CN,Asia/Shanghai,34.75778,113.64861
+Zhongshan,Zhongshan,CN,Asia/Shanghai,22.52306,113.37912
+Zhongwei,Zhongwei,CN,Asia/Shanghai,37.51129,105.19067
+Zhu Cheng City,Zhu Cheng City,CN,Asia/Shanghai,35.99502,119.40259
+Zhuhai,Zhuhai,CN,Asia/Shanghai,22.27694,113.56778
+Zhuzhou,Zhuzhou,CN,Asia/Shanghai,27.83333,113.15
+Zibo,Zibo,CN,Asia/Shanghai,36.79056,118.06333
+Zigong,Zigong,CN,Asia/Shanghai,29.34162,104.77689
+Zoucheng,Zoucheng,CN,Asia/Shanghai,35.40056,116.96556
+Zunyi,Zunyi,CN,Asia/Shanghai,27.68667,106.90722

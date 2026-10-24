@@ -1,0 +1,93 @@
+# crates/teamzones-core/tests/fixtures/sample.toml
+[bands]
+source = "sun"
+
+[home]
+name  = "Paul"
+city  = "Melbourne"
+hours = "9am-6pm"
+days  = "Mon-Fri"
+
+[[person]]
+name  = "Priya"
+city  = "Brisbane"
+hours = "9am-5pm"
+
+[[person]]
+name  = "Sam"
+city  = "Brisbane"
+hours = "9am-5pm"
+
+[[person]]
+name  = "Thandi"
+city  = "Johannesburg"
+hours = "jnb-office"
+
+[[person]]
+name  = "Johan"
+city  = "Johannesburg"
+hours = "jnb-office"
+
+[[person]]
+name  = "Ellie"
+city  = "London"
+
+[[person]]
+name  = "Marcus"
+label = "Austin"
+tz    = "America/Chicago"
+at    = [30.27, -97.74]
+
+[[place]]
+name    = "AU"
+tz      = "Australia/Melbourne"
+trading = "venue"
+at      = [-24.0, 134.0]
+
+[[place]]
+name    = "UK"
+tz      = "Europe/London"
+trading = "venue"
+at      = [54.5, -2.5]
+
+[[place]]
+name    = "US"
+tz      = "America/Chicago"
+trading = "venue"
+at      = [39.5, -96.0]
+
+[[profile]]
+name  = "jnb-office"
+kind  = "hours"
+hours = "8am-4pm"
+days  = "Mon-Fri"
+
+[[profile]]
+name  = "venue"
+kind  = "trading"
+open  = "7am-11pm"
+peak  = ["11:30am-2pm", "5:30-9pm"]
+[[profile.on]]
+days  = "Fri-Sat"
+peak  = ["11:30am-2:30pm", "6-10pm"]
+
+[[group]]
+name   = "team"
+people = ["Priya", "Sam", "Thandi", "Johan"]
+
+[[group]]
+name   = "au"
+people = ["Priya", "Sam"]
+
+[[group]]
+name    = "regions"
+aliases = ["apps"]
+places  = ["AU", "UK", "US"]
+
+[[group]]
+name   = "deploy"
+people = ["Priya", "Thandi"]
+places = ["AU", "UK"]
+
+[theme]
+scheme = "dark"
