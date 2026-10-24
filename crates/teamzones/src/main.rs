@@ -1,6 +1,7 @@
 //! The `teamzones` binary: the TUI and the headless CLI over `teamzones-core`.
 
 mod cli;
+mod clipboard;
 mod paths;
 mod write;
 
@@ -16,6 +17,14 @@ fn main() -> ExitCode {
             .collect(),
     );
     let parsed = cli::Cli::parse_from(argv);
+    let config_path = match paths::config_path() {
+        Ok(path) => path,
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::from(2);
+        }
+    };
+    let mut clipboard = clipboard::Fallback(clipboard::System, clipboard::Terminal);
     let mut stdout = std::io::stdout();
     let mut stderr = std::io::stderr();
     let mut io = cli::Io {
@@ -23,6 +32,8 @@ fn main() -> ExitCode {
         err: &mut stderr,
         stdout_is_tty: std::io::stdout().is_terminal(),
         system_zone: paths::system_zone(),
+        config_path,
+        clipboard: &mut clipboard,
     };
     let code = match cli::run(parsed, &mut io) {
         Ok(()) => 0,

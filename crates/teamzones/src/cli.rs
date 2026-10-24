@@ -16,6 +16,7 @@ use teamzones_core::status::status_lines;
 use teamzones_core::time::Moment;
 use thiserror::Error;
 
+use crate::clipboard::Clipboard;
 use crate::{paths, write};
 
 /// Who's available and where it's busy, on one time axis.
@@ -147,6 +148,8 @@ pub struct Io<'a> {
     pub err: &'a mut dyn Write,
     pub stdout_is_tty: bool,
     pub system_zone: Tz,
+    pub config_path: std::path::PathBuf,
+    pub clipboard: &'a mut dyn Clipboard,
 }
 
 /// Why a command stopped; the Display is what goes to stderr.
@@ -202,8 +205,7 @@ pub fn run(cli: Cli, io: &mut Io) -> Result<(), Failure> {
 }
 
 fn load(io: &Io) -> Result<Config, Failure> {
-    let path = paths::config_path().map_err(usage)?;
-    paths::load(&path, io.system_zone).map_err(usage)
+    paths::load(&io.config_path, io.system_zone).map_err(usage)
 }
 
 fn words(args: &[String]) -> Vec<&str> {
@@ -223,7 +225,7 @@ fn say(args: &SayArgs, now: DateTime<Utc>, io: &mut Io) -> Result<(), Failure> {
         names,
         date,
         no_clause,
-        no_copy: _,
+        no_copy,
         words: tokens,
     } = args;
     let config = load(io)?;
@@ -243,7 +245,15 @@ fn say(args: &SayArgs, now: DateTime<Utc>, io: &mut Io) -> Result<(), Failure> {
         clause,
     };
     let line = say_line(roster, &expr.marks, when, variant);
-    writeln!(io.out, "{line}").map_err(output)
+    writeln!(io.out, "{line}").map_err(output)?;
+    if *no_copy || !io.stdout_is_tty {
+        return Ok(());
+    }
+    let report = match io.clipboard.copy(&line) {
+        Ok(()) => "📋 copied".to_owned(),
+        Err(reason) => format!("not copied: {reason}"),
+    };
+    writeln!(io.err, "{report}").map_err(output)
 }
 
 /// The marks `status` reports on: one `@place` alone, or a who-expression at now.
@@ -364,7 +374,7 @@ fn editor_command(
 }
 
 fn config(action: &ConfigAction, io: &mut Io) -> Result<(), Failure> {
-    let path = paths::config_path().map_err(usage)?;
+    let path = io.config_path.clone();
     let shown = path.display();
     match action {
         ConfigAction::Path => writeln!(io.out, "{shown}").map_err(output),
@@ -418,7 +428,7 @@ fn whereabouts(config: &Config, now: DateTime<Utc>) -> String {
 
 fn here(args: &HereArgs, now: DateTime<Utc>, io: &mut Io) -> Result<(), Failure> {
     let HereArgs { city, until, clear } = args;
-    let path = paths::config_path().map_err(usage)?;
+    let path = io.config_path.clone();
     let config = match (city, until, clear) {
         (Some(city), Some(until), _) => {
             let city = cities::lookup(city).map_err(usage)?;
@@ -439,6 +449,86 @@ fn here(args: &HereArgs, now: DateTime<Utc>, io: &mut Io) -> Result<(), Failure>
 mod tests {
     use super::*;
     use std::path::Path;
+
+    const FIXTURE: &str = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../teamzones-core/tests/fixtures/sample.toml"
+    );
+
+    /// A clipboard that records what it was given, or refuses everything.
+    struct Fake {
+        copied: Vec<String>,
+        works: bool,
+    }
+
+    impl Clipboard for Fake {
+        fn copy(&mut self, text: &str) -> Result<(), String> {
+            if self.works {
+                self.copied.push(text.to_owned());
+                Ok(())
+            } else {
+                Err("no clipboard here".to_owned())
+            }
+        }
+    }
+
+    /// Runs `say team 3pm` plus `extra` on the fixture, returning (stdout, stderr, what was copied).
+    fn say_with(extra: &[&str], stdout_is_tty: bool, works: bool) -> (String, String, Vec<String>) {
+        let argv = ["teamzones", "--now", "2026-10-23T22:04:00Z", "say", "team", "3pm"]
+            .iter()
+            .chain(extra)
+            .map(|word| (*word).to_owned())
+            .collect();
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let mut clipboard = Fake {
+            copied: Vec::new(),
+            works,
+        };
+        let mut io = Io {
+            out: &mut out,
+            err: &mut err,
+            stdout_is_tty,
+            system_zone: chrono_tz::UTC,
+            config_path: FIXTURE.into(),
+            clipboard: &mut clipboard,
+        };
+        run(Cli::parse_from(hoist_flags(argv)), &mut io).unwrap();
+        (
+            String::from_utf8(out).unwrap(),
+            String::from_utf8(err).unwrap(),
+            clipboard.copied,
+        )
+    }
+
+    const LINE: &str = "3pm AEDT / 2pm AEST / 6am SAST";
+
+    #[test]
+    fn say_on_a_tty_copies_the_line_and_says_so_on_stderr() {
+        let (out, err, copied) = say_with(&[], true, true);
+        assert_eq!(out, format!("{LINE}\n"));
+        assert_eq!(err, "📋 copied\n");
+        assert_eq!(copied, [LINE]);
+    }
+
+    #[test]
+    fn say_with_no_copy_on_a_tty_copies_nothing() {
+        let (_, err, copied) = say_with(&["--no-copy"], true, true);
+        assert_eq!((err.as_str(), copied.len()), ("", 0));
+    }
+
+    #[test]
+    fn say_into_a_pipe_copies_nothing() {
+        let (out, err, copied) = say_with(&[], false, true);
+        assert_eq!(out, format!("{LINE}\n"));
+        assert_eq!((err.as_str(), copied.len()), ("", 0));
+    }
+
+    #[test]
+    fn say_still_prints_and_exits_0_when_no_clipboard_works() {
+        let (out, err, _) = say_with(&[], true, false);
+        assert_eq!(out, format!("{LINE}\n"));
+        assert_eq!(err, "not copied: no clipboard here\n");
+    }
 
     fn strings(words: &[&str]) -> Vec<String> {
         words.iter().map(|word| (*word).to_owned()).collect()
