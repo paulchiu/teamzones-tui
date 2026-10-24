@@ -1,0 +1,83 @@
+# Versioning and tagging only. Pushing the tag is where this workflow stops: the
+# release workflow that dist generates (added with the first Homebrew release)
+# triggers on that tag and builds, uploads and publishes from there.
+
+name: Version Tag
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Determine Version Bump
+        id: bump
+        uses: actions/github-script@v9
+        with:
+          result-encoding: string
+          script: |
+            const labels = context.payload.pull_request.labels.map(l => l.name);
+            return ['major', 'minor', 'patch'].find(l => labels.includes(l)) ?? '';
+
+      - name: Checkout code
+        if: steps.bump.outputs.result != ''
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          # A tag pushed with the default GITHUB_TOKEN starts no further workflows,
+          # so the release workflow would never see it. RELEASE_TOKEN is a PAT that
+          # can push here; without it the bump and the tag still land.
+          token: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Setup Rust
+        if: steps.bump.outputs.result != ''
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-edit
+        if: steps.bump.outputs.result != ''
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-edit
+
+      - name: Configure Git
+        if: steps.bump.outputs.result != ''
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump Version
+        if: steps.bump.outputs.result != ''
+        run: |
+          # Version is inherited from [workspace.package], so one bump moves both crates.
+          cargo set-version --workspace --bump "${{ steps.bump.outputs.result }}"
+          cargo update -w
+
+          NEW_VERSION=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')
+
+          # Roll the PR entries under [Unreleased] into this version's heading, and
+          # leave a bare [Unreleased] above it for the next PR.
+          if ! grep -qx '## \[Unreleased\]' CHANGELOG.md; then
+            echo "CHANGELOG.md has no '## [Unreleased]' heading to roll into $NEW_VERSION" >&2
+            exit 1
+          fi
+          awk -v heading="## [$NEW_VERSION] - $(date -u +%F)" '
+            !rolled && $0 == "## [Unreleased]" { print; print ""; print heading; rolled = 1; next }
+            { print }
+          ' CHANGELOG.md > CHANGELOG.md.next
+          mv CHANGELOG.md.next CHANGELOG.md
+
+          git add Cargo.toml Cargo.lock crates/teamzones/Cargo.toml crates/teamzones-core/Cargo.toml CHANGELOG.md
+          git commit -m "chore(release): bump version to $NEW_VERSION"
+          git tag "v$NEW_VERSION"
+
+          git push origin main
+          git push origin "v$NEW_VERSION"
