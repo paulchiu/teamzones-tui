@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-24
+
 ### Added
 
 - A trading profile can name its three levels with `labels = { closed = "...", open = "...", busy = "..." }`, such as `open = "trading hours"`, and those words show on its place rows, in the say line and in `teamzones status`.
