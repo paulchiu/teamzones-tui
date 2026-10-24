@@ -444,6 +444,60 @@ impl Config {
         })?;
         build(raw, &lines)
     }
+
+    /// The config for `text`, where no file, or one holding only comments, means the defaults.
+    ///
+    /// # Errors
+    ///
+    /// The [`ConfigError`] from [`Config::parse`] for any text with a table in it.
+    pub fn load(text: Option<&str>, home_zone: Tz) -> Result<Self, ConfigError> {
+        match text {
+            Some(text) if !is_blank(text) => Self::parse(text),
+            Some(_) | None => Ok(Self::without_file(home_zone)),
+        }
+    }
+
+    /// Home in `zone`, named after it, with no hours, and no people, places or groups.
+    fn without_file(zone: Tz) -> Self {
+        let city = zone
+            .name()
+            .rsplit('/')
+            .next()
+            .unwrap_or_default()
+            .replace('_', " ");
+        let bundled = cities::all()
+            .iter()
+            .filter(|known| known.tz == zone)
+            .min_by_key(|known| known.name != city);
+        let home = Person {
+            name: city.clone(),
+            city,
+            location: Location {
+                tz: zone,
+                lat: bundled.map_or(0.0, |known| known.lat),
+                lon: bundled.map_or(0.0, |known| known.lon),
+            },
+            hours: None,
+        };
+        Self {
+            roster: Roster {
+                daylight: Daylight::Sun,
+                people: vec![home],
+                places: Vec::new(),
+                groups: Vec::new(),
+            },
+            map: MapShow::default(),
+            travel: None,
+            theme: Theme::default(),
+        }
+    }
+}
+
+/// Whether `text` holds no tables or keys, only comments and whitespace.
+fn is_blank(text: &str) -> bool {
+    text.lines()
+        .map(str::trim_start)
+        .all(|line| line.is_empty() || line.starts_with('#'))
 }
 
 fn build(raw: RawConfig, lines: &Lines) -> Result<Config, ConfigError> {
@@ -1380,5 +1434,42 @@ mod tests {
             rejection("[bands]\nsource = \"clock\"\n").reason,
             Reason::MissingHome
         );
+    }
+
+    const MELBOURNE: Tz = chrono_tz::Australia::Melbourne;
+
+    #[test]
+    fn no_file_means_home_in_the_system_zone_with_no_hours_and_nobody_else() {
+        let config = Config::load(None, MELBOURNE).unwrap();
+        let people: Vec<_> = config.roster.people().map(|(_, p)| p).collect();
+        assert_eq!(people.len(), 1);
+        assert_eq!(people[0].name, "Melbourne");
+        assert_eq!(people[0].location.tz, MELBOURNE);
+        assert_eq!(people[0].hours, None);
+        assert_eq!(config.roster.places().count(), 0);
+        assert!(config.roster.groups.is_empty());
+        assert_eq!(config.travel, None);
+    }
+
+    #[test]
+    fn a_file_of_only_comments_is_the_same_as_no_file() {
+        let commented = "# [home]\n# name = \"Kim\"\n\n## prose\n";
+        assert_eq!(
+            Config::load(Some(commented), MELBOURNE),
+            Config::load(None, MELBOURNE)
+        );
+    }
+
+    #[test]
+    fn a_file_with_a_table_but_no_home_is_still_rejected() {
+        let error = Config::load(Some("[bands]\nsource = \"clock\"\n"), MELBOURNE).unwrap_err();
+        assert_eq!(error.reason, Reason::MissingHome);
+    }
+
+    #[test]
+    fn home_without_a_file_takes_its_coordinates_from_the_bundled_city_of_that_name() {
+        let config = Config::load(None, MELBOURNE).unwrap();
+        let home = config.roster.person(PersonId::HOME);
+        assert!((home.location.lat - -37.8).abs() < 0.1, "{:?}", home.location);
     }
 }
