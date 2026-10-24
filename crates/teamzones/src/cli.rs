@@ -61,7 +61,7 @@ struct HereArgs {
     #[arg(requires = "until", conflicts_with = "clear")]
     city: Option<String>,
     /// The last day of the trip, in the city's local date, such as 2026-11-01.
-    #[arg(long, requires = "city")]
+    #[arg(long, requires = "city", conflicts_with = "clear")]
     until: Option<NaiveDate>,
     /// Remove the travel override.
     #[arg(long)]
@@ -110,28 +110,30 @@ fn parse_now(text: &str) -> Result<DateTime<Utc>, chrono::ParseError> {
     DateTime::parse_from_rfc3339(text).map(|instant| instant.with_timezone(&Utc))
 }
 
-/// The long flags `say` and `status` accept after their words; `--now` takes a value.
-const HOISTED: &[&str] = &[
-    "--zones",
-    "--names",
-    "--date",
-    "--no-clause",
-    "--no-copy",
-    "--help",
-];
+/// The flags both `say` and `status` accept after their words; `--now` takes a value.
+const HOISTED: &[&str] = &["--help", "-h"];
 
-/// Moves known long flags that follow `say` or `status` to just after it, so clap reads them as
+/// The flags only `say` accepts after its words.
+const HOISTED_FOR_SAY: &[&str] = &["--zones", "--names", "--date", "--no-clause", "--no-copy"];
+
+/// Moves known flags that follow `say` or `status` to just after it, so clap reads them as
 /// flags rather than as words of the expression.
 pub fn hoist_flags(argv: Vec<String>) -> Vec<String> {
     let Some(at) = argv.iter().position(|arg| arg == "say" || arg == "status") else {
         return argv;
+    };
+    let for_say: &[&str] = if argv[at] == "say" {
+        HOISTED_FOR_SAY
+    } else {
+        &[]
     };
     let (head, tail) = argv.split_at(at + 1);
     let mut flags = Vec::new();
     let mut words = Vec::new();
     let mut rest = tail.iter();
     while let Some(arg) = rest.next() {
-        if HOISTED.contains(&arg.as_str()) || arg.starts_with("--now=") {
+        let flag = arg.as_str();
+        if HOISTED.contains(&flag) || for_say.contains(&flag) || flag.starts_with("--now=") {
             flags.push(arg.clone());
         } else if arg == "--now" {
             flags.push(arg.clone());
@@ -224,7 +226,15 @@ fn words(args: &[String]) -> Vec<&str> {
 fn expr_failure(error: ExprError) -> Failure {
     match error {
         ExprError::NoGroups => Failure::Nothing(error.to_string()),
-        _ => usage(error),
+        ExprError::IsPlace(_)
+        | ExprError::IsPerson(_)
+        | ExprError::GroupAfterTime(_)
+        | ExprError::SecondGroup(_)
+        | ExprError::Unknown { .. }
+        | ExprError::UnknownName(_)
+        | ExprError::NoChange { .. }
+        | ExprError::City(_)
+        | ExprError::Time(_) => usage(error),
     }
 }
 
@@ -441,8 +451,10 @@ fn here(args: &HereArgs, now: DateTime<Utc>, io: &mut Io) -> Result<(), Failure>
     let config = match (city, until, clear) {
         (Some(city), Some(until), _) => {
             let city = cities::lookup(city).map_err(usage)?;
+            let until = write::toml_date(*until)
+                .map_err(|_| usage(format!("{until}: not a date a config file can hold")))?;
             write::edit_config(&path, io.system_zone, |document| {
-                write::set_travel(document, city.name, *until);
+                write::set_travel(document, city.name, until);
             })
             .map_err(usage)?
         }

@@ -42,7 +42,14 @@ fn backticked(cell: &str) -> Vec<&str> {
     cell.split('`').skip(1).step_by(2).collect()
 }
 
-/// Runs one CLI golden row: stdout and exit 0, or the stderr text and exit 2.
+/// The code a `(stderr) ..., exit N` cell names.
+fn exit_code(cell: &str) -> i32 {
+    cell.rsplit_once("exit ")
+        .and_then(|(_, code)| code.trim().parse().ok())
+        .unwrap_or_else(|| panic!("no exit code in {cell:?}"))
+}
+
+/// Runs one CLI golden row: stdout and exit 0, or the stderr text and the exit code the cell names.
 fn cli_row(index: usize) {
     let rows = table_rows(CLI_SPEC, "## CLI golden table");
     let [command, output] = rows[index].as_slice() else {
@@ -55,7 +62,10 @@ fn cli_row(index: usize) {
         .arg("--no-copy")
         .assert();
     if output.starts_with("(stderr)") {
-        assert.code(2).stdout("").stderr(format!("{expected}\n"));
+        assert
+            .code(exit_code(output))
+            .stdout("")
+            .stderr(format!("{expected}\n"));
     } else {
         assert.success().stdout(format!("{expected}\n")).stderr("");
     }
@@ -151,9 +161,16 @@ fn groups_prints_one_line_per_group_in_the_form_the_spec_shows() {
     let stdout = String::from_utf8(output.get_output().stdout.clone()).unwrap();
     let lines: Vec<&str> = stdout.lines().collect();
     let examples = groups_examples();
-    assert_eq!(lines.len(), 4, "{stdout}");
-    assert_eq!(lines[0], examples[0]);
-    assert_eq!(lines[2], examples[1]);
+    assert_eq!(
+        lines,
+        [
+            examples[0].as_str(),
+            /* Characterisation: the spec gives no example for these two. */
+            "2 au: Priya, Sam  asks who",
+            examples[1].as_str(),
+            "4 deploy: Priya, Thandi, @AU, @UK  asks who and off-peak",
+        ]
+    );
 }
 
 /// A fresh, empty directory for one test, under the system temp dir.
@@ -301,6 +318,17 @@ fn here_reports_home_once_until_has_passed_in_the_travel_city() {
 }
 
 #[test]
+fn here_stays_active_late_on_until_in_the_travel_city_after_home_has_moved_on() {
+    let (path, original) = fixture_copy("here-late");
+    std::fs::write(&path, format!("{original}{TRAVEL}")).unwrap();
+    teamzones_on(&path)
+        .args(["here", "--now", "2026-11-01T23:30:00Z"])
+        .assert()
+        .success()
+        .stdout("here London until 2026-11-01\n");
+}
+
+#[test]
 fn here_never_writes_over_a_file_that_does_not_parse() {
     let path = scratch("here-broken").join("config.toml");
     let broken = "[home]\nname = \"Kim\"\ncolour = 1\n";
@@ -324,6 +352,29 @@ fn here_needs_until_when_setting() {
         .assert()
         .code(2);
     assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+}
+
+#[test]
+fn here_refuses_until_alongside_clear() {
+    let (path, original) = fixture_copy("here-clear-until");
+    std::fs::write(&path, format!("{original}{TRAVEL}")).unwrap();
+    teamzones_on(&path)
+        .args(["here", "--clear", "--until", "2026-11-01"])
+        .assert()
+        .code(2);
+    assert_eq!(
+        std::fs::read_to_string(&path).unwrap(),
+        format!("{original}{TRAVEL}")
+    );
+}
+
+#[test]
+fn a_short_help_flag_after_the_words_shows_help() {
+    for command in ["say", "status"] {
+        let assert = teamzones().args([command, "team", "-h"]).assert().success();
+        let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+        assert!(stdout.contains("Usage: teamzones"), "{command}: {stdout}");
+    }
 }
 
 #[test]
