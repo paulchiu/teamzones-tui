@@ -225,6 +225,7 @@ impl App {
             clause,
         };
         match variant {
+            CopyAs::Plain => self.say_line(),
             CopyAs::Date => say_line(
                 roster,
                 &self.marks,
@@ -252,6 +253,31 @@ impl App {
             CopyAs::ThisRow => focus_line(roster, self.focus, when),
             CopyAs::All => say_line(roster, &Marks::all(roster), when, Variant::default()),
         }
+    }
+
+    /// The copy-as dialog's rows, in key order: each format's key, the exact line it copies now,
+    /// and a short description.
+    pub fn copy_menu(&self) -> Vec<(char, String, String)> {
+        let focused = match self.focus {
+            Row::Person(id) => self.roster().person(id).name.clone(),
+            Row::Place(id) => self.roster().place(id).name.clone(),
+        };
+        [
+            ('y', CopyAs::Plain, "marked, ttz format".to_owned()),
+            ('d', CopyAs::Date, "with the date".to_owned()),
+            ('w', CopyAs::Names, "with names".to_owned()),
+            (
+                't',
+                CopyAs::ThisRow,
+                format!("for {focused}, their time first"),
+            ),
+            ('z', CopyAs::Zones, "with place zones".to_owned()),
+            ('s', CopyAs::Short, "without the clause".to_owned()),
+            ('a', CopyAs::All, "everyone".to_owned()),
+        ]
+        .into_iter()
+        .map(|(key, variant, about)| (key, self.copy_as(variant), about))
+        .collect()
     }
 
     /// Whether `row` sits above its block's line: home when the marks ask who, or a marked row.

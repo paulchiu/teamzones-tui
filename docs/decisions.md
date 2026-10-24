@@ -163,3 +163,11 @@ Decision: The footer shows the keys that matter for the current mode: a `range` 
 Why: A footer that never changed never said what mode you were in or how to get out of it.
 
 Held by: the `footer::tests` mode tests and `tui::tests::range_mode_leads_the_footer_with_its_badge_and_keys_and_keeps_the_main_keys` in `teamzones`, plus the binding meta-test `every_hinted_key_dispatches_in_its_context`
+
+## D21: Copy-as shows exactly what each key copies (2026-10-25)
+
+Decision: The `c` menu is a dialog that previews every format's line for the current time or range, with a short description under each. The preview and the copy come from one function, so what is shown is what is copied, and only the preview is ever cut to fit. See the copy-as dialog in [screen](spec/screen.md).
+
+Why: A menu of format names made you try each one to see what it copied.
+
+Held by: `tui::tests::each_copy_as_key_copies_its_preview_and_closes_the_dialog` and `a_preview_too_wide_for_the_dialog_is_cut_with_a_mark_but_copies_whole` in `teamzones`

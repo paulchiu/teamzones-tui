@@ -55,6 +55,7 @@ pub enum Context {
 /// One `c` menu variant.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CopyAs {
+    Plain,
     Date,
     Names,
     ThisRow,
@@ -379,7 +380,7 @@ pub const BINDINGS: &[Binding] = &[
         chords: &[(Key::Char('c'), Action::CopyMenu)],
         ..row(
             "c",
-            "Copy as: `d w t z s a` (letters local to the menu)",
+            "Copy as: `y d w t z s a` (letters local to the menu), previewing each line",
             "M3",
             Context::Main,
         )
@@ -514,6 +515,7 @@ pub const BINDINGS: &[Binding] = &[
     },
     Binding {
         hints: &[
+            hint("y", "line"),
             hint("d", "date"),
             hint("w", "names"),
             hint("t", "this row"),
@@ -523,6 +525,7 @@ pub const BINDINGS: &[Binding] = &[
         ],
         priority: 5,
         chords: &[
+            (Key::Char('y'), Action::CopyAs(CopyAs::Plain)),
             (Key::Char('d'), Action::CopyAs(CopyAs::Date)),
             (Key::Char('w'), Action::CopyAs(CopyAs::Names)),
             (Key::Char('t'), Action::CopyAs(CopyAs::ThisRow)),
@@ -531,8 +534,8 @@ pub const BINDINGS: &[Binding] = &[
             (Key::Char('a'), Action::CopyAs(CopyAs::All)),
         ],
         ..row(
-            "d w t z s a",
-            "Copy with the date; with names; this row only; with place zones; without the clause; for all",
+            "y d w t z s a",
+            "Copy the line; with the date; with names; this row only; with place zones; without the clause; for all",
             "",
             Context::CopyMenu,
         )

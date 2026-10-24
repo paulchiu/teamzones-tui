@@ -20,7 +20,7 @@ Seeded from the shared contract of the teamzones build spec (2026-10-24). Where 
   + `c s` drops the clause.
   + `c a` is the line for `0 all`.
 
-The `c` menu applies one variant at a time. CLI flags can combine, applied in the order date prefix, names, then clause handling.
+The `c` menu applies one variant at a time, and previews each variant's line before you pick it (`y` in the menu is the plain line). CLI flags can combine, applied in the order date prefix, names, then clause handling.
 
 ## Copy golden table
 

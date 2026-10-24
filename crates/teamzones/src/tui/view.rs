@@ -149,8 +149,10 @@ pub fn draw(frame: &mut Frame, app: &App, look: Look) {
     say_panel(buf, clip(areas.say), app, look);
     notice(buf, clip(areas.notice), app, look);
     footer_row(buf, clip(areas.footer), app, look);
-    if let Mode::Help(from) = app.mode {
-        help_overlay(buf, size, from, look);
+    match app.mode {
+        Mode::Help(from) => help_overlay(buf, size, from, look),
+        Mode::CopyMenu => copy_dialog(buf, size, app, look),
+        Mode::Normal | Mode::Prompt(_) | Mode::SortMenu => {}
     }
 }
 
@@ -1032,11 +1034,13 @@ fn notice(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
 
 fn footer_row(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
     let theme = look.theme;
+    let context = context(app);
+    let main = context == keys::Context::Main;
     let situation = footer::Situation {
-        range: app.range.is_some(),
-        away: !app.at_now(),
+        range: main && app.range.is_some(),
+        away: main && !app.at_now(),
     };
-    let footer::Footer { badge, hints } = footer::line(context(app), situation, area.width);
+    let footer::Footer { badge, hints } = footer::line(context, situation, area.width);
     let badge = badge.into_iter().flat_map(|badge| {
         [
             Span::styled(
@@ -1058,6 +1062,48 @@ fn footer_row(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
         }))
         .collect();
     Line::from(spans).render(area, buf);
+}
+
+/// The copy-as dialog: each format's key and the line it copies, with a dim description under it.
+fn copy_dialog(buf: &mut Buffer, size: Rect, app: &App, look: Look) {
+    let theme = look.theme;
+    let rows = app.copy_menu();
+    let width = size.width.min(110);
+    let height = size
+        .height
+        .min(u16::try_from(rows.len() * 2 + 2).unwrap_or(u16::MAX));
+    let area = Rect::new(
+        size.x + (size.width - width) / 2,
+        size.y + (size.height - height) / 2,
+        width,
+        height,
+    );
+    Clear.render(area, buf);
+    let block = Block::bordered()
+        .border_set(look.glyphs.line)
+        .border_style(theme.fg(Role::Accent))
+        .title(Span::styled(
+            " copy as ",
+            theme.fg(Role::Text).add_modifier(Modifier::BOLD),
+        ))
+        .title_bottom(
+            Line::from(vec![
+                Span::styled(" esc", theme.fg(Role::Accent)),
+                Span::styled(" close ", theme.fg(Role::Dim)),
+            ])
+            .right_aligned(),
+        );
+    let inner = block.inner(area);
+    block.render(area, buf);
+    let x = inner.x + 1;
+    let room = usize::from(inner.width.saturating_sub(5));
+    let mark = look.glyphs.text("…");
+    for ((key, line, about), y) in rows.iter().zip((inner.top()..inner.bottom()).step_by(2)) {
+        put(buf, inner, x, y, &key.to_string(), theme.fg(Role::Accent));
+        let preview = truncate_with_mark(&look.glyphs.text(line), room, &mark);
+        put(buf, inner, x + 3, y, &preview, theme.fg(Role::Text));
+        put(buf, inner, x + 3, y + 1, about, theme.fg(Role::Dim));
+    }
 }
 
 fn help_overlay(buf: &mut Buffer, size: Rect, from: keys::Context, look: Look) {

@@ -954,3 +954,80 @@ fn a_committed_range_away_from_now_offers_esc_and_dot_in_the_footer() {
     );
     assert!(!footer.contains("1-9"), "{footer}");
 }
+
+/// The copy-as dialog's rows: each format's key and preview line, then its description.
+fn dialog_rows(buf: &Buffer) -> Vec<String> {
+    let top = y_of(buf, " copy as ");
+    let cells = |y: u16| -> Vec<String> {
+        (0..buf.area.width)
+            .map(|x| buf[(x, y)].symbol().to_owned())
+            .collect()
+    };
+    let border = cells(top);
+    let left = border.iter().position(|c| c == "┌").unwrap() + 1;
+    let right = border.iter().position(|c| c == "┐").unwrap();
+    (top + 1..)
+        .map(|y| cells(y)[left..right].concat())
+        .take_while(|line| !line.contains('─'))
+        .map(|line| line.trim().to_owned())
+        .collect()
+}
+
+#[test]
+fn c_opens_a_dialog_previewing_every_format_with_its_key_and_description() {
+    let app = press(focus_on(team_monday(), "Thandi"), &chars("c"));
+    let buf = render(&app, 120, 36);
+    let rows = dialog_rows(&buf);
+    assert_eq!(
+        rows,
+        [
+            "y  5-6pm AEDT / 4-5pm AEST / 8-9am SAST",
+            "marked, ttz format",
+            "d  Mon 26 Oct, 5-6pm AEDT / 4-5pm AEST / 8-9am SAST",
+            "with the date",
+            "w  5-6pm AEDT (Paul) / 4-5pm AEST (Priya, Sam) / 8-9am SAST (Thandi, Johan)",
+            "with names",
+            "t  8-9am SAST (5-6pm AEDT)",
+            "for Thandi, their time first",
+            "z  5-6pm AEDT / 4-5pm AEST / 8-9am SAST",
+            "with place zones",
+            "s  5-6pm AEDT / 4-5pm AEST / 8-9am SAST",
+            "without the clause",
+            "a  5-6pm AEDT / 4-5pm AEST / 8-9am SAST / 6-7am GMT / 1-2am CDT, open in UK and US, busy in AU",
+            "everyone",
+        ]
+    );
+    insta::assert_snapshot!("copy_as_120x36", text(&buf));
+}
+
+#[test]
+fn each_copy_as_key_copies_its_preview_and_closes_the_dialog() {
+    let app = press(focus_on(team_monday(), "Thandi"), &chars("c"));
+    let rows = dialog_rows(&render(&app, 120, 36));
+    for preview in rows.iter().step_by(2) {
+        let (key, line) = preview.split_once("  ").unwrap();
+        let (after, effects) = press_all(app.clone(), &chars(key));
+        assert_eq!(copied(&effects), [line], "{key}");
+        assert_eq!(after.mode, super::app::Mode::Normal, "{key}");
+    }
+    let (closed, effects) = press_all(app, &[Key::Esc]);
+    assert!(effects.is_empty() && closed.mode == super::app::Mode::Normal);
+}
+
+#[test]
+fn a_preview_too_wide_for_the_dialog_is_cut_with_a_mark_but_copies_whole() {
+    let app = press(team_monday(), &chars("c"));
+    let buf = render(&app, 80, 24);
+    let all = dialog_rows(&buf)
+        .into_iter()
+        .find(|line| line.starts_with("a  "))
+        .unwrap();
+    assert!(all.ends_with('…'), "{all}");
+    let (_, effects) = press_all(app, &chars("a"));
+    assert_eq!(
+        copied(&effects),
+        [
+            "5-6pm AEDT / 4-5pm AEST / 8-9am SAST / 6-7am GMT / 1-2am CDT, open in UK and US, busy in AU"
+        ]
+    );
+}

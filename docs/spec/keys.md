@@ -23,7 +23,7 @@ One binding table generates the footer and the `?` overlay (context first, then 
 | u | Undo the last drop, write, close or delete (within 10 s) | Click `u undo` | M5 (M3 for the switch drop) |
 | tab | Membership matrix | Click `⋯` | M5 |
 | y | Copy the say line | Click `y copy` | M3 / M4 |
-| c | Copy as: `d w t z s a` (letters local to the menu) | Click a variant | M3 |
+| c | Copy as: `y d w t z s a` (letters local to the menu), previewing each line | Click a variant | M3 |
 | b | People lanes: hours, or plain day and night (view only) | Click the who legend | M3 / M4 |
 | s | Sort menu within each block: `o` offset, `n` name | Click a block title | M3 / M4 |
 | m | Flip the map's automatic choice (overlay when there is no room) | none | M4 |
