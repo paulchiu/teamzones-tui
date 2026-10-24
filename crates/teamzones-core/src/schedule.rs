@@ -111,6 +111,33 @@ impl Days {
     }
 }
 
+/// Writes each run of consecutive days as `Mon-Fri` (wrapping past Sunday) and joins runs with commas.
+impl std::fmt::Display for Days {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        const NAMES: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+        let set = |index: u32| self.0 & bit(index) != 0;
+        if self.count() == 7 {
+            return f.write_str("Mon-Sun");
+        }
+        let runs: Vec<String> = (0..7)
+            .filter(|&start| set(start) && !set(start + 6))
+            .map(|start| {
+                let last = (start..start + 6)
+                    .take_while(|&day| set(day + 1))
+                    .last()
+                    .map_or(start, |day| day + 1);
+                let (from, to) = (NAMES[start as usize], NAMES[last as usize % 7]);
+                if start == last {
+                    from.to_owned()
+                } else {
+                    format!("{from}-{to}")
+                }
+            })
+            .collect();
+        f.write_str(&runs.join(","))
+    }
+}
+
 fn bit(index: u32) -> u8 {
     1 << (index % 7)
 }
@@ -329,6 +356,21 @@ mod tests {
             LocalSpan::parse("10pm-2am"),
             Err(ScheduleError::CrossesMidnight { .. })
         ));
+    }
+
+    #[test]
+    fn days_write_back_as_the_shortest_runs_they_parse_from() {
+        let text = |days: &str| Days::parse(days).unwrap().to_string();
+        assert_eq!(
+            [
+                text("Mon-Fri"),
+                text("Fri-Mon"),
+                text("Mon,Wed,Fri"),
+                text("Sat"),
+                text("Mon-Sun")
+            ],
+            ["Mon-Fri", "Fri-Mon", "Mon,Wed,Fri", "Sat", "Mon-Sun"]
+        );
     }
 
     #[test]

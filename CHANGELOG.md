@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ## [Unreleased]
 
+### Added
+
+- Running `teamzones` in a terminal opens the who and where screen: a slider over the viewed day, the who block with each person's day and hours, the where block with each place's trading load, and the say panel with the line `y` copies.
+- Move through time with `h`/`l` (15 minutes), `H`/`L` (an hour) and `[`/`]` (a day), type a time or range with `t`, draw a range with `v`, nudge its edges with `{` `}` `<` `>`, and return to now with `.`.
+- `n` and `N` jump to the next or previous slot that fits everyone the group asks about, keeping the range's length when it can and saying why when it cannot.
+- `1`-`9` switch groups and `0` shows everyone; `space` marks or unmarks the focused row, `X` clears the marks to home, and `u` brings back marks a switch dropped.
+- `c` copies a variant of the say line: with the date, with names, for the focused row, with place zones, without the clause, or for everyone.
+- `?` lists the keys for where you are, then the keys that work everywhere, then what each glyph means.
+- `NO_COLOR` turns colour off, and `glyphs = "ascii"` in `[theme]` draws everything in plain ASCII.
+
 ## [0.3.0] - 2026-10-24
 
 ### Added

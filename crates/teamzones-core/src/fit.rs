@@ -6,7 +6,7 @@ use thiserror::Error;
 
 use crate::clock::{Range, Slot, When};
 use crate::config::Roster;
-use crate::question::{Marks, Score, person_qualifies, place_qualifies, slot_score};
+use crate::question::{Marks, Row, Score, person_qualifies, place_qualifies, slot_score};
 use crate::time::Moment;
 
 /// Nothing fits within the search window; `best` is the earliest slot with the most qualifying rows.
@@ -37,7 +37,7 @@ pub fn slot_fits(roster: &Roster, marks: &Marks, slot: Slot) -> bool {
 }
 
 /// The first instant of `day` in `tz`; a zone that skips midnight starts its day at 1am.
-fn day_start(day: NaiveDate, tz: Tz) -> DateTime<Utc> {
+pub fn day_start(day: NaiveDate, tz: Tz) -> DateTime<Utc> {
     let midnight = day.and_time(NaiveTime::MIN);
     [midnight, midnight + Duration::hours(1)]
         .into_iter()
@@ -90,23 +90,94 @@ pub fn next_fit(roster: &Roster, marks: &Marks, now: DateTime<Utc>) -> Result<Ra
             Ok(Range::new(start, end.unwrap_or(start.offset(CAP_SLOTS)))
                 .unwrap_or(Range::single(start)))
         }
-        None => {
-            let (best, at) = slots()
-                .map(|slot| (slot_score(roster, marks, slot), slot))
-                .reduce(|best, candidate| {
-                    if candidate.0.qualifying > best.0.qualifying {
-                        candidate
-                    } else {
-                        best
-                    }
-                })
-                .unwrap_or((slot_score(roster, marks, first), first));
-            Err(NoFit {
-                best,
-                at,
-                axis: roster.axis(),
-            })
+        None => Err(best_of(roster, marks, slots())),
+    }
+}
+
+/// The TUI's next fit: the first fitting run after `from`, skipping the run `from` already sits in.
+///
+/// # Errors
+///
+/// [`NoFit`] when nothing fits within 7 days, carrying the earliest slot with the best score.
+pub fn next_run(roster: &Roster, marks: &Marks, from: Slot) -> Result<Range, NoFit> {
+    let fits = |slot: Slot| slot_fits(roster, marks, slot);
+    let after = (1..HORIZON_SLOTS)
+        .map(|step| from.offset(step))
+        .find(|slot| !fits(from) || !fits(*slot))
+        .unwrap_or(from.offset(HORIZON_SLOTS));
+    let window = || (0..HORIZON_SLOTS).map(move |step| after.offset(step));
+    match window().find(|slot| fits(*slot)) {
+        Some(start) => {
+            let end = (1..HORIZON_SLOTS)
+                .map(|step| start.offset(step))
+                .find(|slot| !fits(*slot))
+                .unwrap_or(start.offset(HORIZON_SLOTS));
+            Ok(Range::new(start, end).unwrap_or(Range::single(start)))
         }
+        None => Err(best_of(roster, marks, window())),
+    }
+}
+
+/// The TUI's previous fit: the start of the fitting run before `from`, skipping the run `from` sits in.
+///
+/// # Errors
+///
+/// [`NoFit`] when nothing fits within 7 days back, carrying the earliest slot with the best score.
+pub fn previous_run(roster: &Roster, marks: &Marks, from: Slot) -> Result<Range, NoFit> {
+    let fits = |slot: Slot| slot_fits(roster, marks, slot);
+    let before = (1..HORIZON_SLOTS)
+        .map(|step| from.offset(-step))
+        .find(|slot| !fits(from) || !fits(*slot))
+        .unwrap_or(from.offset(-HORIZON_SLOTS));
+    let window = || (0..HORIZON_SLOTS).map(move |step| before.offset(-step));
+    match window().find(|slot| fits(*slot)) {
+        Some(last) => {
+            let start = (1..HORIZON_SLOTS)
+                .map(|step| last.offset(-step))
+                .find(|slot| !fits(*slot))
+                .map_or(last.offset(1 - HORIZON_SLOTS), Slot::next);
+            Ok(Range::new(start, last.next()).unwrap_or(Range::single(last)))
+        }
+        None => {
+            let mut earliest_first: Vec<Slot> = window().collect();
+            earliest_first.reverse();
+            Err(best_of(roster, marks, earliest_first.into_iter()))
+        }
+    }
+}
+
+/// The first counted row that does not qualify at `slot`: people first, then places.
+pub fn blocker(roster: &Roster, marks: &Marks, slot: Slot) -> Option<Row> {
+    let person = marks
+        .counted_people()
+        .into_iter()
+        .find(|id| !person_qualifies(roster, *id, slot))
+        .map(Row::Person);
+    person.or_else(|| {
+        marks
+            .counted_places()
+            .into_iter()
+            .find(|id| !place_qualifies(roster, *id, marks.rule, slot))
+            .map(Row::Place)
+    })
+}
+
+/// The earliest of `slots` with the most qualifying counted rows, as a [`NoFit`].
+fn best_of(roster: &Roster, marks: &Marks, slots: impl Iterator<Item = Slot>) -> NoFit {
+    let (best, at) = slots
+        .map(|slot| (slot_score(roster, marks, slot), slot))
+        .reduce(|best, candidate| {
+            if candidate.0.qualifying > best.0.qualifying {
+                candidate
+            } else {
+                best
+            }
+        })
+        .expect("every search window holds at least one slot");
+    NoFit {
+        best,
+        at,
+        axis: roster.axis(),
     }
 }
 
@@ -247,6 +318,94 @@ mod tests {
         assert_eq!(
             no_fit.to_string(),
             "no full slot in 7 days, best 2/3 at Sat 3pm AEDT"
+        );
+    }
+
+    fn aedt_slot(text: &str) -> Slot {
+        Slot::containing(text.parse().unwrap())
+    }
+
+    #[test]
+    fn next_run_from_saturday_morning_lands_on_monday_for_deploy() {
+        let roster = roster();
+        let run = next_run(&roster, &marks(&roster, "deploy"), Slot::containing(now())).unwrap();
+        assert_eq!(aedt(&[run]), ["Mon 5-5:30pm"]);
+    }
+
+    #[test]
+    fn next_run_steps_past_the_run_it_starts_in() {
+        let roster = roster();
+        // Mon 2pm AEDT sits in the 2-5:30pm regions run, so the next run is 9-10:30pm.
+        let run = next_run(
+            &roster,
+            &marks(&roster, "regions"),
+            aedt_slot("2026-10-26T03:00:00Z"),
+        )
+        .unwrap();
+        assert_eq!(aedt(&[run]), ["Mon 9-10:30pm"]);
+    }
+
+    #[test]
+    fn previous_run_steps_back_past_the_run_it_starts_in() {
+        let roster = roster();
+        // From Mon 9pm AEDT, inside the 9-10:30pm run, the previous run is 2-5:30pm.
+        let run = previous_run(
+            &roster,
+            &marks(&roster, "regions"),
+            aedt_slot("2026-10-26T10:00:00Z"),
+        )
+        .unwrap();
+        assert_eq!(aedt(&[run]), ["Mon 2-5:30pm"]);
+    }
+
+    #[test]
+    fn previous_run_from_outside_a_run_finds_the_one_before() {
+        let roster = roster();
+        // Mon 7pm AEDT is between runs; the one before is 2-5:30pm.
+        let run = previous_run(
+            &roster,
+            &marks(&roster, "regions"),
+            aedt_slot("2026-10-26T08:00:00Z"),
+        )
+        .unwrap();
+        assert_eq!(aedt(&[run]), ["Mon 2-5:30pm"]);
+    }
+
+    #[test]
+    fn next_run_reports_the_best_slot_when_nothing_fits() {
+        let roster = roster();
+        let quiet = Marks {
+            rule: Rule::Quiet,
+            ..marks(&roster, "regions")
+        };
+        let no_fit = next_run(&roster, &quiet, Slot::containing(now())).unwrap_err();
+        assert_eq!(
+            no_fit.to_string(),
+            "no full slot in 7 days, best 2/3 at Sat 3pm AEDT"
+        );
+    }
+
+    #[test]
+    fn the_blocker_at_5_30pm_monday_on_deploy_is_au() {
+        let roster = roster();
+        let blocked = blocker(
+            &roster,
+            &marks(&roster, "deploy"),
+            aedt_slot("2026-10-26T06:30:00Z"),
+        );
+        assert_eq!(blocked, Some(Row::Place(roster.place_named("AU").unwrap())));
+    }
+
+    #[test]
+    fn nothing_blocks_a_fitting_slot() {
+        let roster = roster();
+        assert_eq!(
+            blocker(
+                &roster,
+                &marks(&roster, "deploy"),
+                aedt_slot("2026-10-26T06:00:00Z")
+            ),
+            None
         );
     }
 }
