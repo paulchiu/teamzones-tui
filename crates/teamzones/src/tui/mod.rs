@@ -80,7 +80,10 @@ pub fn run(
         glyphs: Glyphs::of(config.theme.glyphs),
     };
     let mut terminal = ratatui::try_init().inspect_err(|_| ratatui::restore())?;
-    let mut app = App::new(config, clock.now());
+    let mut app = App {
+        debug: env.debug,
+        ..App::new(config, clock.now())
+    };
     let result = loop {
         if let Err(error) = terminal.draw(|frame| view::draw(frame, &app, look)) {
             break Err(error);

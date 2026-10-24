@@ -514,6 +514,7 @@ fn no_color_renders_mono() {
     let env = TerminalEnv {
         no_color: true,
         truecolor: true,
+        debug: false,
     };
     for app in [team_monday(), press(team_monday(), &chars("4"))] {
         let buf = render_with(&app, 120, 36, env);
@@ -1030,4 +1031,100 @@ fn a_preview_too_wide_for_the_dialog_is_cut_with_a_mark_but_copies_whole() {
             "5-6pm AEDT / 4-5pm AEST / 8-9am SAST / 6-7am GMT / 1-2am CDT, open in UK and US, busy in AU"
         ]
     );
+}
+
+/// The app with the debug range-style toggle on, as `TEAMZONES_DEBUG=1` sets it.
+fn debugging(app: App) -> App {
+    App { debug: true, ..app }
+}
+
+/// The slider through the where block as text, each row followed by a mask of how its cells are
+/// marked: `s` selection background or reverse, `u` underline, `d` dim, `.` plain.
+fn styled_grid(buf: &Buffer) -> String {
+    use ratatui::style::{Color, Modifier};
+    let (from, to) = (y_of(buf, " AEDT    "), y_of(buf, "times for") - 2);
+    (from..=to)
+        .flat_map(|y| {
+            let mask: String = (0..buf.area.width)
+                .map(|x| {
+                    let cell = &buf[(x, y)];
+                    if cell.bg != Color::Reset || cell.modifier.contains(Modifier::REVERSED) {
+                        's'
+                    } else if cell.modifier.contains(Modifier::UNDERLINED) {
+                        'u'
+                    } else if cell.modifier.contains(Modifier::DIM) {
+                        'd'
+                    } else {
+                        '.'
+                    }
+                })
+                .collect();
+            [row(buf, y), mask]
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+const NO_COLOR: TerminalEnv = TerminalEnv {
+    no_color: true,
+    truecolor: false,
+    debug: false,
+};
+
+#[test]
+fn f2_cycles_the_range_styles_only_in_debug_and_the_footer_names_the_style() {
+    let plain = team_monday();
+    assert_eq!(press(plain.clone(), &[Key::F(2)]), plain);
+    let names: Vec<String> = (0..6)
+        .scan(debugging(plain.clone()), |app, _| {
+            let buf = render(app, 120, 36);
+            let footer = row(&buf, 35);
+            *app = press(app.clone(), &[Key::F(2)]);
+            Some(footer.rsplit("  ").next().unwrap().to_owned())
+        })
+        .collect();
+    assert_eq!(
+        names,
+        [
+            "range style 1/5: columns",
+            "range style 2/5: edges",
+            "range style 3/5: lines",
+            "range style 4/5: underline",
+            "range style 5/5: dim",
+            "range style 1/5: columns",
+        ]
+    );
+    for frame in [
+        render(&plain, 120, 36),
+        render(&press(plain.clone(), &chars("?")), 120, 36),
+    ] {
+        assert!(!text(&frame).contains("F2") && !text(&frame).contains("range style"));
+    }
+    let help = render(&press(debugging(plain), &chars("?")), 120, 36);
+    assert!(!text(&help).contains("F2"));
+}
+
+#[test]
+fn each_range_style_marks_the_range_its_own_way() {
+    let mut app = debugging(team_monday());
+    for number in 1..=5 {
+        let buf = render(&app, 120, 36);
+        insta::assert_snapshot!(format!("range_style_{number}"), styled_grid(&buf));
+        app = press(app, &[Key::F(2)]);
+    }
+}
+
+#[test]
+fn under_no_color_the_styles_that_need_colour_fall_back_to_edge_lines() {
+    let mut app = debugging(team_monday());
+    let mut grids = Vec::new();
+    for _ in 1..=5 {
+        grids.push(styled_grid(&render_with(&app, 120, 36, NO_COLOR)));
+        app = press(app, &[Key::F(2)]);
+    }
+    let lines = &grids[2];
+    assert_eq!([&grids[0], &grids[1], &grids[4]], [lines, lines, lines]);
+    assert_ne!(&grids[3], lines, "underline needs no colour");
+    assert!(grids[3].contains('u'));
+    insta::assert_snapshot!("range_style_no_color", lines);
 }

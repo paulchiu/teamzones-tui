@@ -14,6 +14,7 @@ pub enum Key {
     Enter,
     Esc,
     Backspace,
+    F(u8),
     Other,
 }
 
@@ -34,6 +35,7 @@ impl Key {
             KeyCode::Enter => Self::Enter,
             KeyCode::Esc => Self::Esc,
             KeyCode::Backspace => Self::Backspace,
+            KeyCode::F(n) => Self::F(n),
             _ => Self::Other,
         }
     }
@@ -50,6 +52,8 @@ pub enum Context {
     CopyMenu,
     SortMenu,
     Help,
+    /// Keys that exist only under `TEAMZONES_DEBUG=1`, never hinted or listed in help.
+    Debug,
 }
 
 /// One `c` menu variant.
@@ -110,6 +114,7 @@ pub enum Action {
     Type(char),
     Erase,
     Submit,
+    CycleRangeStyle,
 }
 
 /// A footer hint: the keys as the footer writes them, a short label, and when it shows.
@@ -497,6 +502,10 @@ pub const BINDINGS: &[Binding] = &[
         ..row("?", "Help", "", Context::Range)
     },
     Binding {
+        chords: &[(Key::F(2), Action::CycleRangeStyle)],
+        ..row("F2", "Cycle the range-marking styles", "", Context::Debug)
+    },
+    Binding {
         hints: &[hint("enter", "go")],
         priority: PINNED,
         chords: &[(Key::Enter, Action::Submit)],
@@ -564,7 +573,7 @@ fn fallbacks(context: Context) -> &'static [Context] {
             &[Context::Global]
         }
         Context::Range => &[Context::Main, Context::Global],
-        Context::Prompt => &[],
+        Context::Prompt | Context::Debug => &[],
     }
 }
 
@@ -574,7 +583,7 @@ fn hints_global(context: Context) -> bool {
         Context::Main | Context::Global | Context::CopyMenu | Context::SortMenu | Context::Help => {
             true
         }
-        Context::Range | Context::Prompt => false,
+        Context::Range | Context::Prompt | Context::Debug => false,
     }
 }
 
@@ -616,8 +625,14 @@ fn unbound(context: Context, key: Key) -> Option<Action> {
         | Context::Global
         | Context::CopyMenu
         | Context::SortMenu
-        | Context::Help => None,
+        | Context::Help
+        | Context::Debug => None,
     }
+}
+
+/// What `key` does among the debug keys, which only a debug run reads.
+pub fn debug_action_for(key: Key) -> Option<Action> {
+    chord_in(Context::Debug, key)
 }
 
 /// The hints a context's footer may show, in display order, each with its priority.

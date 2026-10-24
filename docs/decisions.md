@@ -171,3 +171,11 @@ Decision: The `c` menu is a dialog that previews every format's line for the cur
 Why: A menu of format names made you try each one to see what it copied.
 
 Held by: `tui::tests::each_copy_as_key_copies_its_preview_and_closes_the_dialog` and `a_preview_too_wide_for_the_dialog_is_cut_with_a_mark_but_copies_whole` in `teamzones`
+
+## D22: The range's columns may carry the selection background, provisionally (2026-10-25)
+
+Decision: The selection background covers the focused row and the range's columns (every lane, the ruler and the answer rows), as the mockups always drew it. This is provisional: the shading is hard to read, so with `TEAMZONES_DEBUG=1`, `F2` cycles five range-marking styles (columns, edges, lines, underline, dim) and the footer names the current one. Under `NO_COLOR` the styles that need colour (columns, edges and dim) fall back to lines. The choice is local and never saved. Once Paul picks a style, a follow-up removes the others and the debug key. See [theme](spec/theme.md).
+
+Why: The theme text said the selected row was the only background, while the screen mockups shaded the range's columns too. Paul kept the shading at the hands-on round after M3, pending a side-by-side comparison.
+
+Held by: `tui::tests::each_range_style_marks_the_range_its_own_way`, `under_no_color_the_styles_that_need_colour_fall_back_to_edge_lines` and `f2_cycles_the_range_styles_only_in_debug_and_the_footer_names_the_style` in `teamzones`

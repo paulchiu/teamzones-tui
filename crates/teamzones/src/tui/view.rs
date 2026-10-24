@@ -14,7 +14,7 @@ use teamzones_core::fit::{day_start, slot_fits};
 use teamzones_core::question::{Row, evaluate, person_band};
 use teamzones_core::schedule::{Band, Level, band, is_day};
 
-use super::app::{App, Cursor, Lanes, Mode};
+use super::app::{App, Cursor, Lanes, Mode, RangeStyle};
 use super::glyphs::Glyphs;
 use super::layout::{Areas, MapChoice, layout};
 use super::say::{detail, duration_text, local_text, summary};
@@ -83,9 +83,63 @@ struct Track {
     minutes: u16,
     start: DateTime<Utc>,
     when: When,
+    /// How the range is marked, already fallen back for a theme without colour.
+    marking: RangeStyle,
+}
+
+/// The grid rows a range style can mark: the ruler, the track, a lane or an answer row.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Surface {
+    Ruler,
+    Track,
+    Lane,
+    Answer,
 }
 
 impl Track {
+    /// Cell `index`'s style on `surface`: `base` plus however this range style marks it.
+    fn marked(&self, theme: &Theme, surface: Surface, index: u16, base: Style) -> Style {
+        let selected = self.selected(index);
+        match (self.marking, surface) {
+            (RangeStyle::Columns, _) | (RangeStyle::Edges, Surface::Ruler | Surface::Track)
+                if selected =>
+            {
+                base.patch(theme.selection)
+            }
+            (RangeStyle::Underline, Surface::Ruler | Surface::Lane | Surface::Answer)
+                if selected =>
+            {
+                base.add_modifier(Modifier::UNDERLINED)
+            }
+            (RangeStyle::Dim, Surface::Lane | Surface::Answer) if !selected => {
+                base.add_modifier(Modifier::DIM)
+            }
+            _ => base,
+        }
+    }
+
+    /// Draws the edge glyphs styles 2 and 3 put just outside the range on `surface`'s row `y`.
+    fn edges(&self, buf: &mut Buffer, area: Rect, y: u16, look: Look, surface: Surface) {
+        let glyphs = look.glyphs;
+        let (before, after) = match (self.marking, surface) {
+            (RangeStyle::Edges, Surface::Lane) => (glyphs.edge_before, glyphs.edge_after),
+            (RangeStyle::Lines, Surface::Lane | Surface::Answer) => {
+                (glyphs.edge_line, glyphs.edge_line)
+            }
+            _ => return,
+        };
+        let mut selected = (0..self.cells).filter(|index| self.selected(*index));
+        let Some(first) = selected.next() else { return };
+        let last = selected.next_back().unwrap_or(first);
+        let style = look.theme.fg(Role::Accent);
+        if first > 0 {
+            set_char(buf, area, self.x + first - 1, y, before, style);
+        }
+        if last + 1 < self.cells {
+            set_char(buf, area, self.x + last + 1, y, after, style);
+        }
+    }
+
     fn cell_start(&self, index: u16) -> DateTime<Utc> {
         self.start + chrono::TimeDelta::minutes(i64::from(index) * i64::from(self.minutes))
     }
@@ -140,6 +194,7 @@ pub fn draw(frame: &mut Frame, app: &App, look: Look) {
         minutes: areas.columns.minutes,
         start: day_start(app.day(), app.roster().axis()),
         when: app.when(),
+        marking: app.range_style.without_colour(look.theme.is_mono()),
     };
     let buf = frame.buffer_mut();
     header(buf, clip(areas.header), app, look);
@@ -281,19 +336,23 @@ fn slider(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
         }
     }
     for (index, column) in track.columns() {
-        if track.selected(index) {
-            patch(buf, area, column, ruler_y, theme.selection);
-        }
+        patch(
+            buf,
+            area,
+            column,
+            ruler_y,
+            track.marked(theme, Surface::Ruler, index, Style::new()),
+        );
     }
     let selected: Vec<u16> = track
         .columns()
         .filter(|(index, _)| track.selected(*index))
         .map(|(_, column)| column)
         .collect();
-    let mark = theme
-        .fg(Role::Accent)
-        .add_modifier(Modifier::BOLD)
-        .patch(theme.selection);
+    let mark = theme.fg(Role::Accent).add_modifier(Modifier::BOLD);
+    let mark = selected.first().map_or(mark, |first| {
+        track.marked(theme, Surface::Track, first - track.x, mark)
+    });
     match (app.shown_range(), selected.first(), selected.last()) {
         (Some(_), Some(first), Some(last)) if first != last => {
             for column in &selected {
@@ -354,12 +413,7 @@ fn lane(
 ) {
     let theme = look.theme;
     for ((index, column), (glyph, role)) in track.columns().zip(cells) {
-        let base = theme.fg(*role);
-        let style = if track.selected(index) {
-            base.patch(theme.selection)
-        } else {
-            base
-        };
+        let style = track.marked(theme, Surface::Lane, index, theme.fg(*role));
         set_char(buf, area, column, y, *glyph, style);
     }
     for (index, column) in track.columns() {
@@ -377,6 +431,7 @@ fn lane(
             );
         }
     }
+    track.edges(buf, area, y, look, Surface::Lane);
 }
 
 fn band_role(band: Band) -> Role {
@@ -580,13 +635,10 @@ fn answer(
                 })
                 .collect();
             for ((index, column), (glyph, role)) in track.columns().zip(cell_glyphs) {
-                let style = if track.selected(index) {
-                    theme.fg(role).patch(theme.selection)
-                } else {
-                    theme.fg(role)
-                };
+                let style = track.marked(theme, Surface::Answer, index, theme.fg(role));
                 set_char(buf, area, column, y, glyph, style);
             }
+            track.edges(buf, area, y, look, Surface::Answer);
         }
     }
 }
@@ -1040,7 +1092,18 @@ fn footer_row(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
         range: main && app.range.is_some(),
         away: main && !app.at_now(),
     };
-    let footer::Footer { badge, hints } = footer::line(context, situation, area.width);
+    let debug = app.debug.then(|| app.range_style.label());
+    let room = debug.as_ref().map_or(area.width, |label| {
+        area.width
+            .saturating_sub(u16::try_from(label.len() + 2).unwrap_or(u16::MAX))
+    });
+    if let Some(label) = &debug {
+        let x = area
+            .right()
+            .saturating_sub(u16::try_from(label.len()).unwrap_or(0));
+        put(buf, area, x, area.y, label, theme.fg(Role::Warn));
+    }
+    let footer::Footer { badge, hints } = footer::line(context, situation, room);
     let badge = badge.into_iter().flat_map(|badge| {
         [
             Span::styled(
@@ -1061,7 +1124,13 @@ fn footer_row(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
             ]
         }))
         .collect();
-    Line::from(spans).render(area, buf);
+    Line::from(spans).render(
+        Rect {
+            width: room,
+            ..area
+        },
+        buf,
+    );
 }
 
 /// The copy-as dialog: each format's key and the line it copies, with a dim description under it.

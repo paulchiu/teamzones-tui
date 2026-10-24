@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ## [Unreleased]
 
+### Added
+
+- A trading profile can name its three levels with `labels = { closed = "...", open = "...", busy = "..." }`, such as `open = "trading hours"`, and those words show on its place rows, in the say line and in `teamzones status`.
+- `c` opens a copy-as dialog that previews the exact line each format copies, with a short description under each, and `y` in it copies the plain line.
+- With `TEAMZONES_DEBUG=1`, `F2` cycles five ways of marking the range so they can be compared, and the footer names the current one.
+
+### Changed
+
+- Place levels are now called `closed`, `open` and `busy` (they were `quiet`, `off-peak` and `peak`), and a group's `where` takes `open` or `closed`. The old `off-peak` and `quiet` still work.
+- The who block shows each city in full when the row has room, cutting it only when the times need the space.
+- The box at the bottom is titled `times for <group>` and holds only the line `y` copies. The focused row's details move to a dim line above it.
+- The footer follows the mode: drawing a range shows a `range` badge and only the range keys, a committed range offers `esc clear range`, and `. now` shows whenever you are away from now. `1-9 group` moves to the `?` help.
+- Under `NO_COLOR`, the range is marked with edge lines instead of shading.
+
 ## [0.4.0] - 2026-10-24
 
 ### Added

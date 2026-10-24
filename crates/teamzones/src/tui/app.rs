@@ -60,6 +60,59 @@ pub enum Lanes {
     Plain,
 }
 
+/// How the range is marked across the grid, cycled with `F2` under `TEAMZONES_DEBUG=1` until
+/// one is picked.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RangeStyle {
+    /// The selection background on every in-range cell.
+    Columns,
+    /// The selection background on the ruler and track, and edge bars on every lane.
+    Edges,
+    /// Edge lines through every lane and answer row, with no fill.
+    Lines,
+    /// In-range cells underlined.
+    Underline,
+    /// Cells outside the range dimmed.
+    Dim,
+}
+
+impl RangeStyle {
+    const ALL: [Self; 5] = [
+        Self::Columns,
+        Self::Edges,
+        Self::Lines,
+        Self::Underline,
+        Self::Dim,
+    ];
+
+    pub fn next(self) -> Self {
+        let index = Self::ALL.iter().position(|s| *s == self).unwrap_or(0);
+        Self::ALL[(index + 1) % Self::ALL.len()]
+    }
+
+    /// The footer's name for it, such as `range style 2/5: edges`.
+    pub fn label(self) -> String {
+        let index = Self::ALL.iter().position(|s| *s == self).unwrap_or(0);
+        let name = match self {
+            Self::Columns => "columns",
+            Self::Edges => "edges",
+            Self::Lines => "lines",
+            Self::Underline => "underline",
+            Self::Dim => "dim",
+        };
+        format!("range style {}/{}: {name}", index + 1, Self::ALL.len())
+    }
+
+    /// The style to draw when the theme has no colour: those that need a background or a dim
+    /// foreground fall back to edge lines.
+    pub fn without_colour(self, mono: bool) -> Self {
+        match self {
+            Self::Columns | Self::Edges | Self::Dim if mono => Self::Lines,
+            Self::Columns | Self::Edges | Self::Lines | Self::Underline | Self::Dim => self,
+        }
+    }
+}
+
 /// The one level of undo: the lens and marks a group switch dropped, until it expires.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Undo {
@@ -98,6 +151,9 @@ pub struct App {
     pub lanes: Lanes,
     pub sort: Sort,
     pub running: bool,
+    /// Whether `TEAMZONES_DEBUG=1` turned on the debug keys.
+    pub debug: bool,
+    pub range_style: RangeStyle,
 }
 
 impl App {
@@ -124,6 +180,8 @@ impl App {
             lanes: Lanes::Hours,
             sort: Sort::Offset,
             running: true,
+            debug: false,
+            range_style: RangeStyle::Columns,
         }
     }
 

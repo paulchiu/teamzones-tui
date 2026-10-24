@@ -54,16 +54,20 @@ impl Role {
 pub struct TerminalEnv {
     pub no_color: bool,
     pub truecolor: bool,
+    /// `TEAMZONES_DEBUG=1`, which turns on the debug keys.
+    pub debug: bool,
 }
 
 impl TerminalEnv {
-    /// Reads `NO_COLOR` (set and non-empty) and `COLORTERM` (`truecolor` or `24bit`).
+    /// Reads `NO_COLOR` (set and non-empty), `COLORTERM` (`truecolor` or `24bit`) and
+    /// `TEAMZONES_DEBUG`.
     pub fn from_env() -> Self {
         let set = |name: &str| std::env::var_os(name).is_some_and(|value| !value.is_empty());
         let colorterm = std::env::var("COLORTERM").unwrap_or_default();
         Self {
             no_color: set("NO_COLOR"),
             truecolor: matches!(colorterm.as_str(), "truecolor" | "24bit"),
+            debug: std::env::var("TEAMZONES_DEBUG").is_ok_and(|value| value == "1"),
         }
     }
 }
@@ -171,6 +175,11 @@ impl Theme {
         })
     }
 
+    /// Whether this theme draws no colour, as under `NO_COLOR` or `scheme = "mono"`.
+    pub fn is_mono(&self) -> bool {
+        self.scheme == Scheme::Mono
+    }
+
     /// A foreground-only style for `role`.
     pub fn fg(&self, role: Role) -> Style {
         Style::new().fg(self.color(role))
@@ -192,6 +201,7 @@ mod tests {
             TerminalEnv {
                 no_color: true,
                 truecolor: true,
+                debug: false,
             },
         );
         let roles = [Role::Accent, Role::Warn, Role::Work, Role::Night];
@@ -216,6 +226,7 @@ mod tests {
                 TerminalEnv {
                     no_color: false,
                     truecolor,
+                    debug: false,
                 },
             )
             .color(Role::Marker)
