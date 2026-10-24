@@ -236,3 +236,78 @@ fn config_edit_seeds_the_template_before_opening_the_editor() {
     let text = std::fs::read_to_string(&path).unwrap();
     assert!(text.starts_with("## teamzones configuration"), "{text}");
 }
+
+/// A copy of the fixture in a fresh directory, so a test can write to it.
+fn fixture_copy(name: &str) -> (std::path::PathBuf, String) {
+    let path = scratch(name).join("config.toml");
+    let text = std::fs::read_to_string(FIXTURE).unwrap();
+    std::fs::write(&path, &text).unwrap();
+    (path, text)
+}
+
+const TRAVEL: &str = "\n[travel]\nhere = \"London\"\nuntil = 2026-11-01\n";
+
+#[test]
+fn here_with_no_arguments_reports_home_when_not_travelling() {
+    teamzones()
+        .arg("here")
+        .assert()
+        .success()
+        .stdout("home Melbourne\n");
+}
+
+#[test]
+fn here_writes_travel_after_the_untouched_file_and_clear_removes_it() {
+    let (path, original) = fixture_copy("here-set-clear");
+    teamzones_on(&path)
+        .args(["here", "london", "--until", "2026-11-01"])
+        .assert()
+        .success()
+        .stdout("here London until 2026-11-01\n");
+    assert_eq!(
+        std::fs::read_to_string(&path).unwrap(),
+        format!("{original}{TRAVEL}")
+    );
+    teamzones_on(&path)
+        .arg("here")
+        .assert()
+        .success()
+        .stdout("here London until 2026-11-01\n");
+    teamzones_on(&path)
+        .args(["here", "--clear"])
+        .assert()
+        .success()
+        .stdout("home Melbourne\n");
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+}
+
+#[test]
+fn here_reports_home_once_until_has_passed_in_the_travel_city() {
+    let (path, original) = fixture_copy("here-expired");
+    std::fs::write(&path, format!("{original}{TRAVEL}")).unwrap();
+    teamzones_on(&path)
+        .args(["here", "--now", "2026-11-02T00:30:00Z"])
+        .assert()
+        .success()
+        .stdout("home Melbourne\n");
+}
+
+#[test]
+fn here_never_writes_over_a_file_that_does_not_parse() {
+    let path = scratch("here-broken").join("config.toml");
+    let broken = "[home]\nname = \"Kim\"\ncolour = 1\n";
+    std::fs::write(&path, broken).unwrap();
+    teamzones_on(&path)
+        .args(["here", "london", "--until", "2026-11-01"])
+        .assert()
+        .code(2)
+        .stderr(format!("{}: line 3: unknown key \"colour\"\n", path.display()));
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), broken);
+}
+
+#[test]
+fn here_needs_until_when_setting() {
+    let (path, original) = fixture_copy("here-no-until");
+    teamzones_on(&path).args(["here", "london"]).assert().code(2);
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+}

@@ -2,11 +2,12 @@
 
 use std::io::Write;
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use chrono_tz::Tz;
 use clap::{Args, Parser, Subcommand};
+use teamzones_core::cities;
 use teamzones_core::clock::Clock;
-use teamzones_core::config::{Config, Group, Roster, Rule};
+use teamzones_core::config::{Config, Group, PersonId, Roster, Rule};
 use teamzones_core::copy::{Clause, Variant, say_line};
 use teamzones_core::expr::{ExprError, parse_expr};
 use teamzones_core::fit::resolve;
@@ -40,11 +41,26 @@ enum Command {
     },
     /// Print one line per group: its members and the question it asks.
     Groups,
+    /// Show, set or clear a dated travel override.
+    Here(HereArgs),
     /// Find, create, edit or validate the config file.
     Config {
         #[command(subcommand)]
         action: ConfigAction,
     },
+}
+
+#[derive(Debug, Args)]
+struct HereArgs {
+    /// The city you are in, from the bundled list.
+    #[arg(requires = "until", conflicts_with = "clear")]
+    city: Option<String>,
+    /// The last day of the trip, in the city's local date, such as 2026-11-01.
+    #[arg(long, requires = "city")]
+    until: Option<NaiveDate>,
+    /// Remove the travel override.
+    #[arg(long)]
+    clear: bool,
 }
 
 #[derive(Debug, Subcommand)]
@@ -174,6 +190,7 @@ pub fn run(cli: Cli, io: &mut Io) -> Result<(), Failure> {
         Some(Command::Status { words: tokens }) => status(&tokens, now, io),
         Some(Command::Groups) => groups(io),
         Some(Command::Config { action }) => config(&action, io),
+        Some(Command::Here(args)) => here(&args, now, io),
         None => Err(usage(
             "teamzones needs a command for now: try teamzones --help",
         )),
@@ -383,6 +400,35 @@ fn config(action: &ConfigAction, io: &mut Io) -> Result<(), Failure> {
             writeln!(io.out, "{shown}: {verdict}").map_err(output)
         }
     }
+}
+
+/// `here London until 2026-11-01` while travel is active, else `home Melbourne`.
+fn whereabouts(config: &Config, now: DateTime<Utc>) -> String {
+    match &config.travel {
+        Some(travel) if travel.is_active(now) => {
+            format!("here {} until {}", travel.here, travel.until)
+        }
+        Some(_) | None => format!("home {}", config.roster.person(PersonId::HOME).city),
+    }
+}
+
+fn here(args: &HereArgs, now: DateTime<Utc>, io: &mut Io) -> Result<(), Failure> {
+    let HereArgs { city, until, clear } = args;
+    let path = paths::config_path().map_err(usage)?;
+    let config = match (city, until, clear) {
+        (Some(city), Some(until), _) => {
+            let city = cities::lookup(city).map_err(usage)?;
+            write::edit_config(&path, io.system_zone, |document| {
+                write::set_travel(document, city.name, *until);
+            })
+            .map_err(usage)?
+        }
+        (None, _, true) => {
+            write::edit_config(&path, io.system_zone, write::clear_travel).map_err(usage)?
+        }
+        (Some(_), None, _) | (None, _, false) => load(io)?,
+    };
+    writeln!(io.out, "{}", whereabouts(&config, now)).map_err(output)
 }
 
 #[cfg(test)]

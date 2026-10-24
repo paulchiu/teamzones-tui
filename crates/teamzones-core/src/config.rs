@@ -256,6 +256,13 @@ pub struct Travel {
     pub until: NaiveDate,
 }
 
+impl Travel {
+    /// Whether the override holds at `now`: through the end of `until` in the travel city's local date.
+    pub fn is_active(&self, now: chrono::DateTime<chrono::Utc>) -> bool {
+        now.with_timezone(&self.location.tz).date_naive() <= self.until
+    }
+}
+
 /// A validated config.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Config {
@@ -1471,5 +1478,14 @@ mod tests {
         let config = Config::load(None, MELBOURNE).unwrap();
         let home = config.roster.person(PersonId::HOME);
         assert!((home.location.lat - -37.8).abs() < 0.1, "{:?}", home.location);
+    }
+
+    #[test]
+    fn travel_holds_through_the_end_of_until_in_the_travel_citys_date() {
+        let text = format!("{FIXTURE}\n[travel]\nhere = \"London\"\nuntil = 2026-11-01\n");
+        let travel = Config::parse(&text).unwrap().travel.unwrap();
+        // 11:30pm GMT on 1 Nov is still the 1st in London, though it is the 2nd in Melbourne.
+        assert!(travel.is_active("2026-11-01T23:30:00Z".parse().unwrap()));
+        assert!(!travel.is_active("2026-11-02T00:00:00Z".parse().unwrap()));
     }
 }
