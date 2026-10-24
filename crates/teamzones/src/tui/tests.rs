@@ -157,11 +157,11 @@ fn switching_groups_never_moves_the_ruler_the_borders_or_the_say_panel() {
     assert_eq!(anchors(&regions), anchors(&deploy));
     assert_eq!(
         say_line(&regions),
-        "5-6pm AEDT, open in UK and US, busy in AU"
+        "5-6pm AEDT, closed in UK and US, busy in AU"
     );
     assert_eq!(
         say_line(&deploy),
-        "5-6pm AEDT / 4-5pm AEST / 8-9am SAST, open in UK, busy in AU"
+        "5-6pm AEDT / 4-5pm AEST / 8-9am SAST, closed in UK, busy in AU"
     );
 }
 
@@ -193,13 +193,19 @@ fn n_from_saturday_on_deploy_lands_on_monday_and_shortens_the_range() {
 #[test]
 fn repeated_n_steps_run_by_run() {
     let app = press(go_to(press(fixture(), &chars("3")), "mon 2pm"), &chars("n"));
-    assert_eq!(app.say_line(), "9-10pm AEDT, open in AU, UK and US");
+    assert_eq!(
+        app.say_line(),
+        "9-10pm AEDT, open in AU and UK, closed in US"
+    );
 }
 
 #[test]
 fn shift_n_lands_on_the_start_of_the_previous_run() {
     let app = press(go_to(press(fixture(), &chars("3")), "mon 9pm"), &chars("N"));
-    assert_eq!(app.say_line(), "2-3pm AEDT, open in AU, UK and US");
+    assert_eq!(
+        app.say_line(),
+        "2-3pm AEDT, open in AU and US, closed in UK"
+    );
 }
 
 #[test]
@@ -327,7 +333,7 @@ fn c_a_copies_the_line_for_all() {
     assert_eq!(
         copied(&press_all(app, &chars("ca")).1),
         [
-            "5-6pm AEDT / 4-5pm AEST / 8-9am SAST / 6-7am GMT / 1-2am CDT, open in UK and US, busy in AU"
+            "5-6pm AEDT / 4-5pm AEST / 8-9am SAST / 6-7am GMT / 1-2am CDT, closed in UK and US, busy in AU"
         ]
     );
 }
@@ -828,10 +834,14 @@ fn where_border(app: &App) -> String {
     row(&buf, y_of(&buf, " where "))
 }
 
+const SCREEN_SPEC: &str = include_str!("../../../../docs/spec/screen.md");
+
 #[test]
 fn the_where_legend_names_the_default_levels() {
+    let (_, rest) = SCREEN_SPEC.split_once("the load legend ").unwrap();
+    let legend = rest.split('`').nth(1).unwrap();
     assert!(
-        where_border(&team_monday()).ends_with("▁ closed  ▄ open  █ busy"),
+        where_border(&team_monday()).ends_with(legend),
         "{}",
         where_border(&team_monday())
     );
@@ -994,7 +1004,7 @@ fn c_opens_a_dialog_previewing_every_format_with_its_key_and_description() {
             "with place zones",
             "s  5-6pm AEDT / 4-5pm AEST / 8-9am SAST",
             "without the clause",
-            "a  5-6pm AEDT / 4-5pm AEST / 8-9am SAST / 6-7am GMT / 1-2am CDT, open in UK and US, busy in AU",
+            "a  5-6pm AEDT / 4-5pm AEST / 8-9am SAST / 6-7am GMT / 1-2am CDT, closed in UK and US, busy in AU",
             "everyone",
         ]
     );
@@ -1028,7 +1038,7 @@ fn a_preview_too_wide_for_the_dialog_is_cut_with_a_mark_but_copies_whole() {
     assert_eq!(
         copied(&effects),
         [
-            "5-6pm AEDT / 4-5pm AEST / 8-9am SAST / 6-7am GMT / 1-2am CDT, open in UK and US, busy in AU"
+            "5-6pm AEDT / 4-5pm AEST / 8-9am SAST / 6-7am GMT / 1-2am CDT, closed in UK and US, busy in AU"
         ]
     );
 }

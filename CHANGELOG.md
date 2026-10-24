@@ -15,10 +15,11 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 ### Changed
 
 - Place levels are now called `closed`, `open` and `busy` (they were `quiet`, `off-peak` and `peak`), and a group's `where` takes `open` or `closed`. The old `off-peak` and `quiet` still work.
+- The say line names each place by its own state, such as `open in AU and US, closed in UK`, so a closed place is never called open.
 - The who block shows each city in full when the row has room, cutting it only when the times need the space.
 - The box at the bottom is titled `times for <group>` and holds only the line `y` copies. The focused row's details move to a dim line above it.
 - The footer follows the mode: drawing a range shows a `range` badge and only the range keys, a committed range offers `esc clear range`, and `. now` shows whenever you are away from now. `1-9 group` moves to the `?` help.
-- Under `NO_COLOR`, the range is marked with edge lines instead of shading.
+- Under `NO_COLOR` or `scheme = "mono"`, the range is marked with edge lines instead of shading.
 
 ## [0.4.0] - 2026-10-24
 

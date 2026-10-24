@@ -4,7 +4,7 @@ Seeded from the shared contract of the teamzones build spec (2026-10-24). Where 
 
 ## Summary
 
-Build `teamzones`, a single binary with a TUI and a headless CLI. It shows people (who you tell) by availability and places (regions we operate in) by trading load on one home-time axis. It finds slots that answer a group's question, and copies a `ttz`-style line such as `5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST, open in AU and UK`.
+Build `teamzones`, a single binary with a TUI and a headless CLI. It shows people (who you tell) by availability and places (regions we operate in) by trading load on one home-time axis. It finds slots that answer a group's question, and copies a `ttz`-style line such as `5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST, open in AU, closed in UK`.
 
 ## Scope
 

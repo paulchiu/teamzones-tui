@@ -132,37 +132,32 @@ fn and_list(names: &[&str]) -> String {
     }
 }
 
-/// The places' states, counting places first, as in `open in UK, busy in AU`.
+/// Levels in clause order: the ones the rule counts first, then the rest.
+fn clause_order(rule: Rule) -> &'static [Level] {
+    match rule {
+        Rule::Open => &[Level::Open, Level::Closed, Level::Busy],
+        Rule::Closed => &[Level::Closed, Level::Busy, Level::Open],
+        Rule::Context => &[],
+    }
+}
+
+/// The places' states, as in `open in AU and US, closed in UK`.
 ///
-/// Each place speaks its own profile's labels, so places that share a state but not its word
-/// form separate groups, in config order.
+/// Each place is named by its real state in its own profile's labels, so the line never calls a
+/// closed place open. Places that share a state but not its word form separate groups, in
+/// config order.
 fn clause(roster: &Roster, marks: &Marks, when: When) -> Option<String> {
     let states: Vec<(&Place, Level)> = marks
         .counted_places()
         .into_iter()
         .filter_map(|id| place_state(roster, id, when).map(|level| (roster.place(id), level)))
         .collect();
-    let counts = |level| marks.rule.admits(level);
-    // Each section names its word's level, and the uncounted level it lists, or `None` for the
-    // counting places.
-    let sections: &[(Level, Option<Level>)] = match marks.rule {
-        Rule::Open => &[(Level::Open, None), (Level::Busy, Some(Level::Busy))],
-        Rule::Closed => &[
-            (Level::Closed, None),
-            (Level::Busy, Some(Level::Busy)),
-            (Level::Open, Some(Level::Open)),
-        ],
-        Rule::Context => &[],
-    };
     let mut groups: Vec<(&str, Vec<&str>)> = Vec::new();
-    for &(word_level, uncounted) in sections {
+    for &section in clause_order(marks.rule) {
         let first = groups.len();
-        let listed = states.iter().filter(|(_, level)| match uncounted {
-            None => counts(*level),
-            Some(wanted) => !counts(*level) && *level == wanted,
-        });
+        let listed = states.iter().filter(|(_, level)| *level == section);
         for (place, _) in listed {
-            let word = place.labels().word(word_level);
+            let word = place.labels().word(section);
             match groups[first..].iter_mut().find(|(known, _)| *known == word) {
                 Some((_, names)) => names.push(&place.name),
                 None => groups.push((word, vec![&place.name])),
@@ -273,15 +268,28 @@ mod tests {
     }
 
     #[test]
+    fn a_counting_place_is_named_by_its_real_state_not_the_question() {
+        let roster = Config::parse(FIXTURE).unwrap().roster;
+        assert_eq!(
+            line(&roster, "apps 3pm"),
+            "3pm AEDT, open in AU, closed in UK and US"
+        );
+        assert_eq!(
+            line(&roster, "regions 2-4pm mon"),
+            "2-4pm AEDT, open in AU and US, closed in UK"
+        );
+    }
+
+    #[test]
     fn each_place_speaks_its_own_profile_s_labels() {
         let roster = labelled();
         assert_eq!(
             line(&roster, "regions -@us 5:30pm mon"),
-            "5:30pm AEDT, trading hours in UK, rush in AU"
+            "5:30pm AEDT, closed in UK, rush in AU"
         );
         assert_eq!(
             line(&roster, "regions 2-4pm mon"),
-            "2-4pm AEDT, trading hours in AU and UK, open in US"
+            "2-4pm AEDT, trading hours in AU, open in US, closed in UK"
         );
     }
 }

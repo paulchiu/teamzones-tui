@@ -100,34 +100,46 @@ impl Track {
     /// Cell `index`'s style on `surface`: `base` plus however this range style marks it.
     fn marked(&self, theme: &Theme, surface: Surface, index: u16, base: Style) -> Style {
         let selected = self.selected(index);
-        match (self.marking, surface) {
-            (RangeStyle::Columns, _) | (RangeStyle::Edges, Surface::Ruler | Surface::Track)
-                if selected =>
-            {
-                base.patch(theme.selection)
-            }
-            (RangeStyle::Underline, Surface::Ruler | Surface::Lane | Surface::Answer)
-                if selected =>
-            {
-                base.add_modifier(Modifier::UNDERLINED)
-            }
-            (RangeStyle::Dim, Surface::Lane | Surface::Answer) if !selected => {
-                base.add_modifier(Modifier::DIM)
-            }
-            _ => base,
+        let shade = || base.patch(theme.selection);
+        match self.marking {
+            RangeStyle::Columns if selected => shade(),
+            RangeStyle::Edges if selected => match surface {
+                Surface::Ruler => shade(),
+                Surface::Track | Surface::Lane | Surface::Answer => base,
+            },
+            RangeStyle::Underline if selected => match surface {
+                Surface::Ruler | Surface::Lane | Surface::Answer => {
+                    base.add_modifier(Modifier::UNDERLINED)
+                }
+                Surface::Track => base,
+            },
+            RangeStyle::Dim if !selected => match surface {
+                Surface::Lane | Surface::Answer => base.add_modifier(Modifier::DIM),
+                Surface::Ruler | Surface::Track => base,
+            },
+            RangeStyle::Columns
+            | RangeStyle::Edges
+            | RangeStyle::Lines
+            | RangeStyle::Underline
+            | RangeStyle::Dim => base,
         }
     }
 
     /// Draws the edge glyphs styles 2 and 3 put just outside the range on `surface`'s row `y`.
     fn edges(&self, buf: &mut Buffer, area: Rect, y: u16, look: Look, surface: Surface) {
         let glyphs = look.glyphs;
-        let (before, after) = match (self.marking, surface) {
-            (RangeStyle::Edges, Surface::Lane) => (glyphs.edge_before, glyphs.edge_after),
-            (RangeStyle::Lines, Surface::Lane | Surface::Answer) => {
-                (glyphs.edge_line, glyphs.edge_line)
-            }
-            _ => return,
+        let pair = match self.marking {
+            RangeStyle::Edges => match surface {
+                Surface::Lane => Some((glyphs.edge_before, glyphs.edge_after)),
+                Surface::Ruler | Surface::Track | Surface::Answer => None,
+            },
+            RangeStyle::Lines => match surface {
+                Surface::Lane | Surface::Answer => Some((glyphs.edge_line, glyphs.edge_line)),
+                Surface::Ruler | Surface::Track => None,
+            },
+            RangeStyle::Columns | RangeStyle::Underline | RangeStyle::Dim => None,
         };
+        let Some((before, after)) = pair else { return };
         let mut selected = (0..self.cells).filter(|index| self.selected(*index));
         let Some(first) = selected.next() else { return };
         let last = selected.next_back().unwrap_or(first);

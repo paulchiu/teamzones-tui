@@ -104,7 +104,7 @@ h/l time  v range  n next fit  space mark  1-9 group  w save  tab groups  y copy
   + ratatui `Canvas` with `Map { resolution: High }` and Braille markers, cropped to latitudes -58 to 80.
   + After the canvas renders, paint the night side onto the buffer: dim the foreground and add the night background tint. Draw `☼` at the subsolar point.
   + Markers: `⌂` home, `●` counted people, `◆` counted places. Uncounted people are dim `●` and uncounted places dim `◇`. Uncounted markers are drawn first, so a counted marker wins a shared cell.
-  + Labels are drawn only for home and counted rows: `City 4-5pm` for a person (with `·N` after it when N counted people share the city, as in `Brisbane 4-5pm ·2`), and `UK quiet 3-5am` for a place. Try the right of the marker on its row first, then the row above, then the left. Drop the label whole if all three overlap another label or leave the map.
+  + Labels are drawn only for home and counted rows: `City 4-5pm` for a person (with `·N` after it when N counted people share the city, as in `Brisbane 4-5pm ·2`), and `UK closed 3-5am` for a place, using its profile's label for the state. Try the right of the marker on its row first, then the row above, then the left. Drop the label whole if all three overlap another label or leave the map.
   + The night side and `☼` use the range midpoint, or the cursor when there is no range.
 * **Map hiding**:
   + The map shows only if there are at least 100 columns and at least 12 rows are left after the fixed rows.

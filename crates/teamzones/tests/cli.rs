@@ -485,7 +485,7 @@ fn say_and_status_use_a_profile_s_labels() {
         .args(["say", "regions", "-@us", "5:30pm", "mon", "--no-copy"])
         .assert()
         .success()
-        .stdout("5:30pm AEDT, trading hours in UK, rush in AU\n");
+        .stdout("5:30pm AEDT, closed in UK, rush in AU\n");
     let status = teamzones_on(&path)
         .args(["status", "regions"])
         .assert()

@@ -25,14 +25,14 @@ Fixture config, `--now 2026-10-23T22:04:00Z`, `--no-copy`.
 | `say team 3pm` | `3pm AEDT / 2pm AEST / 6am SAST` |
 | `say au 3pm` | `3pm AEDT / 2pm AEST` |
 | `say 3pm` | `3pm AEDT / 2pm AEST / 6am SAST` (first group is team) |
-| `say apps 3pm` | `3pm AEDT, open in AU, UK and US` |
+| `say apps 3pm` | `3pm AEDT, open in AU, closed in UK and US` |
 | `say apps 3pm --zones` | `3pm AEDT / 5am BST / Fri 11pm CDT` |
-| `say regions 2-4pm mon` | `2-4pm AEDT, open in AU, UK and US` |
-| `say regions -@us 5:30pm mon` | `5:30pm AEDT, open in UK, busy in AU` |
-| `say regions -@au 5:30pm mon` | `5:30pm AEDT, open in UK and US` |
-| `say team +@uk 5pm mon` | `5pm AEDT / 4pm AEST / 8am SAST, open in UK` |
-| `say deploy next` | `Mon 26 Oct, 5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST, open in AU and UK` |
-| `say regions next` | `Sat 24 Oct, 9:15-10am AEDT, open in AU, UK and US` |
+| `say regions 2-4pm mon` | `2-4pm AEDT, open in AU and US, closed in UK` |
+| `say regions -@us 5:30pm mon` | `5:30pm AEDT, closed in UK, busy in AU` |
+| `say regions -@au 5:30pm mon` | `5:30pm AEDT, closed in UK and US` |
+| `say team +@uk 5pm mon` | `5pm AEDT / 4pm AEST / 8am SAST, closed in UK` |
+| `say deploy next` | `Mon 26 Oct, 5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST, open in AU, closed in UK` |
+| `say regions next` | `Sat 24 Oct, 9:15-10am AEDT, open in AU and US, closed in UK` |
 | `say team next` | `Mon 26 Oct, 5-6pm AEDT / 4-5pm AEST / 8-9am SAST` |
 | `say uk now` | (stderr) `uk is a place: did you mean @uk?`, exit 2 |
 | `say regions -au 5pm` | (stderr) `regions -au: none of au's people are in regions; did you mean -@au?`, exit 2 |

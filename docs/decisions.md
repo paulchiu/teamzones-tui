@@ -46,6 +46,8 @@ Held by: nothing yet
 
 ## D6: Off-peak means not at peak (2026-10-24)
 
+Superseded by D17, which renames the keywords to `open` and `closed` and keeps this meaning.
+
 Decision: `where = "off-peak"` (the default) counts a place that is not at peak. `where = "quiet"` counts a place only while it is closed.
 
 Why: With the sample profiles, AU, UK and US are never all closed at once.
@@ -134,15 +136,15 @@ Held by: `config::tests` in `teamzones-core` (no file, a file of only comments, 
 
 ## D17: Place levels are closed, open and busy, and a trading profile may rename them (2026-10-25)
 
-Decision: The default level words are `closed`, `open` and `busy`, replacing `quiet`, `off-peak` and `peak`, and `where` takes `open` and `closed`. A trading profile's `labels` renames the three words wherever its places appear, and the where legend shows them only when every place shares them. The old keywords still load as aliases (`off-peak` as `open`, `quiet` as `closed`), and D6's meaning is unchanged: `open` as a question counts a place that is not busy, closed included. See [config](spec/config.md#data-model-and-config) and [copy](spec/copy.md).
+Decision: The default level words are `closed`, `open` and `busy`, replacing `quiet`, `off-peak` and `peak`, and `where` takes `open` and `closed`. A trading profile's `labels` renames the three words wherever its places appear, and the where legend shows them only when every place shares them. The old keywords still load as aliases (`off-peak` as `open`, `quiet` as `closed`), and D6's meaning is unchanged: `open` as a question counts a place that is not busy, closed included. The say clause names each place by its real state, so a closed place that counts reads `closed in UK`, never `open in UK`. See [config](spec/config.md#data-model-and-config) and [copy](spec/copy.md).
 
-Why: The old words are hospitality words, and an office or support desk reads better as "office hours" or "trading hours". Paul chose the generic defaults at the hands-on round after M3.
+Why: The old words are hospitality words, and an office or support desk reads better as "office hours" or "trading hours". Paul chose the generic defaults at the hands-on round after M3. `off-peak` was true of a closed place, but `open` and a profile's label name a level, so the clause must use the place's own level to stay true.
 
-Held by: `config::tests::where_takes_the_new_keywords_and_the_old_ones_as_aliases` and the `labels` tests in `config::tests` in `teamzones-core`, `copy::tests::each_place_speaks_its_own_profile_s_labels`, the copy and CLI golden tables, and `tui::tests::the_where_legend_shows_labels_every_place_shares_and_the_defaults_otherwise` in `teamzones`
+Held by: `config::tests::where_takes_the_new_keywords_and_the_old_ones_as_aliases` and the `labels` tests in `config::tests` in `teamzones-core`, `copy::tests::each_place_speaks_its_own_profile_s_labels` and `a_counting_place_is_named_by_its_real_state_not_the_question`, the copy and CLI golden tables, and `tui::tests::the_where_legend_shows_labels_every_place_shares_and_the_defaults_otherwise` in `teamzones`
 
 ## D18: City names show in full whenever the label has room (2026-10-25)
 
-Decision: The who block's city column is sized to the longest city and cuts with a mark only when a row would otherwise lose its time. The column still appears only when the label is at least 32 columns, so at 120 columns (a 24-column label) there is no city column at all. See the row label in [screen](spec/screen.md).
+Decision: The who block's city column is sized to the longest city and cuts with a mark only when a row would otherwise lose its time. When the column appears at all is unchanged, and the widths are in the row label and columns rules of [screen](spec/screen.md).
 
 Why: A fixed 9-column cap cut `Johannesburg` to `Johannes.` on wide terminals with plenty of spare room.
 

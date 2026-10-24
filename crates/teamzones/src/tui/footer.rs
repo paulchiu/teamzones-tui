@@ -162,9 +162,22 @@ mod tests {
         );
     }
 
+    const SCREEN_SPEC: &str = include_str!("../../../../docs/spec/screen.md");
+
+    /// The first backticked text after `marker` in the screen spec.
+    fn spec_code_after(marker: &str) -> &'static str {
+        let (_, rest) = SCREEN_SPEC
+            .split_once(marker)
+            .expect("the screen spec has the marker");
+        rest.split('`')
+            .nth(1)
+            .expect("a backticked value follows the marker")
+    }
+
     #[test]
     fn while_drawing_a_range_the_footer_leads_with_the_mode_and_only_its_keys() {
-        let expected = "range  h/l move end  H/L 1h  o swap end  v/enter done  esc cancel  ? help";
+        let keys = spec_code_after("shows only the range keys: ");
+        let expected = format!("range  {keys}  ? help");
         assert_eq!(at(Context::Range, RANGED, 120), expected);
         assert_eq!(at(Context::Range, RANGED, 80), expected);
         assert_eq!(
