@@ -155,3 +155,11 @@ Decision: The box at the bottom is titled `times for <group>` and contains only 
 Why: With the detail inside a border that said `y copies this line`, the box read as if all of it was copied.
 
 Held by: `tui::tests::the_copy_box_holds_only_the_line_y_copies_and_the_detail_sits_above_it` in `teamzones`
+
+## D20: The footer follows the mode (2026-10-25)
+
+Decision: The footer shows the keys that matter for the current mode: a `range` badge and only the range keys while drawing a range, `esc clear range` with a committed range, and `. now` away from now. Mode hints drop last, after everything but `? help` and `q quit`. `1-9 group` leaves the footer and stays in help. See the footer in [screen](spec/screen.md).
+
+Why: A footer that never changed never said what mode you were in or how to get out of it.
+
+Held by: the `footer::tests` mode tests and `tui::tests::range_mode_leads_the_footer_with_its_badge_and_keys_and_keeps_the_main_keys` in `teamzones`, plus the binding meta-test `every_hinted_key_dispatches_in_its_context`

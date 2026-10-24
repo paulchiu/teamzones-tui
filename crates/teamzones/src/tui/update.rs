@@ -41,9 +41,10 @@ pub enum Effect {
     Copy { key: String, text: String },
 }
 
-/// The context whose bindings read the next key.
-pub fn context(mode: &Mode) -> Context {
-    match mode {
+/// The context whose bindings read the next key: a modal, range mode while drawing, or main.
+pub fn context(app: &App) -> Context {
+    match &app.mode {
+        Mode::Normal if app.visual.is_some() => Context::Range,
         Mode::Normal => Context::Main,
         Mode::Prompt(_) => Context::Prompt,
         Mode::CopyMenu => Context::CopyMenu,
@@ -103,7 +104,7 @@ fn with_notice(app: App, key: &str, text: &str, now: DateTime<Utc>) -> App {
 }
 
 fn on_key(app: App, key: Key) -> (App, Vec<Effect>) {
-    let Some(action) = action_for(context(&app.mode), key) else {
+    let Some(action) = action_for(context(&app), key) else {
         return (app, Vec::new());
     };
     let app = App {
@@ -205,7 +206,9 @@ fn act(app: App, action: Action, key: Key) -> (App, Vec<Effect>) {
         Action::Help => only(App {
             mode: match &app.mode {
                 Mode::Help(_) => Mode::Normal,
-                other => Mode::Help(context(other)),
+                Mode::Normal | Mode::Prompt(_) | Mode::CopyMenu | Mode::SortMenu => {
+                    Mode::Help(context(&app))
+                }
             },
             ..app
         }),

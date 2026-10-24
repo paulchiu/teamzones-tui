@@ -1032,17 +1032,30 @@ fn notice(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
 
 fn footer_row(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
     let theme = look.theme;
-    let hints = footer::fit(&keys::hints(context(&app.mode)), area.width);
-    let spans: Vec<Span> = hints
-        .iter()
-        .enumerate()
-        .flat_map(|(index, hint)| {
+    let situation = footer::Situation {
+        range: app.range.is_some(),
+        away: !app.at_now(),
+    };
+    let footer::Footer { badge, hints } = footer::line(context(app), situation, area.width);
+    let badge = badge.into_iter().flat_map(|badge| {
+        [
+            Span::styled(
+                badge,
+                theme
+                    .fg(Role::Accent)
+                    .add_modifier(Modifier::BOLD | Modifier::REVERSED),
+            ),
+            Span::raw("  "),
+        ]
+    });
+    let spans: Vec<Span> = badge
+        .chain(hints.iter().enumerate().flat_map(|(index, hint)| {
             let gap = if index + 1 < hints.len() { "  " } else { "" };
             [
                 Span::styled(hint.keys, theme.fg(Role::Accent)),
                 Span::styled(format!(" {}{gap}", hint.label), theme.fg(Role::Dim)),
             ]
-        })
+        }))
         .collect();
     Line::from(spans).render(area, buf);
 }

@@ -486,11 +486,11 @@ fn a_bad_typed_time_says_why_in_the_notice() {
 }
 
 #[test]
-fn the_footer_at_80_columns_drops_copy_as_and_keeps_help_and_quit() {
+fn the_footer_at_now_leaves_out_the_group_hint_and_the_mode_hints() {
     let buf = render(&fixture(), 80, 24);
     assert_eq!(
         row(&buf, 23),
-        "h/l time  v range  n next fit  space mark  1-9 group  y copy  ? help  q quit"
+        "h/l time  v range  n next fit  space mark  y copy  c copy as  ? help  q quit"
     );
 }
 
@@ -600,7 +600,7 @@ fn the_prompt_acts_on_the_keys_its_footer_advertises() {
 fn each_modal_context_swallows_the_keys_it_does_not_advertise() {
     for opener in ["c", "s", "?"] {
         let open = press(fixture(), &chars(opener));
-        let context = super::update::context(&open.mode);
+        let context = super::update::context(&open);
         let own: Vec<Key> = super::keys::BINDINGS
             .iter()
             .filter(|b| b.context == context || b.context == super::keys::Context::Global)
@@ -926,4 +926,31 @@ fn the_copy_box_holds_only_the_line_y_copies_and_the_detail_sits_above_it() {
 fn the_copy_box_is_titled_times_for_all_on_the_all_lens() {
     let buf = render(&press(team_monday(), &chars("0")), 120, 36);
     assert!(row(&buf, y_of(&buf, " times for ")).starts_with("╭ times for all "));
+}
+
+#[test]
+fn range_mode_leads_the_footer_with_its_badge_and_keys_and_keeps_the_main_keys() {
+    let drawing = press(team_monday(), &chars("v"));
+    for (cols, rows) in [(120, 36), (80, 24)] {
+        let buf = render(&drawing, cols, rows);
+        assert_eq!(
+            row(&buf, rows - 1),
+            "range  h/l move end  H/L 1h  o swap end  v/enter done  esc cancel  ? help"
+        );
+    }
+    let (_, effects) = press_all(drawing.clone(), &chars("y"));
+    assert_eq!(copied(&effects), [drawing.say_line()]);
+    let help = render(&press(drawing, &chars("?")), 120, 36);
+    assert!(y_of(&help, "Swap the active end") < y_of(&help, "everywhere"));
+}
+
+#[test]
+fn a_committed_range_away_from_now_offers_esc_and_dot_in_the_footer() {
+    let buf = render(&team_monday(), 120, 36);
+    let footer = row(&buf, 35);
+    assert!(
+        footer.contains(". now") && footer.contains("esc clear range"),
+        "{footer}"
+    );
+    assert!(!footer.contains("1-9"), "{footer}");
 }

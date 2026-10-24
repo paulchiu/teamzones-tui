@@ -96,7 +96,9 @@ h/l time  v range  n next fit  space mark  1-9 group  w save  tab groups  y copy
   + `d  deleted Ellie from config and 2 groups  u undo`
   + `r  config reloaded`, or `r  config error line 12: unknown key "hour", kept the last good config`
   + `y  copied`, or `y  clipboard unavailable: 5-6pm AEDT / …`
-* **Footer**: ASCII only, generated from the binding table as a priority ladder. Hints keep their display order, and when space runs out they drop from the lowest priority up. Highest priority first: `y`, `space`, `1-9`, `h/l`, `m` (raised to just below `h/l` while the map is auto-hidden, and otherwise last), `tab`, `v`, `n`, `w`, `c`. `? help` and `q quit` are pinned and never drop. The display order is `h/l v n space 1-9 w tab y c m ? q`.
+* **Footer**: ASCII only, generated from the binding table as a priority ladder, and it follows the mode. Hints keep their display order, and when space runs out they drop from the lowest priority up. `? help` and `q quit` are pinned and never drop, and mode hints are the last of the rest to drop.
+  + In normal mode, highest priority first: `esc clear range` (only with a committed range), `. now` (only when the cursor or range is anywhere other than now), `y`, `space`, `h/l`, `m` (raised to just below `h/l` while the map is auto-hidden, and otherwise last), `tab`, `v`, `n`, `w`, `c`. The display order is `h/l . v n space w tab y c m esc ? q`. `1-9 group` is not in the footer, because the who strip already numbers the groups, and it stays in the `?` overlay.
+  + While drawing a range with `v`, the footer leads with a `range` badge and shows only the range keys: `h/l move end  H/L 1h  o swap end  v/enter done  esc cancel`, then `? help`. Every main key still works in this mode.
 * **Map** (M4):
   + ratatui `Canvas` with `Map { resolution: High }` and Braille markers, cropped to latitudes -58 to 80.
   + After the canvas renders, paint the night side onto the buffer: dim the foreground and add the night background tint. Draw `☼` at the subsolar point.

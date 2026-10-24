@@ -136,6 +136,11 @@ impl App {
         self.visual.map(Visual::range).or(self.range)
     }
 
+    /// Whether the view sits on exact now, with no range drawn or committed.
+    pub fn at_now(&self) -> bool {
+        self.cursor == Cursor::Now && self.shown_range().is_none()
+    }
+
     /// What the say line and labels are about: the range, or the cursor's instant.
     pub fn when(&self) -> When {
         match (self.shown_range(), self.cursor) {
