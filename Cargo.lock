@@ -502,7 +502,7 @@ dependencies = [
 
 [[package]]
 name = "teamzones"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -511,7 +511,7 @@ dependencies = [
 
 [[package]]
 name = "teamzones-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "chrono-tz",
