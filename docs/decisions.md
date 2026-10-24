@@ -122,7 +122,7 @@ Decision: `update(state, msg)` returns the new state and a list of effects. Clip
 
 Why: A pure update is testable without a terminal, a clipboard or a file system.
 
-Held by: `tui::tests::the_update_module_names_no_io_crate` in `teamzones`
+Held by: `tui::tests::the_update_layer_names_no_io_crate` in `teamzones`, which scans `update.rs` and the `app.rs`, `prompt.rs`, `notice.rs` and `say.rs` it calls into
 
 ## D16: No config file, or one holding only comments, means the defaults (2026-10-24)
 

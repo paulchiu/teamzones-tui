@@ -17,7 +17,7 @@ use teamzones_core::schedule::{Band, Level, band, is_day};
 use super::app::{App, Cursor, Lanes, Mode};
 use super::glyphs::Glyphs;
 use super::layout::{Areas, MapChoice, layout};
-use super::say::{detail, local_text, summary};
+use super::say::{detail, duration_text, local_text, summary};
 use super::theme::{Role, Theme};
 use super::update::context;
 use super::{footer, help, keys};
@@ -221,15 +221,6 @@ fn hour_label(hour: u32) -> String {
     }
 }
 
-fn duration_text(range: Range) -> String {
-    let minutes = range.end().since(range.start()) * 15;
-    match (minutes / 60, minutes % 60) {
-        (0, m) => format!("{m}m"),
-        (h, 0) => format!("{h}h"),
-        (h, m) => format!("{h}h{m}m"),
-    }
-}
-
 fn slider(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
     let (theme, glyphs) = (look.theme, look.glyphs);
     let axis = app.roster().axis();
@@ -251,7 +242,6 @@ fn slider(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
         &viewed.format("%Z").to_string(),
         theme.fg(Role::Dim),
     );
-    let per_hour = 60 / track.minutes.max(1);
     let every = if track.minutes == 15 { 3 } else { 6 };
     for (index, column) in track.columns() {
         set_char(buf, area, column, ruler_y, ' ', Style::new());
@@ -267,11 +257,12 @@ fn slider(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
         };
         set_char(buf, area, column, track_y, mark, theme.fg(role));
     }
-    let hours = track
+    let hours: Vec<(u32, u16)> = track
         .columns()
-        .filter(|(index, _)| index % per_hour.max(1) == 0)
-        .map(|(index, column)| (u32::from(index / per_hour.max(1)), column));
-    let hours: Vec<(u32, u16)> = hours.collect();
+        .map(|(index, column)| (track.cell_start(index).with_timezone(&axis), column))
+        .filter(|(local, _)| local.minute() == 0)
+        .map(|(local, column)| (local.hour(), column))
+        .collect();
     for (_, column) in hours.iter().filter(|(hour, _)| hour % every != 0) {
         set_char(
             buf,
@@ -313,7 +304,10 @@ fn slider(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
         (_, None, _) => {}
     }
     let label = match (app.shown_range(), app.cursor) {
-        (Some(range), _) => (local_text(When::Over(range), axis), duration_text(range)),
+        (Some(range), _) => (
+            local_text(When::Over(range), axis),
+            duration_text(range.end().since(range.start())),
+        ),
         (None, Cursor::Now) => (local_text(app.when(), axis), "now".to_owned()),
         (None, Cursor::At(_)) => (local_text(app.when(), axis), String::new()),
     };
@@ -770,7 +764,8 @@ fn who(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
         y += 1;
     }
     let lens = app.lens_name();
-    let result = match evaluate(roster, &app.marks, app.when()).who {
+    let who = evaluate(roster, &app.marks, app.when()).who;
+    let result = match who {
         Some(block) => Ok((
             block.score.qualifying,
             block.score.counted,
@@ -788,9 +783,7 @@ fn who(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
             })
         }
     };
-    let word = evaluate(roster, &app.marks, app.when())
-        .who
-        .map_or("who", |block| block.rule.label());
+    let word = who.map_or("who", |block| block.rule.label());
     answer(buf, area, y, look, track, word, result);
     y += 1;
     for row in &rows.below {
@@ -815,7 +808,9 @@ fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
             Span::styled(rule_word(rule), theme.fg(Role::Accent)),
         ]),
         (false, Rule::Context, false) => title.push(Span::styled(" context", theme.fg(Role::Dim))),
-        (false, _, _) => title.push(Span::styled(" not asked", theme.fg(Role::Dim))),
+        (false, Rule::Context, true) | (false, Rule::OffPeak | Rule::Quiet, _) => {
+            title.push(Span::styled(" not asked", theme.fg(Role::Dim)));
+        }
     }
     title.push(Span::raw(" "));
     let items = [
@@ -845,8 +840,8 @@ fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
         let right_style = match (state, counted) {
             (Some(Level::Peak), true) => theme.fg(Role::Warn).add_modifier(Modifier::BOLD),
             (Some(Level::Peak), false) => theme.fg(Role::Warn),
-            (_, true) => theme.fg(Role::Text),
-            (_, false) => theme.fg(Role::Dim),
+            (Some(Level::OffPeak | Level::Quiet) | None, true) => theme.fg(Role::Text),
+            (Some(Level::OffPeak | Level::Quiet) | None, false) => theme.fg(Role::Dim),
         };
         let clock = time_candidates(app, tz);
         label(

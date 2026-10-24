@@ -1,5 +1,7 @@
 //! Semantic colour roles, resolved once from `[theme]` and the terminal's environment.
 
+use std::collections::BTreeMap;
+
 use ratatui::style::{Color, Modifier, Style};
 use teamzones_core::config::{self, Scheme};
 
@@ -12,32 +14,21 @@ pub enum Role {
     Marker,
     Ok,
     Warn,
+    #[expect(
+        dead_code,
+        reason = "a theme role with no painter until write-back errors land"
+    )]
     Danger,
     Day,
     Night,
     Dawn,
     Work,
     Quiet,
+    #[expect(dead_code, reason = "the map paints the night tint")]
     NightTint,
 }
 
 impl Role {
-    const ALL: [Self; 13] = [
-        Self::Text,
-        Self::Dim,
-        Self::Accent,
-        Self::Marker,
-        Self::Ok,
-        Self::Warn,
-        Self::Danger,
-        Self::Day,
-        Self::Night,
-        Self::Dawn,
-        Self::Work,
-        Self::Quiet,
-        Self::NightTint,
-    ];
-
     /// The role's key in `[theme]`.
     fn key(self) -> &'static str {
         match self {
@@ -55,13 +46,6 @@ impl Role {
             Self::Quiet => "quiet",
             Self::NightTint => "night_tint",
         }
-    }
-
-    fn index(self) -> usize {
-        Self::ALL
-            .iter()
-            .position(|role| *role == self)
-            .expect("ALL lists every role")
     }
 }
 
@@ -84,10 +68,12 @@ impl TerminalEnv {
     }
 }
 
-/// A resolved theme: one foreground per role, plus the selection style, the only background.
+/// A resolved theme: a scheme and its overrides, read per role, plus the selection style.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Theme {
-    colors: [Color; 13],
+    scheme: Scheme,
+    truecolor: bool,
+    overrides: BTreeMap<String, String>,
     pub selection: Style,
 }
 
@@ -157,27 +143,32 @@ impl Theme {
         } else {
             theme.scheme
         };
-        let base = |role| match scheme {
-            Scheme::Dark => dark(role, env.truecolor),
-            Scheme::Light => light(role),
-            Scheme::Mono => mono(role),
-        };
-        let custom = |key: &str| {
-            (scheme != Scheme::Mono)
-                .then(|| theme.overrides.get(key).and_then(|hex| rgb(hex)))
-                .flatten()
-        };
-        let colors = Role::ALL.map(|role| custom(role.key()).unwrap_or_else(|| base(role)));
-        let selection = match (custom("selection"), scheme) {
+        let custom = (scheme != Scheme::Mono)
+            .then(|| theme.overrides.get("selection").and_then(|hex| rgb(hex)))
+            .flatten();
+        let selection = match (custom, scheme) {
             (Some(color), _) => Style::new().bg(color),
             (None, Scheme::Light) => Style::new().bg(rgb("#ddf4ff").unwrap_or(Color::Reset)),
             (None, Scheme::Dark | Scheme::Mono) => Style::new().add_modifier(Modifier::REVERSED),
         };
-        Self { colors, selection }
+        Self {
+            scheme,
+            truecolor: env.truecolor,
+            overrides: theme.overrides.clone(),
+            selection,
+        }
     }
 
+    /// The role's override in hex when the scheme takes overrides, else the scheme's colour.
     pub fn color(&self, role: Role) -> Color {
-        self.colors[role.index()]
+        let custom = (self.scheme != Scheme::Mono)
+            .then(|| self.overrides.get(role.key()).and_then(|hex| rgb(hex)))
+            .flatten();
+        custom.unwrap_or_else(|| match self.scheme {
+            Scheme::Dark => dark(role, self.truecolor),
+            Scheme::Light => light(role),
+            Scheme::Mono => mono(role),
+        })
     }
 
     /// A foreground-only style for `role`.
@@ -191,19 +182,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn no_color_forces_mono_over_the_configured_scheme() {
+    fn no_color_forces_mono_over_the_configured_scheme_and_its_overrides() {
+        let config = config::Theme {
+            overrides: [("accent".to_owned(), "#123456".to_owned())].into(),
+            ..config::Theme::default()
+        };
         let theme = Theme::resolve(
-            &config::Theme::default(),
+            &config,
             TerminalEnv {
                 no_color: true,
                 truecolor: true,
             },
         );
-        assert!(
-            Role::ALL
-                .iter()
-                .all(|role| matches!(theme.color(*role), Color::Reset | Color::DarkGray))
-        );
+        let roles = [Role::Accent, Role::Warn, Role::Work, Role::Night];
+        assert_eq!(roles.map(|role| theme.color(role)), roles.map(mono));
     }
 
     #[test]

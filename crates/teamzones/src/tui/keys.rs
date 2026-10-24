@@ -498,10 +498,23 @@ pub fn action_for(context: Context, key: Key) -> Option<Action> {
                 .then(|| chord_in(Context::Global, key))
                 .flatten()
         })
-        .or(match (context, key) {
-            (Context::Prompt, Key::Char(c)) => Some(Action::Type(c)),
-            _ => None,
-        })
+        .or_else(|| unbound(context, key))
+}
+
+/// What a key no binding claims does: a prompt types printable characters, and the rest swallow it.
+fn unbound(context: Context, key: Key) -> Option<Action> {
+    match context {
+        Context::Prompt => {
+            if let Key::Char(c) = key {
+                Some(Action::Type(c))
+            } else {
+                None
+            }
+        }
+        Context::Main | Context::Global | Context::CopyMenu | Context::SortMenu | Context::Help => {
+            None
+        }
+    }
 }
 
 /// The hints a context's footer may show, in display order, each with its priority.

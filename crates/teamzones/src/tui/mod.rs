@@ -79,7 +79,7 @@ pub fn run(
         theme: &theme,
         glyphs: Glyphs::of(config.theme.glyphs),
     };
-    let mut terminal = ratatui::init();
+    let mut terminal = ratatui::try_init().inspect_err(|_| ratatui::restore())?;
     let mut app = App::new(config, clock.now());
     let result = loop {
         if let Err(error) = terminal.draw(|frame| view::draw(frame, &app, look)) {

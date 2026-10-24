@@ -12,6 +12,7 @@ use super::app::{App, Cursor, Lanes, Lens, Mode, Undo, Visual, base_marks};
 use super::keys::{Action, Context, Key, action_for};
 use super::notice::{Notice, TIMEOUT};
 use super::prompt;
+use super::say::duration_text;
 
 /// Slots in an hour and in a day, for the coarse moves.
 const HOUR: i64 = 4;
@@ -424,12 +425,13 @@ enum Step {
     Previous,
 }
 
-fn duration_text(slots: i64) -> String {
-    let minutes = slots * 15;
-    match (minutes / 60, minutes % 60) {
-        (0, m) => format!("{m}m"),
-        (h, 0) => format!("{h}h"),
-        (h, m) => format!("{h}h{m}m"),
+impl Step {
+    /// The key that steps this way, and the word its notice uses.
+    fn key_and_word(self) -> (&'static str, &'static str) {
+        match self {
+            Self::Next => ("n", "next"),
+            Self::Previous => ("N", "previous"),
+        }
     }
 }
 
@@ -463,12 +465,13 @@ fn fit_step(app: App, step: Step) -> App {
     };
     let now = app.now;
     match found {
-        Ok(run) => landed(app, run, length, now),
-        Err(no_fit) => missed(app, no_fit, now),
+        Ok(run) => landed(app, step, run, length, now),
+        Err(no_fit) => missed(app, step, no_fit, now),
     }
 }
 
-fn landed(app: App, run: Range, length: i64, now: DateTime<Utc>) -> App {
+fn landed(app: App, step: Step, run: Range, length: i64, now: DateTime<Utc>) -> App {
+    let (key, word) = step.key_and_word();
     let run_length = run.end().since(run.start());
     let kept = length.min(run_length);
     let range = Range::new(run.start(), run.start().offset(kept)).unwrap_or(run);
@@ -478,7 +481,7 @@ fn landed(app: App, run: Range, length: i64, now: DateTime<Utc>) -> App {
         range.end().start().with_timezone(&axis),
     );
     let mut text = format!(
-        "next fit for {}: {} {} {}",
+        "{word} fit for {}: {} {} {}",
         app.expression(),
         start.format("%a"),
         span_text(&start, &end),
@@ -500,17 +503,17 @@ fn landed(app: App, run: Range, length: i64, now: DateTime<Utc>) -> App {
         visual: None,
         ..app
     };
-    with_notice(next, "n", &text, now)
+    with_notice(next, key, &text, now)
 }
 
-fn missed(app: App, no_fit: NoFit, now: DateTime<Utc>) -> App {
+fn missed(app: App, step: Step, no_fit: NoFit, now: DateTime<Utc>) -> App {
     let next = App {
         range: None,
         cursor: Cursor::At(no_fit.at),
         visual: None,
         ..app
     };
-    with_notice(next, "n", &no_fit.to_string(), now)
+    with_notice(next, step.key_and_word().0, &no_fit.to_string(), now)
 }
 
 fn edit_prompt(app: App, typed: Option<char>) -> App {

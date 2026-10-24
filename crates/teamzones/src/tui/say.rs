@@ -6,10 +6,20 @@ use teamzones_core::clock::{Slot, When};
 use teamzones_core::config::PersonId;
 use teamzones_core::copy::{Clause, Variant, clock_text, say_line, span_text};
 use teamzones_core::question::{Row, person_band, place_level, place_state};
-use teamzones_core::schedule::{Band, LocalSpan};
+use teamzones_core::schedule::{Band, Hours};
 use teamzones_core::status::place_next;
 
 use super::app::App;
+
+/// A length in grid slots as the track label and notices write it: `1h`, `30m` or `1h15m`.
+pub fn duration_text(slots: i64) -> String {
+    let minutes = slots * 15;
+    match (minutes / 60, minutes % 60) {
+        (0, m) => format!("{m}m"),
+        (h, 0) => format!("{h}h"),
+        (h, m) => format!("{h}h{m}m"),
+    }
+}
 
 fn plural(count: usize, one: &str, many: &str) -> String {
     format!("{count} {}", if count == 1 { one } else { many })
@@ -65,13 +75,16 @@ fn offset_text(tz: Tz, instant: DateTime<Utc>) -> String {
     }
 }
 
-fn hours_text(span: LocalSpan) -> String {
+fn hours_text(Hours { span, days }: Hours) -> String {
     let day = NaiveDate::default();
     let wall = |minute: u32| {
         Utc.from_utc_datetime(&day.and_time(chrono::NaiveTime::MIN))
             + chrono::TimeDelta::minutes(i64::from(minute))
     };
-    format!("hours {}", span_text(&wall(span.start), &wall(span.end)))
+    format!(
+        "hours {} {days}",
+        span_text(&wall(span.start), &wall(span.end))
+    )
 }
 
 fn groups_text(app: &App, row: Row) -> Option<String> {
@@ -101,7 +114,9 @@ pub fn detail(app: &App) -> (String, Vec<String>) {
             let local = start.with_timezone(&tz);
             let state = match person_band(roster, id, slot) {
                 Band::Working => "in hours",
-                band => band.word(),
+                band @ (Band::Night | Band::Day | Band::Morning | Band::Evening | Band::Off) => {
+                    band.word()
+                }
             };
             let pieces = [
                 Some(person.city.clone()),
@@ -109,7 +124,7 @@ pub fn detail(app: &App) -> (String, Vec<String>) {
                 Some(
                     person
                         .hours
-                        .map_or_else(|| "no hours set".to_owned(), |hours| hours_text(hours.span)),
+                        .map_or_else(|| "no hours set".to_owned(), hours_text),
                 ),
                 groups_text(app, app.focus),
                 Some(format!(

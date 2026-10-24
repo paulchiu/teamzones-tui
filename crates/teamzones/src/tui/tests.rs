@@ -304,20 +304,31 @@ fn every_copy_golden_row_comes_from_its_keys() {
             .split(' ')
             .map(|k| Key::Char(k.chars().next().unwrap()))
             .collect();
-        let (_, effects) = press_all(copy_setup(&setup), &keys);
+        let (app, effects) = press_all(copy_setup(&setup), &keys);
         assert_eq!(
             copied(&effects),
             [unticked(&clipboard)],
             "{setup}, {keys:?}"
         );
+        if keys == [Key::Char('y')] {
+            assert_eq!(
+                say_line(&render(&app, 120, 36)),
+                unticked(&clipboard),
+                "{setup} on screen"
+            );
+        }
     }
 }
 
 #[test]
 fn c_a_copies_the_line_for_all() {
     let app = team_monday();
-    let all = copied(&press_all(app.clone(), &chars("0y")).1);
-    assert_eq!(copied(&press_all(app, &chars("ca")).1), all);
+    assert_eq!(
+        copied(&press_all(app, &chars("ca")).1),
+        [
+            "5-6pm AEDT / 4-5pm AEST / 8-9am SAST / 6-7am GMT / 1-2am CDT, off-peak in UK and US, peak in AU"
+        ]
+    );
 }
 
 #[test]
@@ -467,7 +478,10 @@ fn esc_collapses_the_range_to_its_start() {
 #[test]
 fn a_bad_typed_time_says_why_in_the_notice() {
     let app = go_to(fixture(), "9-5");
-    assert!(app.notice.unwrap().text.starts_with("t  "));
+    assert_eq!(
+        app.notice.unwrap().text,
+        "t  9-5 needs am/pm or HH:MM, such as 9am-5pm or 09:00-17:00"
+    );
 }
 
 #[test]
@@ -601,8 +615,12 @@ fn each_modal_context_swallows_the_keys_it_does_not_advertise() {
 
 #[test]
 fn focus_stays_on_a_visible_row_across_a_group_switch() {
-    let app = press(focus_on(fixture(), "Ellie"), &chars("3"));
-    assert_eq!(focus_name(&app), "Ellie");
+    let team = focus_on(fixture(), "Thandi");
+    let deploy = press(team.clone(), &chars("4"));
+    let index = |app: &App| app.focus_rows().iter().position(|row| *row == app.focus);
+    assert_eq!((index(&team), index(&deploy)), (Some(3), Some(2)));
+    assert_eq!(focus_name(&deploy), "Thandi");
+    let app = deploy;
     assert!(app.focus_rows().contains(&app.focus));
 }
 
@@ -638,8 +656,14 @@ fn focus_name(app: &App) -> String {
 }
 
 #[test]
-fn the_update_module_names_no_io_crate() {
-    let source = include_str!("update.rs");
+fn the_update_layer_names_no_io_crate() {
+    let sources = [
+        ("update.rs", include_str!("update.rs")),
+        ("app.rs", include_str!("app.rs")),
+        ("prompt.rs", include_str!("prompt.rs")),
+        ("notice.rs", include_str!("notice.rs")),
+        ("say.rs", include_str!("say.rs")),
+    ];
     let forbidden = [
         "std::fs",
         "std::io",
@@ -654,11 +678,16 @@ fn the_update_module_names_no_io_crate() {
         "crate::clipboard",
         "Clipboard",
     ];
-    let named: Vec<&str> = forbidden
-        .into_iter()
-        .filter(|name| source.contains(name))
+    let named: Vec<(&str, &str)> = sources
+        .iter()
+        .flat_map(|(file, source)| {
+            forbidden
+                .iter()
+                .filter(|name| source.contains(*name))
+                .map(|name| (*file, *name))
+        })
         .collect();
-    assert!(named.is_empty(), "update.rs names {named:?}");
+    assert!(named.is_empty(), "the update layer names {named:?}");
 }
 
 #[test]
@@ -701,5 +730,86 @@ fn b_draws_people_lanes_as_plain_day_and_night() {
     assert!(
         !paul.contains('▓') && !paul.contains('▚') && paul.contains('▒'),
         "{paul}"
+    );
+}
+
+#[test]
+fn brackets_move_the_range_a_day_and_back() {
+    let monday = team_monday();
+    let range = monday.range.unwrap();
+    let tuesday = press(monday, &chars("]"));
+    assert_eq!(tuesday.range.unwrap().start(), range.start().offset(96));
+    assert_eq!(press(tuesday, &chars("[")).range, Some(range));
+}
+
+#[test]
+fn o_swaps_the_active_end_so_h_grows_the_range_earlier() {
+    assert_eq!(
+        press(team_monday(), &chars("vhv")).say_line(),
+        "5-5:45pm AEDT / 4-4:45pm AEST / 8-8:45am SAST"
+    );
+    assert_eq!(
+        press(team_monday(), &chars("vohv")).say_line(),
+        "4:45-6pm AEDT / 3:45-5pm AEST / 7:45-9am SAST"
+    );
+}
+
+#[test]
+fn g_and_capital_g_focus_the_first_and_last_rows() {
+    let last = press(fixture(), &chars("G"));
+    assert_eq!(focus_name(&last), "US");
+    assert_eq!(focus_name(&press(last, &chars("g"))), "Paul");
+}
+
+#[test]
+fn shift_arrows_move_the_range_an_hour() {
+    assert_eq!(
+        press(team_monday(), &[Key::ShiftRight]).say_line(),
+        "6-7pm AEDT / 5-6pm AEST / 9-10am SAST"
+    );
+    assert_eq!(
+        press(team_monday(), &[Key::ShiftLeft]).say_line(),
+        "4-5pm AEDT / 3-4pm AEST / 7-8am SAST"
+    );
+}
+
+#[test]
+fn ruler_labels_follow_the_local_clock_on_a_daylight_saving_change() {
+    let buf = render(&go_to(fixture(), "2026-10-04 3pm"), 120, 36);
+    let y = y_of(&buf, "Sun 4 Oct AEDT");
+    let column_of = |label: &str| {
+        let cells: Vec<&str> = (0..buf.area.width).map(|x| buf[(x, y)].symbol()).collect();
+        let label: Vec<String> = label.chars().map(String::from).collect();
+        cells
+            .windows(label.len())
+            .position(|window| window == label.as_slice())
+    };
+    assert_eq!(
+        (column_of("12a"), column_of("3a"), column_of("6a")),
+        (Some(24), Some(24 + 8), Some(24 + 20)),
+        "Melbourne skips 2am to 3am on 4 Oct, so 3am is two hours in"
+    );
+}
+
+#[test]
+fn the_person_detail_names_their_hours_and_work_days() {
+    let buf = render(&focus_on(team_monday(), "Priya"), 120, 36);
+    let detail = row(&buf, y_of(&buf, "▶ Priya"));
+    assert!(
+        detail.contains(
+            "▶ Priya  Brisbane  AEST UTC+10  hours 9am-5pm Mon-Fri  groups team, au, deploy  Mon 26 Oct 4-5pm in hours"
+        ),
+        "{detail}"
+    );
+}
+
+#[test]
+fn capital_n_names_the_previous_fit() {
+    let app = press(go_to(fixture(), "26 oct 7pm"), &chars("N"));
+    assert!(
+        app.notice
+            .unwrap()
+            .text
+            .starts_with("N  previous fit for team: Mon 5-6pm AEDT"),
     );
 }
