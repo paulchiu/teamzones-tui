@@ -37,7 +37,11 @@ enum Command {
     /// Print where each row of a who-expression, or one place, is now and what comes next.
     Status {
         /// The who-expression or `@place`; the first group by default.
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, value_name = "EXPR | @place")]
+        #[arg(
+            trailing_var_arg = true,
+            allow_hyphen_values = true,
+            value_name = "EXPR | @place"
+        )]
         words: Vec<String>,
     },
     /// Print one line per group: its members and the question it asks.
@@ -119,10 +123,7 @@ const HOISTED: &[&str] = &[
 /// Moves known long flags that follow `say` or `status` to just after it, so clap reads them as
 /// flags rather than as words of the expression.
 pub fn hoist_flags(argv: Vec<String>) -> Vec<String> {
-    let Some(at) = argv
-        .iter()
-        .position(|arg| arg == "say" || arg == "status")
-    else {
+    let Some(at) = argv.iter().position(|arg| arg == "say" || arg == "status") else {
         return argv;
     };
     let (head, tail) = argv.split_at(at + 1);
@@ -176,10 +177,18 @@ impl Failure {
     }
 }
 
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "a map_err callback is handed the error by value"
+)]
 fn usage(error: impl ToString) -> Failure {
     Failure::Usage(error.to_string())
 }
 
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "a map_err callback is handed the error by value"
+)]
 fn output(error: std::io::Error) -> Failure {
     Failure::Usage(format!("cannot write output: {error}"))
 }
@@ -474,11 +483,18 @@ mod tests {
 
     /// Runs `say team 3pm` plus `extra` on the fixture, returning (stdout, stderr, what was copied).
     fn say_with(extra: &[&str], stdout_is_tty: bool, works: bool) -> (String, String, Vec<String>) {
-        let argv = ["teamzones", "--now", "2026-10-23T22:04:00Z", "say", "team", "3pm"]
-            .iter()
-            .chain(extra)
-            .map(|word| (*word).to_owned())
-            .collect();
+        let argv = [
+            "teamzones",
+            "--now",
+            "2026-10-23T22:04:00Z",
+            "say",
+            "team",
+            "3pm",
+        ]
+        .iter()
+        .chain(extra)
+        .map(|word| (*word).to_owned())
+        .collect();
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let mut clipboard = Fake {
             copied: Vec::new(),
@@ -536,10 +552,28 @@ mod tests {
 
     #[test]
     fn hoisting_moves_trailing_flags_and_now_ahead_of_the_words() {
-        let argv = strings(&["teamzones", "say", "team", "-@au", "3pm", "--no-copy", "--now", "X"]);
+        let argv = strings(&[
+            "teamzones",
+            "say",
+            "team",
+            "-@au",
+            "3pm",
+            "--no-copy",
+            "--now",
+            "X",
+        ]);
         assert_eq!(
             hoist_flags(argv),
-            strings(&["teamzones", "say", "--no-copy", "--now", "X", "team", "-@au", "3pm"])
+            strings(&[
+                "teamzones",
+                "say",
+                "--no-copy",
+                "--now",
+                "X",
+                "team",
+                "-@au",
+                "3pm"
+            ])
         );
     }
 

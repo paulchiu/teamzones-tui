@@ -142,10 +142,7 @@ fn groups_examples() -> Vec<String> {
         .iter()
         .find(|row| row[0] == "`teamzones groups`")
         .unwrap();
-    backticked(&row[1])
-        .into_iter()
-        .map(str::to_owned)
-        .collect()
+    backticked(&row[1]).into_iter().map(str::to_owned).collect()
 }
 
 #[test]
@@ -189,14 +186,21 @@ fn config_path_prints_the_resolved_path() {
 #[test]
 fn config_init_writes_a_commented_template_that_check_accepts() {
     let path = scratch("config-init").join("nested").join("config.toml");
-    teamzones_on(&path).args(["config", "init"]).assert().success();
+    teamzones_on(&path)
+        .args(["config", "init"])
+        .assert()
+        .success();
     let text = std::fs::read_to_string(&path).unwrap();
     assert!(text.starts_with("## teamzones configuration"), "{text}");
     assert!(
-        text.lines().all(|line| line.is_empty() || line.starts_with('#')),
+        text.lines()
+            .all(|line| line.is_empty() || line.starts_with('#')),
         "every line is a comment:\n{text}"
     );
-    teamzones_on(&path).args(["config", "check"]).assert().success();
+    teamzones_on(&path)
+        .args(["config", "check"])
+        .assert()
+        .success();
 }
 
 #[test]
@@ -214,7 +218,11 @@ fn config_init_exits_2_and_leaves_an_existing_file_alone() {
 #[test]
 fn config_check_exits_2_naming_the_path_and_line_of_a_broken_file() {
     let path = scratch("config-check-broken").join("config.toml");
-    std::fs::write(&path, "[home]\nname = \"Kim\"\ncity = \"Melbourne\"\ncolour = 1\n").unwrap();
+    std::fs::write(
+        &path,
+        "[home]\nname = \"Kim\"\ncity = \"Melbourne\"\ncolour = 1\n",
+    )
+    .unwrap();
     teamzones_on(&path)
         .args(["config", "check"])
         .assert()
@@ -301,14 +309,20 @@ fn here_never_writes_over_a_file_that_does_not_parse() {
         .args(["here", "london", "--until", "2026-11-01"])
         .assert()
         .code(2)
-        .stderr(format!("{}: line 3: unknown key \"colour\"\n", path.display()));
+        .stderr(format!(
+            "{}: line 3: unknown key \"colour\"\n",
+            path.display()
+        ));
     assert_eq!(std::fs::read_to_string(&path).unwrap(), broken);
 }
 
 #[test]
 fn here_needs_until_when_setting() {
     let (path, original) = fixture_copy("here-no-until");
-    teamzones_on(&path).args(["here", "london"]).assert().code(2);
+    teamzones_on(&path)
+        .args(["here", "london"])
+        .assert()
+        .code(2);
     assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
 }
 

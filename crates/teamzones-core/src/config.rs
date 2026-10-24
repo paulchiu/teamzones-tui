@@ -1477,7 +1477,11 @@ mod tests {
     fn home_without_a_file_takes_its_coordinates_from_the_bundled_city_of_that_name() {
         let config = Config::load(None, MELBOURNE).unwrap();
         let home = config.roster.person(PersonId::HOME);
-        assert!((home.location.lat - -37.8).abs() < 0.1, "{:?}", home.location);
+        assert!(
+            (home.location.lat - -37.8).abs() < 0.1,
+            "{:?}",
+            home.location
+        );
     }
 
     #[test]

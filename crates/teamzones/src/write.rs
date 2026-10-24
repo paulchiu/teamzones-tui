@@ -61,13 +61,11 @@ pub fn set_travel(document: &mut DocumentMut, here: &str, until: NaiveDate) {
         month: u8::try_from(until.month()).unwrap_or_default(),
         day: u8::try_from(until.day()).unwrap_or_default(),
     };
-    let travel = document
-        .entry("travel")
-        .or_insert_with(|| {
-            let mut table = Table::new();
-            table.decor_mut().set_prefix("\n");
-            Item::Table(table)
-        });
+    let travel = document.entry("travel").or_insert_with(|| {
+        let mut table = Table::new();
+        table.decor_mut().set_prefix("\n");
+        Item::Table(table)
+    });
     travel["here"] = value(here);
     travel["until"] = value(toml_edit::Datetime {
         date: Some(date),
@@ -177,7 +175,11 @@ mod tests {
     fn setting_travel_again_rewrites_the_table_where_it_already_is() {
         let text = "[travel]\nhere = \"London\" # trip\nuntil = 2026-11-01\n\n[theme]\nscheme = \"dark\"\n";
         let mut document: DocumentMut = text.parse().unwrap();
-        set_travel(&mut document, "Paris", NaiveDate::from_ymd_opt(2026, 12, 5).unwrap());
+        set_travel(
+            &mut document,
+            "Paris",
+            NaiveDate::from_ymd_opt(2026, 12, 5).unwrap(),
+        );
         assert_eq!(
             document.to_string(),
             "[travel]\nhere = \"Paris\"\nuntil = 2026-12-05\n\n[theme]\nscheme = \"dark\"\n"

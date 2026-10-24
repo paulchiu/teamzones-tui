@@ -57,8 +57,7 @@ pub fn osc52(text: &str) -> String {
 
 /// Standard base64 with padding (RFC 4648), which is all OSC 52 needs.
 fn base64(bytes: &[u8]) -> String {
-    const ALPHABET: &[u8; 64] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     bytes
         .chunks(3)
         .flat_map(|chunk| {

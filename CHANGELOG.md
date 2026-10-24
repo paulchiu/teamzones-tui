@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ## [Unreleased]
 
+### Added
+
+- `teamzones say` prints the say line for a group and a time, such as `teamzones say team 3pm` or `teamzones say deploy next`, and copies it when run in a terminal (`--no-copy` skips that). `--zones`, `--names`, `--date` and `--no-clause` reshape the line.
+- `teamzones status` shows where each person or place in a group is right now, and what comes next for each place.
+- `teamzones groups` lists each group with its members and the question it asks.
+- `teamzones config path`, `init`, `edit` and `check` find, create, open and validate the config file. A new file starts from a commented template that behaves exactly like no file.
+- `teamzones here london --until 2026-11-01` records a trip in config without touching the rest of the file, and `teamzones here --clear` removes it.
+- Without a config file, home is the system time zone.
+
 ## [0.2.0] - 2026-10-24
 
 ### Added
