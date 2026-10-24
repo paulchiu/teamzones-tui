@@ -98,7 +98,7 @@ Decision: Range edges, `n` targets and range states are all evaluated on 15-minu
 
 Why: The screen and the jump agree exactly at 120 columns.
 
-Held by: nothing yet
+Held by: the `clock::tests` slot tests in `teamzones-core` (quarter-hour alignment, the first slot after now, half-open ranges)
 
 ## D13: The core never renders (2026-10-24)
 
