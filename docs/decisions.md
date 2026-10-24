@@ -139,3 +139,11 @@ Decision: The default level words are `closed`, `open` and `busy`, replacing `qu
 Why: The old words are hospitality words, and an office or support desk reads better as "office hours" or "trading hours". Paul chose the generic defaults at the hands-on round after M3.
 
 Held by: `config::tests::where_takes_the_new_keywords_and_the_old_ones_as_aliases` and the `labels` tests in `config::tests` in `teamzones-core`, `copy::tests::each_place_speaks_its_own_profile_s_labels`, the copy and CLI golden tables, and `tui::tests::the_where_legend_shows_labels_every_place_shares_and_the_defaults_otherwise` in `teamzones`
+
+## D18: City names show in full whenever the label has room (2026-10-25)
+
+Decision: The who block's city column is sized to the longest city and cuts with a mark only when a row would otherwise lose its time. The column still appears only when the label is at least 32 columns, so at 120 columns (a 24-column label) there is no city column at all. See the row label in [screen](spec/screen.md).
+
+Why: A fixed 9-column cap cut `Johannesburg` to `Johannes.` on wide terminals with plenty of spare room.
+
+Held by: `tui::tests::the_city_column_shows_the_whole_city_when_the_label_has_room` and `the_city_column_cuts_with_a_mark_only_when_the_times_need_the_room` in `teamzones`

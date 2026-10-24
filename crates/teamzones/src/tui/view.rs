@@ -503,6 +503,21 @@ fn person_cells(app: &App, track: &Track, look: Look, id: PersonId) -> Vec<(char
         .collect()
 }
 
+/// The city column: as wide as the longest city, cut only so every row keeps its time without
+/// the zone.
+fn city_width(app: &App, label_width: usize, names: usize) -> usize {
+    let roster = app.roster();
+    let longest = name_width(roster.people().map(|(_, p)| p.city.as_str()));
+    let time = roster
+        .people()
+        .map(|(_, person)| width_of(&time_candidates(app, person.location.tz)[1]))
+        .max()
+        .unwrap_or(0);
+    // The label keeps its last column free, and the mark, name and city each end with a gap.
+    let room = label_width.saturating_sub(1 + 2 + names + 1 + 1 + time);
+    longest.min(room)
+}
+
 fn name_width<'a>(names: impl Iterator<Item = &'a str>) -> usize {
     names.map(width_of).max().unwrap_or(0)
 }
@@ -713,6 +728,7 @@ fn who(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
     let label_width = track.x.saturating_sub(area.x);
     let wide = label_width >= 32;
     let names = name_width(roster.people().map(|(_, p)| p.name.as_str()));
+    let city_width = city_width(app, usize::from(label_width), names);
     let draw_person = |buf: &mut Buffer, y: u16, id: PersonId| {
         let person = roster.person(id);
         let counted = app.is_counted(Row::Person(id));
@@ -732,8 +748,8 @@ fn who(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
                 mark_role,
                 name: &person.name,
                 name_width: names,
-                middle: wide.then(|| truncate_with_mark(&person.city, 9, ".")),
-                middle_width: 9,
+                middle: wide.then(|| truncate_with_mark(&person.city, city_width, ".")),
+                middle_width: city_width,
                 right: time_candidates(app, person.location.tz),
                 right_style: theme.fg(if counted || id == PersonId::HOME {
                     Role::Text

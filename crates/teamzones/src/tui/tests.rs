@@ -872,3 +872,21 @@ fn a_place_row_shows_its_profile_s_word_for_its_state() {
     assert!(row(&buf, y_of(&buf, "◇ AU")).contains("rush"));
     assert!(row(&buf, y_of(&buf, "◇ UK")).contains("shut"));
 }
+
+#[test]
+fn the_city_column_shows_the_whole_city_when_the_label_has_room() {
+    let buf = render(&team_monday(), 140, 36);
+    let thandi = row(&buf, y_of(&buf, "● Thandi"));
+    assert!(thandi.starts_with("● Thandi Johannesburg"), "{thandi}");
+    insta::assert_snapshot!("team_140x36", text(&buf));
+}
+
+#[test]
+fn the_city_column_cuts_with_a_mark_only_when_the_times_need_the_room() {
+    let buf = render(&press(fixture(), &chars("3")), 80, 24);
+    let thandi = row(&buf, y_of(&buf, "○ Thandi"));
+    assert!(thandi.starts_with("○ Thandi Johannesb. "), "{thandi}");
+    let wide = render(&team_monday(), 80, 24);
+    let thandi = row(&wide, y_of(&wide, "● Thandi"));
+    assert!(thandi.starts_with("● Thandi Johannesburg"), "{thandi}");
+}
