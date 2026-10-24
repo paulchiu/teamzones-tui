@@ -10,19 +10,19 @@ Sat 24 Oct AEDT                 12a · · · · 6a· · · · · 12p · · · ·
 ≡ who                        --  not asked: regions has no people
 ○ Priya  Brisbane   8:04am AEST ░░Sat░░░░░░░░╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌░░░░░░░░░░
 ○ Sam    Brisbane   8:04am AEST ░░Sat░░░░░░░░╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌░░░░░░░░░░
-○ Thandi Johannes. 12:04am SAST ▓▓▚▚▚▚▚░░░░░░░░░░░Sat░░░░░░░░╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
-○ Johan  Johannes. 12:04am SAST ▓▓▚▚▚▚▚░░░░░░░░░░░Sat░░░░░░░░╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+○ Thandi Johannesb.     12:04am ▓▓▚▚▚▚▚░░░░░░░░░░░Sat░░░░░░░░╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+○ Johan  Johannesb.     12:04am ▓▓▚▚▚▚▚░░░░░░░░░░░Sat░░░░░░░░╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
 ○ Ellie  London     Fri 11:04pm ▒▒▒▒▒▒▒▒░░░░░░░░░░░░Sat░░░░░░░░░░░░░▒▒▒▒▒▒▒▒▒▒▒▒
 ○ Marcus Austin      Fri 5:04pm ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒░░░░░░░░░░Sat░░░░░░░░░░░░░
- where  asks off-peak ───────────────────────────── ▁ quiet  ▄ off-peak  █ peak
-◆ AU  9:04am AEDT      off-peak Sat▁▁▁▁▁▁▁▁▁▁▁▄▄▄▄▄▄▄▄▄██████▄▄▄▄▄▄▄████████▄▄▁▁
-◆ UK  Fri 11:04pm BST     quiet █▄▄▄▄▄▄▄████████▄▄▁▁Sat▁▁▁▁▁▁▁▁▁▁▁▄▄▄▄▄▄▄▄▄█████
-◆ US  Fri 5:04pm CDT   off-peak ▄▄▄▄▄▄▄██████▄▄▄▄▄▄▄████████▄▄▁▁Sat▁▁▁▁▁▁▁▁▁▁▁▄▄
-≡ off-peak                  3/3 ⣇━━━━━━⣇⡄⡄⡄⡄⡄⣇⣇⣇━━━━⣇⣇⣇⡄⡄⡄⡄⡄⣇━━━━━━━⣇⣇⣇⣇⣇⣇⣇⡄⣇⣇⣇⣇
+ where  asks open ──────────────────────────────────── ▁ closed  ▄ open  █ busy
+◆ AU  9:04am AEDT          open Sat▁▁▁▁▁▁▁▁▁▁▁▄▄▄▄▄▄▄▄▄██████▄▄▄▄▄▄▄████████▄▄▁▁
+◆ UK  Fri 11:04pm BST    closed █▄▄▄▄▄▄▄████████▄▄▁▁Sat▁▁▁▁▁▁▁▁▁▁▁▄▄▄▄▄▄▄▄▄█████
+◆ US  Fri 5:04pm CDT       open ▄▄▄▄▄▄▄██████▄▄▄▄▄▄▄████████▄▄▁▁Sat▁▁▁▁▁▁▁▁▁▁▁▄▄
+≡ open                      3/3 ⣇━━━━━━⣇⡄⡄⡄⡄⡄⣇⣇⣇━━━━⣇⣇⣇⡄⡄⡄⡄⡄⣇━━━━━━━⣇⣇⣇⣇⣇⣇⣇⡄⣇⣇⣇⣇
 ────────────────────────────────────────────────────────────────────────────────
-╭ say regions ───────────────────────────────────────────── y copies this line ╮
-│ 9:04am AEDT, off-peak in AU, UK and US   home zone, 3 places                 │
-│ ▶ Paul  Melbourne  AEDT UTC+11  hours 9am-6pm Mon-Fri                        │
-╰──────────────────────────────────────────────────────────────────────────────╯
+▶ Paul  Melbourne  AEDT UTC+11  hours 9am-6pm Mon-Fri
+╭ times for regions ─────────────────────────────────────────────────── y copy ╮
+│ 9:04am AEDT, open in AU and US, closed in UK                                 │
+╰───────────────────────────────────────────────────────── home zone, 3 places ╯
 
-h/l time  v range  n next fit  space mark  1-9 group  y copy  ? help  q quit
+h/l time  v range  n next fit  space mark  y copy  c copy as  ? help  q quit

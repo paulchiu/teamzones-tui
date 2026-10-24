@@ -34,7 +34,8 @@
 # at = [54.5, -2.5]
 
 ## A named weekly schedule on a local clock: kind = "hours" (office hours) or "trading" (open
-## hours and peaks, with [[profile.on]] entries overriding them on some days).
+## hours and peaks, with [[profile.on]] entries overriding them on some days). labels names its
+## places' three levels on screen and in copy, such as open = "trading hours".
 # [[profile]]
 # name = "office"
 # kind = "hours"
@@ -46,18 +47,20 @@
 # kind = "trading"
 # open = "7am-11pm"
 # peak = ["11:30am-2pm", "5:30-9pm"]
+# labels = { closed = "closed", open = "open", busy = "busy" }
 # [[profile.on]]
 # days = "Fri-Sat"
 # peak = ["11:30am-2:30pm", "6-10pm"]
 
 ## A named, ordered list of people and places, numbered 1-9 in file order. It asks who when it
-## lists people, and where when it lists places. where is "off-peak", "quiet" or "context".
+## lists people, and where when it lists places. where is "open" (not busy), "closed" or
+## "context"; the older "off-peak" and "quiet" still work.
 # [[group]]
 # name = "crew"
 # aliases = ["c"]
 # people = ["Alex"]
 # places = ["UK"]
-# where = "off-peak"
+# where = "open"
 
 ## Whether the map shows: "auto" hides it when the terminal is too small.
 # [map]

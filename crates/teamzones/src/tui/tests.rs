@@ -100,7 +100,7 @@ fn y_of(buf: &Buffer, needle: &str) -> u16 {
 
 /// The say line: the say panel's first inner row, up to the summary.
 fn say_line(buf: &Buffer) -> String {
-    let y = y_of(buf, " say ") + 1;
+    let y = y_of(buf, " times for ") + 1;
     row(buf, y)
         .trim_start_matches(['│', '|', ' '])
         .split("   ")
@@ -126,7 +126,8 @@ fn the_team_frame_at_120_by_36_sits_on_the_row_budget() {
     assert!(row(&buf, 21).starts_with("≡ in hours          5/5"));
     assert!(row(&buf, 24).starts_with(" where  not asked"));
     assert!(row(&buf, 25).starts_with("≡ where              --  not asked: team has no places"));
-    assert!(row(&buf, 30).starts_with("╭ say team "));
+    assert!(row(&buf, 30).starts_with("▶ Paul"));
+    assert!(row(&buf, 31).starts_with("╭ times for team "));
     assert_eq!(say_line(&buf), "5-6pm AEDT / 4-5pm AEST / 8-9am SAST");
     assert_eq!(row(&buf, 34), "");
     assert!(row(&buf, 35).starts_with("h/l time"));
@@ -136,7 +137,7 @@ fn the_team_frame_at_120_by_36_sits_on_the_row_budget() {
 /// The rows that must hold still: the ruler, both blocks' top borders, the where block's bottom
 /// border and the say panel's top border.
 fn anchors(buf: &Buffer) -> [u16; 5] {
-    let say = y_of(buf, " say ");
+    let say = y_of(buf, " times for ");
     [
         y_of(buf, " AEDT    "),
         y_of(buf, " who "),
@@ -156,11 +157,11 @@ fn switching_groups_never_moves_the_ruler_the_borders_or_the_say_panel() {
     assert_eq!(anchors(&regions), anchors(&deploy));
     assert_eq!(
         say_line(&regions),
-        "5-6pm AEDT, off-peak in UK and US, peak in AU"
+        "5-6pm AEDT, closed in UK and US, busy in AU"
     );
     assert_eq!(
         say_line(&deploy),
-        "5-6pm AEDT / 4-5pm AEST / 8-9am SAST, off-peak in UK, peak in AU"
+        "5-6pm AEDT / 4-5pm AEST / 8-9am SAST, closed in UK, busy in AU"
     );
 }
 
@@ -170,7 +171,7 @@ fn n_from_saturday_on_deploy_lands_on_monday_and_shortens_the_range() {
     let buf = render(&app, 120, 36);
     assert_eq!(
         row(&buf, 34),
-        "n  next fit for deploy: Mon 5-5:30pm AEDT, range shortened from 1h to 30m (AU peak from 5:30pm)"
+        "n  next fit for deploy: Mon 5-5:30pm AEDT, range shortened from 1h to 30m (AU busy from 5:30pm)"
     );
     let axis = app.roster().axis();
     let fits: Vec<String> = teamzones_core::fit::fits(app.roster(), &app.marks, app.day())
@@ -192,13 +193,19 @@ fn n_from_saturday_on_deploy_lands_on_monday_and_shortens_the_range() {
 #[test]
 fn repeated_n_steps_run_by_run() {
     let app = press(go_to(press(fixture(), &chars("3")), "mon 2pm"), &chars("n"));
-    assert_eq!(app.say_line(), "9-10pm AEDT, off-peak in AU, UK and US");
+    assert_eq!(
+        app.say_line(),
+        "9-10pm AEDT, open in AU and UK, closed in US"
+    );
 }
 
 #[test]
 fn shift_n_lands_on_the_start_of_the_previous_run() {
     let app = press(go_to(press(fixture(), &chars("3")), "mon 9pm"), &chars("N"));
-    assert_eq!(app.say_line(), "2-3pm AEDT, off-peak in AU, UK and US");
+    assert_eq!(
+        app.say_line(),
+        "2-3pm AEDT, open in AU and US, closed in UK"
+    );
 }
 
 #[test]
@@ -216,7 +223,7 @@ fn n_with_nothing_in_seven_days_says_so_and_moves_to_the_best_slot() {
         app.notice.as_ref().unwrap().text,
         "n  no full slot in 7 days, best 2/3 at Sat 3pm AEDT"
     );
-    assert_eq!(app.say_line(), "3pm AEDT, quiet in UK and US, open in AU");
+    assert_eq!(app.say_line(), "3pm AEDT, closed in UK and US, open in AU");
 }
 
 /// Moves focus down until it sits on the row named `name`.
@@ -326,7 +333,7 @@ fn c_a_copies_the_line_for_all() {
     assert_eq!(
         copied(&press_all(app, &chars("ca")).1),
         [
-            "5-6pm AEDT / 4-5pm AEST / 8-9am SAST / 6-7am GMT / 1-2am CDT, off-peak in UK and US, peak in AU"
+            "5-6pm AEDT / 4-5pm AEST / 8-9am SAST / 6-7am GMT / 1-2am CDT, closed in UK and US, busy in AU"
         ]
     );
 }
@@ -362,8 +369,8 @@ fn a_copy_raises_copied_or_shows_the_line_when_no_clipboard_works() {
 fn space_on_uk_in_team_drifts_and_a_switch_drops_it_until_u() {
     let marked = press(focus_on(team_monday(), "UK"), &chars(" "));
     let buf = render(&marked, 120, 36);
-    assert!(row(&buf, y_of(&buf, " say ")).contains("say team +@UK"));
-    assert!(row(&buf, y_of(&buf, " where ")).contains("asks off-peak"));
+    assert!(row(&buf, y_of(&buf, " times for ")).contains("times for team +@UK"));
+    assert!(row(&buf, y_of(&buf, " where ")).contains("asks open"));
     let golden = copy_rows()
         .into_iter()
         .find(|[setup, _, _]| setup.contains("`space` on UK"))
@@ -485,11 +492,11 @@ fn a_bad_typed_time_says_why_in_the_notice() {
 }
 
 #[test]
-fn the_footer_at_80_columns_drops_copy_as_and_keeps_help_and_quit() {
+fn the_footer_at_now_leaves_out_the_group_hint_and_the_mode_hints() {
     let buf = render(&fixture(), 80, 24);
     assert_eq!(
         row(&buf, 23),
-        "h/l time  v range  n next fit  space mark  1-9 group  y copy  ? help  q quit"
+        "h/l time  v range  n next fit  space mark  y copy  c copy as  ? help  q quit"
     );
 }
 
@@ -513,6 +520,7 @@ fn no_color_renders_mono() {
     let env = TerminalEnv {
         no_color: true,
         truecolor: true,
+        debug: false,
     };
     for app in [team_monday(), press(team_monday(), &chars("4"))] {
         let buf = render_with(&app, 120, 36, env);
@@ -550,9 +558,9 @@ fn the_frames_at_120_by_24_and_80_by_24_sit_on_the_row_budget() {
             (
                 y_of(&buf, " who "),
                 y_of(&buf, " where "),
-                y_of(&buf, " say ")
+                y_of(&buf, " times for ")
             ),
-            (3, 12, 18),
+            (3, 12, 19),
             "{cols} columns"
         );
         assert!(row(&buf, 1).starts_with("Sat 24 Oct AEDT"));
@@ -599,7 +607,7 @@ fn the_prompt_acts_on_the_keys_its_footer_advertises() {
 fn each_modal_context_swallows_the_keys_it_does_not_advertise() {
     for opener in ["c", "s", "?"] {
         let open = press(fixture(), &chars(opener));
-        let context = super::update::context(&open.mode);
+        let context = super::update::context(&open);
         let own: Vec<Key> = super::keys::BINDINGS
             .iter()
             .filter(|b| b.context == context || b.context == super::keys::Context::Global)
@@ -812,4 +820,321 @@ fn capital_n_names_the_previous_fit() {
             .text
             .starts_with("N  previous fit for team: Mon 5-6pm AEDT"),
     );
+}
+
+const VENUE: &str = "name  = \"venue\"\nkind  = \"trading\"\n";
+
+/// The fixture with the venue profile, which every place uses, given `labels`.
+fn venue_labelled(labels: &str) -> String {
+    FIXTURE.replacen(VENUE, &format!("{VENUE}labels = {labels}\n"), 1)
+}
+
+fn where_border(app: &App) -> String {
+    let buf = render(app, 120, 36);
+    row(&buf, y_of(&buf, " where "))
+}
+
+const SCREEN_SPEC: &str = include_str!("../../../../docs/spec/screen.md");
+
+#[test]
+fn the_where_legend_names_the_default_levels() {
+    let (_, rest) = SCREEN_SPEC.split_once("the load legend ").unwrap();
+    let legend = rest.split('`').nth(1).unwrap();
+    assert!(
+        where_border(&team_monday()).ends_with(legend),
+        "{}",
+        where_border(&team_monday())
+    );
+}
+
+#[test]
+fn the_where_legend_shows_labels_every_place_shares_and_the_defaults_otherwise() {
+    let labels = "{ closed = \"shut\", open = \"trading hours\", busy = \"rush\" }";
+    let shared = Config::parse(&venue_labelled(labels)).unwrap();
+    let app = go_to(App::new(shared, now()), "26 oct 5-6pm");
+    assert!(
+        where_border(&app).ends_with("▁ shut  ▄ trading hours  █ rush"),
+        "{}",
+        where_border(&app)
+    );
+    let mixed = venue_labelled(labels).replacen(
+        "tz      = \"America/Chicago\"\ntrading = \"venue\"",
+        "tz      = \"America/Chicago\"\ntrading = \"desk\"",
+        1,
+    ) + "\n[[profile]]\nname = \"desk\"\nkind = \"trading\"\nopen = \"7am-11pm\"\n";
+    let app = go_to(
+        App::new(Config::parse(&mixed).unwrap(), now()),
+        "26 oct 5-6pm",
+    );
+    assert!(
+        where_border(&app).ends_with("▁ closed  ▄ open  █ busy"),
+        "{}",
+        where_border(&app)
+    );
+}
+
+#[test]
+fn a_place_row_shows_its_profile_s_word_for_its_state() {
+    let labels = "{ closed = \"shut\", open = \"trading hours\", busy = \"rush\" }";
+    let app = go_to(
+        App::new(Config::parse(&venue_labelled(labels)).unwrap(), now()),
+        "26 oct 5-6pm",
+    );
+    let buf = render(&app, 120, 36);
+    assert!(row(&buf, y_of(&buf, "◇ AU")).contains("rush"));
+    assert!(row(&buf, y_of(&buf, "◇ UK")).contains("shut"));
+}
+
+#[test]
+fn the_city_column_shows_the_whole_city_when_the_label_has_room() {
+    let buf = render(&team_monday(), 140, 36);
+    let thandi = row(&buf, y_of(&buf, "● Thandi"));
+    assert!(thandi.starts_with("● Thandi Johannesburg"), "{thandi}");
+    insta::assert_snapshot!("team_140x36", text(&buf));
+}
+
+#[test]
+fn the_city_column_cuts_with_a_mark_only_when_the_times_need_the_room() {
+    let buf = render(&press(fixture(), &chars("3")), 80, 24);
+    let thandi = row(&buf, y_of(&buf, "○ Thandi"));
+    assert!(thandi.starts_with("○ Thandi Johannesb. "), "{thandi}");
+    let wide = render(&team_monday(), 80, 24);
+    let thandi = row(&wide, y_of(&wide, "● Thandi"));
+    assert!(thandi.starts_with("● Thandi Johannesburg"), "{thandi}");
+}
+
+#[test]
+fn the_copy_box_holds_only_the_line_y_copies_and_the_detail_sits_above_it() {
+    let app = focus_on(team_monday(), "Priya");
+    for (cols, rows) in [(120, 36), (80, 24)] {
+        let buf = render(&app, cols, rows);
+        let top = y_of(&buf, " times for team ");
+        assert!(row(&buf, top).ends_with(" y copy ╮"), "{}", row(&buf, top));
+        assert!(
+            row(&buf, top - 1).starts_with("▶ Priya  Brisbane"),
+            "{cols}"
+        );
+        let inside: Vec<String> = (top + 1..)
+            .take_while(|y| !row(&buf, *y).starts_with('╰'))
+            .map(|y| row(&buf, y))
+            .collect();
+        assert_eq!(
+            inside,
+            [format!(
+                "│ {:<width$} │",
+                "5-6pm AEDT / 4-5pm AEST / 8-9am SAST",
+                width = usize::from(cols) - 4
+            )],
+            "{cols}"
+        );
+        assert!(!row(&buf, rows - 1).is_empty(), "the footer still fits");
+    }
+    let detail_style = render(&app, 120, 36)[(2, 30)].fg;
+    assert_eq!(detail_style, ratatui::style::Color::DarkGray);
+}
+
+#[test]
+fn the_copy_box_is_titled_times_for_all_on_the_all_lens() {
+    let buf = render(&press(team_monday(), &chars("0")), 120, 36);
+    assert!(row(&buf, y_of(&buf, " times for ")).starts_with("╭ times for all "));
+}
+
+#[test]
+fn range_mode_leads_the_footer_with_its_badge_and_keys_and_keeps_the_main_keys() {
+    let drawing = press(team_monday(), &chars("v"));
+    for (cols, rows) in [(120, 36), (80, 24)] {
+        let buf = render(&drawing, cols, rows);
+        assert_eq!(
+            row(&buf, rows - 1),
+            "range  h/l move end  H/L 1h  o swap end  v/enter done  esc cancel  ? help"
+        );
+    }
+    let (_, effects) = press_all(drawing.clone(), &chars("y"));
+    assert_eq!(copied(&effects), [drawing.say_line()]);
+    let help = render(&press(drawing, &chars("?")), 120, 36);
+    assert!(y_of(&help, "Swap the active end") < y_of(&help, "everywhere"));
+}
+
+#[test]
+fn a_committed_range_away_from_now_offers_esc_and_dot_in_the_footer() {
+    let buf = render(&team_monday(), 120, 36);
+    let footer = row(&buf, 35);
+    assert!(
+        footer.contains(". now") && footer.contains("esc clear range"),
+        "{footer}"
+    );
+    assert!(!footer.contains("1-9"), "{footer}");
+}
+
+/// The copy-as dialog's rows: each format's key and preview line, then its description.
+fn dialog_rows(buf: &Buffer) -> Vec<String> {
+    let top = y_of(buf, " copy as ");
+    let cells = |y: u16| -> Vec<String> {
+        (0..buf.area.width)
+            .map(|x| buf[(x, y)].symbol().to_owned())
+            .collect()
+    };
+    let border = cells(top);
+    let left = border.iter().position(|c| c == "┌").unwrap() + 1;
+    let right = border.iter().position(|c| c == "┐").unwrap();
+    (top + 1..)
+        .map(|y| cells(y)[left..right].concat())
+        .take_while(|line| !line.contains('─'))
+        .map(|line| line.trim().to_owned())
+        .collect()
+}
+
+#[test]
+fn c_opens_a_dialog_previewing_every_format_with_its_key_and_description() {
+    let app = press(focus_on(team_monday(), "Thandi"), &chars("c"));
+    let buf = render(&app, 120, 36);
+    let rows = dialog_rows(&buf);
+    assert_eq!(
+        rows,
+        [
+            "y  5-6pm AEDT / 4-5pm AEST / 8-9am SAST",
+            "marked, ttz format",
+            "d  Mon 26 Oct, 5-6pm AEDT / 4-5pm AEST / 8-9am SAST",
+            "with the date",
+            "w  5-6pm AEDT (Paul) / 4-5pm AEST (Priya, Sam) / 8-9am SAST (Thandi, Johan)",
+            "with names",
+            "t  8-9am SAST (5-6pm AEDT)",
+            "for Thandi, their time first",
+            "z  5-6pm AEDT / 4-5pm AEST / 8-9am SAST",
+            "with place zones",
+            "s  5-6pm AEDT / 4-5pm AEST / 8-9am SAST",
+            "without the clause",
+            "a  5-6pm AEDT / 4-5pm AEST / 8-9am SAST / 6-7am GMT / 1-2am CDT, closed in UK and US, busy in AU",
+            "everyone",
+        ]
+    );
+    insta::assert_snapshot!("copy_as_120x36", text(&buf));
+}
+
+#[test]
+fn each_copy_as_key_copies_its_preview_and_closes_the_dialog() {
+    let app = press(focus_on(team_monday(), "Thandi"), &chars("c"));
+    let rows = dialog_rows(&render(&app, 120, 36));
+    for preview in rows.iter().step_by(2) {
+        let (key, line) = preview.split_once("  ").unwrap();
+        let (after, effects) = press_all(app.clone(), &chars(key));
+        assert_eq!(copied(&effects), [line], "{key}");
+        assert_eq!(after.mode, super::app::Mode::Normal, "{key}");
+    }
+    let (closed, effects) = press_all(app, &[Key::Esc]);
+    assert!(effects.is_empty() && closed.mode == super::app::Mode::Normal);
+}
+
+#[test]
+fn a_preview_too_wide_for_the_dialog_is_cut_with_a_mark_but_copies_whole() {
+    let app = press(team_monday(), &chars("c"));
+    let buf = render(&app, 80, 24);
+    let all = dialog_rows(&buf)
+        .into_iter()
+        .find(|line| line.starts_with("a  "))
+        .unwrap();
+    assert!(all.ends_with('…'), "{all}");
+    let (_, effects) = press_all(app, &chars("a"));
+    assert_eq!(
+        copied(&effects),
+        [
+            "5-6pm AEDT / 4-5pm AEST / 8-9am SAST / 6-7am GMT / 1-2am CDT, closed in UK and US, busy in AU"
+        ]
+    );
+}
+
+/// The app with the debug range-style toggle on, as `TEAMZONES_DEBUG=1` sets it.
+fn debugging(app: App) -> App {
+    App { debug: true, ..app }
+}
+
+/// The slider through the where block as text, each row followed by a mask of how its cells are
+/// marked: `s` selection background or reverse, `u` underline, `d` dim, `.` plain.
+fn styled_grid(buf: &Buffer) -> String {
+    use ratatui::style::{Color, Modifier};
+    let (from, to) = (y_of(buf, " AEDT    "), y_of(buf, "times for") - 2);
+    (from..=to)
+        .flat_map(|y| {
+            let mask: String = (0..buf.area.width)
+                .map(|x| {
+                    let cell = &buf[(x, y)];
+                    if cell.bg != Color::Reset || cell.modifier.contains(Modifier::REVERSED) {
+                        's'
+                    } else if cell.modifier.contains(Modifier::UNDERLINED) {
+                        'u'
+                    } else if cell.modifier.contains(Modifier::DIM) {
+                        'd'
+                    } else {
+                        '.'
+                    }
+                })
+                .collect();
+            [row(buf, y), mask]
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+const NO_COLOR: TerminalEnv = TerminalEnv {
+    no_color: true,
+    truecolor: false,
+    debug: false,
+};
+
+#[test]
+fn f2_cycles_the_range_styles_only_in_debug_and_the_footer_names_the_style() {
+    let plain = team_monday();
+    assert_eq!(press(plain.clone(), &[Key::F(2)]), plain);
+    let names: Vec<String> = (0..6)
+        .scan(debugging(plain.clone()), |app, _| {
+            let buf = render(app, 120, 36);
+            let footer = row(&buf, 35);
+            *app = press(app.clone(), &[Key::F(2)]);
+            Some(footer.rsplit("  ").next().unwrap().to_owned())
+        })
+        .collect();
+    assert_eq!(
+        names,
+        [
+            "range style 1/5: columns",
+            "range style 2/5: edges",
+            "range style 3/5: lines",
+            "range style 4/5: underline",
+            "range style 5/5: dim",
+            "range style 1/5: columns",
+        ]
+    );
+    for frame in [
+        render(&plain, 120, 36),
+        render(&press(plain.clone(), &chars("?")), 120, 36),
+    ] {
+        assert!(!text(&frame).contains("F2") && !text(&frame).contains("range style"));
+    }
+    let help = render(&press(debugging(plain), &chars("?")), 120, 36);
+    assert!(!text(&help).contains("F2"));
+}
+
+#[test]
+fn each_range_style_marks_the_range_its_own_way() {
+    let mut app = debugging(team_monday());
+    for number in 1..=5 {
+        let buf = render(&app, 120, 36);
+        insta::assert_snapshot!(format!("range_style_{number}"), styled_grid(&buf));
+        app = press(app, &[Key::F(2)]);
+    }
+}
+
+#[test]
+fn under_no_color_the_styles_that_need_colour_fall_back_to_edge_lines() {
+    let mut app = debugging(team_monday());
+    let mut grids = Vec::new();
+    for _ in 1..=5 {
+        grids.push(styled_grid(&render_with(&app, 120, 36, NO_COLOR)));
+        app = press(app, &[Key::F(2)]);
+    }
+    let lines = &grids[2];
+    assert_eq!([&grids[0], &grids[1], &grids[4]], [lines, lines, lines]);
+    assert_ne!(&grids[3], lines, "underline needs no colour");
+    assert!(grids[3].contains('u'));
+    insta::assert_snapshot!("range_style_no_color", lines);
 }

@@ -4,7 +4,7 @@ Seeded from the shared contract of the teamzones build spec (2026-10-24). Where 
 
 ## Summary
 
-Build `teamzones`, a single binary with a TUI and a headless CLI. It shows people (who you tell) by availability and places (regions we operate in) by trading load on one home-time axis. It finds slots that answer a group's question, and copies a `ttz`-style line such as `5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST, off-peak in AU and UK`.
+Build `teamzones`, a single binary with a TUI and a headless CLI. It shows people (who you tell) by availability and places (regions we operate in) by trading load on one home-time axis. It finds slots that answer a group's question, and copies a `ttz`-style line such as `5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST, open in AU, closed in UK`.
 
 ## Scope
 
@@ -33,7 +33,7 @@ The words used here are defined in [GLOSSARY.md](../../GLOSSARY.md). The contrac
 * `space` toggles the focused row's mark. The row crosses its block's line, focus follows it by stable id (`enum Row { Person(Id), Place(Id) }`), and the inferred question updates. `X` clears the marks to home only, which asks who.
 * `w` writes the marked people to `people` and the marked places to `places`, in config order, plus a changed `where`. A new `places` key goes directly after `people`. The notice reads, for example, `team: +@UK saved`, and `u` within 10 s un-writes it. `+` saves the marks as a new group, using an inline name prompt in the strip prefilled from the expression, lowercased, with `@` dropped and parts joined by `_` (`team_uk`). Groups past the ninth get no number and are reached through the matrix.
 * `x` closes the active group with no confirm. The group disappears at once, the notice reads `closed deploy: its people and places stay  u undo`, and config is written after 10 s or on quit. `0 all` cannot be closed. It marks every person and place, is read-only, and `w` on it acts as `+`.
-* `=` cycles `where` through `off-peak`, `quiet` and `context`, skipping `context` when no people are marked. The change shows as drift until `w`.
+* `=` cycles `where` through `open`, `closed` and `context`, skipping `context` when no people are marked. The change shows as drift until `w`.
 * `tab` opens the membership matrix overlay. People and then places run down the side, and groups run across with the question each asks. `space` toggles a cell, and home is locked at `⌂`. The overlay's bottom lines preview the group's say line and the equivalent CLI call. Matrix changes, including a close with `x` inside it, are written when the overlay closes. Until then, `u` undoes within the overlay.
 * `a` opens a picker for a new person (name, city, hours) or a new place (name, zone, trading profile, marker). `e` edits the focused row, and `d` deletes it from config and every group, with the same 10 s `u`. Text prompts swallow every key except `esc` and `enter`.
 * `u` is a single level of undo covering the last drop, write, close or delete, and it expires 10 s after the action. Nothing ever asks for confirmation, and no key confirms on `y`.

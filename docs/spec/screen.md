@@ -11,11 +11,13 @@ The layout runs top to bottom with no outer frame and a horizontal margin of 0:
 * slider: ruler and track (2)
 * who block: top border holding the lens strip, every person, and the answer row (people + 2)
 * where block: top border, every place, answer row, bottom border (places + 3)
-* say panel (4)
+* say panel (4): the detail line, then the copy box (3)
 * notice row (1)
 * footer (1)
 
 The fixture has 7 people (home included) and 3 places, so the fixed rows total 24. Block heights come from the whole roster, never from the active group.
+
+The mockups below predate the hands-on round after M3 ([D17 to D22](../decisions.md)): they still show the old level words (`quiet`, `off-peak`, `peak`), the `say` panel with the detail line inside it and the old footer. Where they disagree with this text, the text wins.
 
 ```
 teamzones   now Sat 24 Oct 9:04am AEDT   viewing Mon 26 Oct +2d                                         ⌂ Melbourne AEDT
@@ -72,34 +74,37 @@ h/l time  v range  n next fit  space mark  1-9 group  w save  tab groups  y copy
   + The people legend is right-aligned in the border and lists only the bands on screen.
   + Rows go home first, then counted people, then the `≡` answer row, then the uncounted people dimmed.
   + Rows within each section are ordered by descending UTC offset, then config order.
-* **Row label**: the mark (`⌂ ● ○`), the name, and the person's local time for the range, right-aligned (`4-5pm AEST`). A weekday prefix is added when the date differs from the axis date. When `L ≥ 32`, a city column sits after the name. City names longer than 9 characters are cut to 8 plus `.`, so the 80-column mockup's `Jo'burg` is illustrative and the build shows `Johannes.`. When the label is short of room, drop the zone first, then the minutes.
+* **Row label**: the mark (`⌂ ● ○`), the name, and the person's local time for the range, right-aligned (`4-5pm AEST`). A weekday prefix is added when the date differs from the axis date. When `L ≥ 32`, a city column sits after the name. It is as wide as the longest city among the people, and cuts with a `.` mark only when that would leave a row too little room for its time without the zone. So at 80 columns regions at now shows `Johannesb.`, team on Monday shows `Johannesburg`, and at 140 columns every city is whole. When the label is short of room, drop the zone first, then the minutes.
 * **Person lane**: `░` night, `▒` day, `▚` morning or evening, `▓` working, `╌` off. A 3-letter weekday tag (`Mon`) is overwritten into the lane at local midnight.
 * **Where block**:
-  + The top border holds `  where  ` (padded with a space each side) and `asks off-peak`, `asks quiet`, `context` or `not asked`, plus the load legend `▁ quiet  ▄ off-peak  █ peak`.
+  + The top border holds `  where  ` (padded with a space each side) and `asks open`, `asks closed`, `context` or `not asked`, plus the load legend `▁ closed  ▄ open  █ busy`. When every place uses the same `labels`, the legend shows those words instead.
   + Rows go counted places (`◆`), the answer row, then the other places (`◇`) dimmed.
-  + A place label is its range state word, worst over the range, with `peak` in warn bold. At 80 columns the label also shows the place's local clock.
-  + Lanes draw `▁` quiet (night colour), `▄` off-peak (dim), `█` peak (warn), with day tags as for people.
+  + A place label is its range state word (its profile's label for the level), worst over the range, with `busy` in warn bold. At 80 columns the label also shows the place's local clock.
+  + Lanes draw `▁` closed (night colour), `▄` open (dim), `█` busy (warn), with day tags as for people.
 * **Answer row**:
   + The label reads `≡ <rule>` with the count right-aligned (`≡ in hours 5/5`).
   + Each cell shows `·` when no row counts, a braille fill by fraction (`⡀ ⡄ ⡆ ⡇ ⣇ ⣧ ⣷`, nearest seventh), or `━` in ok colour when all count.
   + When the block is not asked, the row reads `-- not asked: team has no places (space on a place adds one)`, or the people version of that text.
-* **Say panel**: a rounded block titled `say <expression>`, with `y copies this line` right-aligned in the title.
-  + Line 1 is the say line followed by a dim summary (`3 zones for 5 people, 2 places`).
-  + Line 2 is `▶` plus the focused row's detail. For a person: city, zone, offset, hours, groups and state. For a place: state, what comes next, zone, profile and groups. Pieces drop whole from the right when there is no room.
+* **Say panel**: the detail line, then the copy box under it.
+  + The copy box is a rounded block titled `times for <expression>` (`times for all` on the `0 all` lens), with `y copy` right-aligned in the title. It holds only the say line, exactly what `y` copies. A dim summary (`3 zones for 5 people, 2 places`) sits right-aligned in its bottom border.
+  + The detail line, directly above the box, is a dim `▶` plus the focused row's detail. It is never copied. For a person: city, zone, offset, hours, groups and state. For a place: state, what comes next, zone, profile and groups. Pieces drop whole from the right when there is no room.
 * **Notice row**: blank unless there is something to say. A notice starts with its key, two spaces, then the text, plus a clickable `u undo` where it applies. It clears on the next key or after 10 s, whichever comes first. Clearing a notice does not cancel undo: `u` stays live for 10 s after the action. The texts are:
-  + `n  next fit for deploy: Mon 5-5:30pm AEDT, range shortened from 1h to 30m (AU peak from 5:30pm)`
+  + `n  next fit for deploy: Mon 5-5:30pm AEDT, range shortened from 1h to 30m (AU busy from 5:30pm)`
   + `3  dropped team +@UK  u undo`
   + `w  team: +@UK saved  u undo`
   + `x  closed deploy: its people and places stay  u undo`
   + `d  deleted Ellie from config and 2 groups  u undo`
   + `r  config reloaded`, or `r  config error line 12: unknown key "hour", kept the last good config`
   + `y  copied`, or `y  clipboard unavailable: 5-6pm AEDT / …`
-* **Footer**: ASCII only, generated from the binding table as a priority ladder. Hints keep their display order, and when space runs out they drop from the lowest priority up. Highest priority first: `y`, `space`, `1-9`, `h/l`, `m` (raised to just below `h/l` while the map is auto-hidden, and otherwise last), `tab`, `v`, `n`, `w`, `c`. `? help` and `q quit` are pinned and never drop. The display order is `h/l v n space 1-9 w tab y c m ? q`.
+* **Copy-as dialog**: `c` opens a bordered `copy as` dialog over the grid, with `esc close` in its bottom border. Each built format (`y d w t z s a`) gets two rows: its key and the exact line it would copy right now, then a dim description (`for Thandi, their time first` names the focused row under `t`). A preview too wide for the dialog is cut with `…`, but the key always copies the whole line. A format's key copies and closes the dialog, and `esc` closes it without copying.
+* **Footer**: ASCII only, generated from the binding table as a priority ladder, and it follows the mode. Hints keep their display order, and when space runs out they drop from the lowest priority up. `? help` and `q quit` are pinned and never drop, and mode hints are the last of the rest to drop.
+  + In normal mode, highest priority first: `esc clear range` (only with a committed range), `. now` (only when the cursor or range is anywhere other than now), `y`, `space`, `h/l`, `m` (raised to just below `h/l` while the map is auto-hidden, and otherwise last), `tab`, `v`, `n`, `w`, `c`. The display order is `h/l . v n space w tab y c m esc ? q`. `1-9 group` is not in the footer, because the who strip already numbers the groups, and it stays in the `?` overlay.
+  + While drawing a range with `v`, the footer leads with a `range` badge and shows only the range keys: `h/l move end  H/L 1h  o swap end  v/enter done  esc cancel`, then `? help`. Every main key still works in this mode.
 * **Map** (M4):
   + ratatui `Canvas` with `Map { resolution: High }` and Braille markers, cropped to latitudes -58 to 80.
   + After the canvas renders, paint the night side onto the buffer: dim the foreground and add the night background tint. Draw `☼` at the subsolar point.
   + Markers: `⌂` home, `●` counted people, `◆` counted places. Uncounted people are dim `●` and uncounted places dim `◇`. Uncounted markers are drawn first, so a counted marker wins a shared cell.
-  + Labels are drawn only for home and counted rows: `City 4-5pm` for a person (with `·N` after it when N counted people share the city, as in `Brisbane 4-5pm ·2`), and `UK quiet 3-5am` for a place. Try the right of the marker on its row first, then the row above, then the left. Drop the label whole if all three overlap another label or leave the map.
+  + Labels are drawn only for home and counted rows: `City 4-5pm` for a person (with `·N` after it when N counted people share the city, as in `Brisbane 4-5pm ·2`), and `UK closed 3-5am` for a place, using its profile's label for the state. Try the right of the marker on its row first, then the row above, then the left. Drop the label whole if all three overlap another label or leave the map.
   + The night side and `☼` use the range midpoint, or the cursor when there is no range.
 * **Map hiding**:
   + The map shows only if there are at least 100 columns and at least 12 rows are left after the fixed rows.

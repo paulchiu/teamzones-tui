@@ -303,7 +303,7 @@ mod tests {
     fn quiet_regions_never_fit_and_report_the_best_two_of_three() {
         let roster = roster();
         let quiet = Marks {
-            rule: Rule::Quiet,
+            rule: Rule::Closed,
             ..marks(&roster, "regions")
         };
         let no_fit = next_fit(&roster, &quiet, now()).unwrap_err();
@@ -375,7 +375,7 @@ mod tests {
     fn next_run_reports_the_best_slot_when_nothing_fits() {
         let roster = roster();
         let quiet = Marks {
-            rule: Rule::Quiet,
+            rule: Rule::Closed,
             ..marks(&roster, "regions")
         };
         let no_fit = next_run(&roster, &quiet, Slot::containing(now())).unwrap_err();

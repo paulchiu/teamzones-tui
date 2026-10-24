@@ -9,7 +9,7 @@ use teamzones_core::question::{Marks, Row, person_band, place_level};
 use teamzones_core::time::Moment;
 
 use super::app::{App, Cursor, Lanes, Lens, Mode, Undo, Visual, base_marks};
-use super::keys::{Action, Context, Key, action_for};
+use super::keys::{Action, Context, Key, action_for, debug_action_for};
 use super::notice::{Notice, TIMEOUT};
 use super::prompt;
 use super::say::duration_text;
@@ -41,9 +41,10 @@ pub enum Effect {
     Copy { key: String, text: String },
 }
 
-/// The context whose bindings read the next key.
-pub fn context(mode: &Mode) -> Context {
-    match mode {
+/// The context whose bindings read the next key: a modal, range mode while drawing, or main.
+pub fn context(app: &App) -> Context {
+    match &app.mode {
+        Mode::Normal if app.visual.is_some() => Context::Range,
         Mode::Normal => Context::Main,
         Mode::Prompt(_) => Context::Prompt,
         Mode::CopyMenu => Context::CopyMenu,
@@ -103,7 +104,8 @@ fn with_notice(app: App, key: &str, text: &str, now: DateTime<Utc>) -> App {
 }
 
 fn on_key(app: App, key: Key) -> (App, Vec<Effect>) {
-    let Some(action) = action_for(context(&app.mode), key) else {
+    let debug = app.debug.then(|| debug_action_for(key)).flatten();
+    let Some(action) = debug.or_else(|| action_for(context(&app), key)) else {
         return (app, Vec::new());
     };
     let app = App {
@@ -205,7 +207,9 @@ fn act(app: App, action: Action, key: Key) -> (App, Vec<Effect>) {
         Action::Help => only(App {
             mode: match &app.mode {
                 Mode::Help(_) => Mode::Normal,
-                other => Mode::Help(context(other)),
+                Mode::Normal | Mode::Prompt(_) | Mode::CopyMenu | Mode::SortMenu => {
+                    Mode::Help(context(&app))
+                }
             },
             ..app
         }),
@@ -216,6 +220,10 @@ fn act(app: App, action: Action, key: Key) -> (App, Vec<Effect>) {
         Action::Type(c) => only(edit_prompt(app, Some(c))),
         Action::Erase => only(edit_prompt(app, None)),
         Action::Submit => only(submit(app)),
+        Action::CycleRangeStyle => only(App {
+            range_style: app.range_style.next(),
+            ..app
+        }),
     }
 }
 
@@ -359,6 +367,7 @@ fn key_text(key: Key) -> String {
         | Key::Enter
         | Key::Esc
         | Key::Backspace
+        | Key::F(_)
         | Key::Other => String::new(),
     }
 }
@@ -448,7 +457,8 @@ fn ends_because(app: &App, slot: Slot) -> Option<String> {
         Row::Place(id) => format!(
             "{} {} from {from}",
             roster.place(id).name,
-            place_level(roster, id, slot).map_or("closed", |level| level.word())
+            place_level(roster, id, slot)
+                .map_or("closed", |level| roster.place(id).labels().word(level))
         ),
     })
 }

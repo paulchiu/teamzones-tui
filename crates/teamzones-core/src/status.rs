@@ -88,25 +88,26 @@ fn next_opening(trading: &Trading, date: NaiveDate, minute: u32) -> Option<(Naiv
         })
 }
 
-/// What comes next for a place: the peak in progress or coming up today, or when it opens.
+/// What comes next for a place: the busy spell in progress or coming up today, or when it opens.
 pub fn place_next(trading: &Trading, tz: Tz, level: Level, now: DateTime<Utc>) -> String {
+    let busy = &trading.labels.busy;
     let local = now.with_timezone(&tz);
     let (today, minute) = (local.date_naive(), local.hour() * 60 + local.minute());
     let trading_day = trading.on(local.weekday());
     let later_peak = |date, from| {
         next_peak(trading, date, from)
-            .map(|(day, peak)| format!("next peak {}", span_on(day, peak, today)))
+            .map(|(day, peak)| format!("next {busy} {}", span_on(day, peak, today)))
     };
     let pieces: Vec<String> = match level {
-        Level::Peak => trading_day
+        Level::Busy => trading_day
             .peaks
             .iter()
             .find(|peak| peak.contains(minute))
-            .map(|peak| format!("peak {}", span_on(today, *peak, today)))
+            .map(|peak| format!("{busy} {}", span_on(today, *peak, today)))
             .into_iter()
             .collect(),
-        Level::OffPeak => match trading_day.peaks.iter().find(|peak| peak.start > minute) {
-            Some(peak) => vec![format!("peak {}", span_on(today, *peak, today))],
+        Level::Open => match trading_day.peaks.iter().find(|peak| peak.start > minute) {
+            Some(peak) => vec![format!("{busy} {}", span_on(today, *peak, today))],
             None => {
                 let closes = trading_day
                     .open
@@ -117,7 +118,7 @@ pub fn place_next(trading: &Trading, tz: Tz, level: Level, now: DateTime<Utc>) -
                     .collect()
             }
         },
-        Level::Quiet => match next_opening(trading, today, minute) {
+        Level::Closed => match next_opening(trading, today, minute) {
             Some((day, opens)) => std::iter::once(format!("opens {}", clock_on(day, opens, today)))
                 .chain(later_peak(day, opens))
                 .collect(),
@@ -176,9 +177,10 @@ pub fn status_lines(roster: &Roster, marks: &Marks, now: DateTime<Utc>) -> Vec<S
             let place = roster.place(*id);
             let tz = place.location.tz;
             let (state, next) = match (&place.trading, place_level(roster, *id, slot)) {
-                (Some(trading), Some(level)) => {
-                    (level.word().to_owned(), place_next(trading, tz, level, now))
-                }
+                (Some(trading), Some(level)) => (
+                    trading.labels.word(level).to_owned(),
+                    place_next(trading, tz, level, now),
+                ),
                 (None, _) | (_, None) => (
                     band(place.location, None, roster.daylight, slot)
                         .word()
@@ -217,24 +219,44 @@ mod tests {
     }
 
     #[test]
-    fn a_place_at_peak_shows_the_peak_in_progress() {
+    fn a_busy_place_shows_the_busy_spell_in_progress() {
         let roster = Config::parse(FIXTURE).unwrap().roster;
         let marks = Marks::of_group(roster.group_named("regions").unwrap());
-        // Sat 24 Oct 12pm AEDT: AU is in its Saturday lunch peak, UK quiet and US peak, so the state column is five wide.
+        // Sat 24 Oct 12pm AEDT: AU is in its Saturday lunch peak, UK closed and US busy, so the state column is six wide.
         let lines = status_lines(&roster, &marks, "2026-10-24T01:00:00Z".parse().unwrap());
-        assert_eq!(lines[0], "AU  peak   Sat 12pm AEDT  peak 11:30am-2:30pm");
+        assert_eq!(lines[0], "AU  busy    Sat 12pm AEDT  busy 11:30am-2:30pm");
     }
 
     #[test]
-    fn off_peak_after_the_last_peak_shows_closing_and_the_next_peak() {
+    fn open_after_the_last_busy_spell_shows_closing_and_the_next_one() {
         let roster = Config::parse(FIXTURE).unwrap().roster;
         let marks = Marks::of_group(roster.group_named("regions").unwrap());
         // Sat 24 Oct 10:30pm AEDT: AU is open until 11pm with no peak left today.
         let lines = status_lines(&roster, &marks, "2026-10-24T11:30:00Z".parse().unwrap());
         assert!(
-            lines[0].ends_with("closes 11pm, next peak Sun 11:30am-2pm"),
+            lines[0].ends_with("closes 11pm, next busy Sun 11:30am-2pm"),
             "{}",
             lines[0]
+        );
+    }
+
+    #[test]
+    fn a_profile_s_labels_name_the_state_and_what_comes_next() {
+        let text = FIXTURE.replacen(
+            "kind  = \"trading\"\n",
+            "kind  = \"trading\"\nlabels = { closed = \"shut\", open = \"trading hours\", busy = \"rush\" }\n",
+            1,
+        );
+        let roster = Config::parse(&text).unwrap().roster;
+        let marks = Marks::of_group(roster.group_named("regions").unwrap());
+        let lines = status_lines(&roster, &marks, "2026-10-23T22:04:00Z".parse().unwrap());
+        assert_eq!(
+            lines,
+            [
+                "AU  trading hours  Sat 9:04am AEDT  rush 11:30am-2:30pm",
+                "UK  shut           Fri 11:04pm BST  opens Sat 7am, next rush Sat 11:30am-2:30pm",
+                "US  trading hours  Fri 5:04pm CDT   rush 6-10pm",
+            ]
         );
     }
 }

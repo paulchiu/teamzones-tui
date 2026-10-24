@@ -14,6 +14,7 @@ pub enum Key {
     Enter,
     Esc,
     Backspace,
+    F(u8),
     Other,
 }
 
@@ -34,6 +35,7 @@ impl Key {
             KeyCode::Enter => Self::Enter,
             KeyCode::Esc => Self::Esc,
             KeyCode::Backspace => Self::Backspace,
+            KeyCode::F(n) => Self::F(n),
             _ => Self::Other,
         }
     }
@@ -43,16 +45,21 @@ impl Key {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Context {
     Main,
+    /// Drawing a range with `v`: its own keys first, then the main ones.
+    Range,
     Global,
     Prompt,
     CopyMenu,
     SortMenu,
     Help,
+    /// Keys that exist only under `TEAMZONES_DEBUG=1`, never hinted or listed in help.
+    Debug,
 }
 
 /// One `c` menu variant.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CopyAs {
+    Plain,
     Date,
     Names,
     ThisRow,
@@ -107,13 +114,25 @@ pub enum Action {
     Type(char),
     Erase,
     Submit,
+    CycleRangeStyle,
 }
 
-/// A footer hint: the keys as the footer writes them, and a short label.
+/// A footer hint: the keys as the footer writes them, a short label, and when it shows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Hint {
     pub keys: &'static str,
     pub label: &'static str,
+    pub shown: Shown,
+}
+
+/// When a hint earns its footer space.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Shown {
+    Always,
+    /// Only while a range is committed.
+    WithRange,
+    /// Only while the cursor or range is anywhere other than now.
+    AwayFromNow,
 }
 
 /// One row of the binding table; the main and global rows mirror `docs/spec/keys.md` row for row.
@@ -141,8 +160,19 @@ pub struct Binding {
 pub const PINNED: u8 = u8::MAX;
 
 const fn hint(keys: &'static str, label: &'static str) -> Hint {
-    Hint { keys, label }
+    Hint {
+        keys,
+        label,
+        shown: Shown::Always,
+    }
 }
+
+const fn hint_when(keys: &'static str, label: &'static str, shown: Shown) -> Hint {
+    Hint { keys, label, shown }
+}
+
+/// The footer priority of a mode hint: below the pinned ones, above everything else.
+const MODE: u8 = 200;
 
 const fn row(
     keys: &'static str,
@@ -209,6 +239,8 @@ pub const BINDINGS: &[Binding] = &[
         ..row("[ ]", "Previous or next day", "M3 / M4", Context::Main)
     },
     Binding {
+        hints: &[hint_when(".", "now", Shown::AwayFromNow)],
+        priority: MODE,
         chords: &[(Key::Char('.'), Action::Now)],
         ..row(
             ".",
@@ -270,6 +302,8 @@ pub const BINDINGS: &[Binding] = &[
         )
     },
     Binding {
+        hints: &[hint_when("esc", "clear range", Shown::WithRange)],
+        priority: MODE + 1,
         chords: &[(Key::Esc, Action::Unwind)],
         ..row(
             "esc",
@@ -315,8 +349,6 @@ pub const BINDINGS: &[Binding] = &[
         Context::Main,
     ),
     Binding {
-        hints: &[hint("1-9", "group")],
-        priority: 8,
         chords: &GROUP_CHORDS,
         ..row(
             "1-9, 0",
@@ -353,7 +385,7 @@ pub const BINDINGS: &[Binding] = &[
         chords: &[(Key::Char('c'), Action::CopyMenu)],
         ..row(
             "c",
-            "Copy as: `d w t z s a` (letters local to the menu)",
+            "Copy as: `y d w t z s a` (letters local to the menu), previewing each line",
             "M3",
             Context::Main,
         )
@@ -411,6 +443,69 @@ pub const BINDINGS: &[Binding] = &[
         )
     },
     Binding {
+        hints: &[hint("h/l", "move end")],
+        priority: MODE + 5,
+        chords: &[
+            (Key::Char('h'), Action::Earlier(1)),
+            (Key::Char('l'), Action::Later(1)),
+            (Key::Left, Action::Earlier(1)),
+            (Key::Right, Action::Later(1)),
+        ],
+        ..row("h l, ← →", "Move the active end 15 min", "", Context::Range)
+    },
+    Binding {
+        hints: &[hint("H/L", "1h")],
+        priority: MODE + 1,
+        chords: &[
+            (Key::Char('H'), Action::Earlier(4)),
+            (Key::Char('L'), Action::Later(4)),
+            (Key::ShiftLeft, Action::Earlier(4)),
+            (Key::ShiftRight, Action::Later(4)),
+        ],
+        ..row(
+            "H L, shift-← →",
+            "Move the active end 1 hour",
+            "",
+            Context::Range,
+        )
+    },
+    Binding {
+        hints: &[hint("o", "swap end")],
+        priority: MODE + 2,
+        chords: &[(Key::Char('o'), Action::SwapEnd)],
+        ..row("o", "Swap the active end", "", Context::Range)
+    },
+    Binding {
+        hints: &[hint("v/enter", "done")],
+        priority: MODE + 4,
+        chords: &[
+            (Key::Char('v'), Action::Visual),
+            (Key::Enter, Action::Commit),
+        ],
+        ..row("v, enter", "Commit the range", "", Context::Range)
+    },
+    Binding {
+        hints: &[hint("esc", "cancel")],
+        priority: MODE + 3,
+        chords: &[(Key::Esc, Action::Unwind)],
+        ..row(
+            "esc",
+            "Cancel, restoring the range before",
+            "",
+            Context::Range,
+        )
+    },
+    Binding {
+        hints: &[hint("?", "help")],
+        priority: PINNED,
+        chords: &[(Key::Char('?'), Action::Help)],
+        ..row("?", "Help", "", Context::Range)
+    },
+    Binding {
+        chords: &[(Key::F(2), Action::CycleRangeStyle)],
+        ..row("F2", "Cycle the range-marking styles", "", Context::Debug)
+    },
+    Binding {
         hints: &[hint("enter", "go")],
         priority: PINNED,
         chords: &[(Key::Enter, Action::Submit)],
@@ -429,6 +524,7 @@ pub const BINDINGS: &[Binding] = &[
     },
     Binding {
         hints: &[
+            hint("y", "line"),
             hint("d", "date"),
             hint("w", "names"),
             hint("t", "this row"),
@@ -438,6 +534,7 @@ pub const BINDINGS: &[Binding] = &[
         ],
         priority: 5,
         chords: &[
+            (Key::Char('y'), Action::CopyAs(CopyAs::Plain)),
             (Key::Char('d'), Action::CopyAs(CopyAs::Date)),
             (Key::Char('w'), Action::CopyAs(CopyAs::Names)),
             (Key::Char('t'), Action::CopyAs(CopyAs::ThisRow)),
@@ -446,8 +543,8 @@ pub const BINDINGS: &[Binding] = &[
             (Key::Char('a'), Action::CopyAs(CopyAs::All)),
         ],
         ..row(
-            "d w t z s a",
-            "Copy with the date; with names; this row only; with place zones; without the clause; for all",
+            "y d w t z s a",
+            "Copy the line; with the date; with names; this row only; with place zones; without the clause; for all",
             "",
             Context::CopyMenu,
         )
@@ -468,13 +565,25 @@ pub const BINDINGS: &[Binding] = &[
     },
 ];
 
-/// Whether a context answers the global keys too; a prompt takes every key but `ctrl-c` as text.
-fn reads_global(context: Context) -> bool {
+/// The contexts a key falls through to after its own; a prompt takes every key but `ctrl-c` as
+/// text, and range mode keeps every main key.
+fn fallbacks(context: Context) -> &'static [Context] {
+    match context {
+        Context::Main | Context::Global | Context::CopyMenu | Context::SortMenu | Context::Help => {
+            &[Context::Global]
+        }
+        Context::Range => &[Context::Main, Context::Global],
+        Context::Prompt | Context::Debug => &[],
+    }
+}
+
+/// Whether a context's footer adds the global hints; range mode names only its own keys.
+fn hints_global(context: Context) -> bool {
     match context {
         Context::Main | Context::Global | Context::CopyMenu | Context::SortMenu | Context::Help => {
             true
         }
-        Context::Prompt => false,
+        Context::Range | Context::Prompt | Context::Debug => false,
     }
 }
 
@@ -494,9 +603,9 @@ pub fn action_for(context: Context, key: Key) -> Option<Action> {
     }
     chord_in(context, key)
         .or_else(|| {
-            reads_global(context)
-                .then(|| chord_in(Context::Global, key))
-                .flatten()
+            fallbacks(context)
+                .iter()
+                .find_map(|fallback| chord_in(*fallback, key))
         })
         .or_else(|| unbound(context, key))
 }
@@ -511,10 +620,19 @@ fn unbound(context: Context, key: Key) -> Option<Action> {
                 None
             }
         }
-        Context::Main | Context::Global | Context::CopyMenu | Context::SortMenu | Context::Help => {
-            None
-        }
+        Context::Main
+        | Context::Range
+        | Context::Global
+        | Context::CopyMenu
+        | Context::SortMenu
+        | Context::Help
+        | Context::Debug => None,
     }
+}
+
+/// What `key` does among the debug keys, which only a debug run reads.
+pub fn debug_action_for(key: Key) -> Option<Action> {
+    chord_in(Context::Debug, key)
 }
 
 /// The hints a context's footer may show, in display order, each with its priority.
@@ -522,7 +640,7 @@ pub fn hints(context: Context) -> Vec<(Hint, u8)> {
     let own = BINDINGS.iter().filter(move |b| b.context == context);
     let global = BINDINGS
         .iter()
-        .filter(move |b| b.context == Context::Global && reads_global(context));
+        .filter(move |b| b.context == Context::Global && hints_global(context));
     own.chain(global)
         .filter(|binding| !binding.chords.is_empty())
         .flat_map(|binding| binding.hints.iter().map(|hint| (*hint, binding.priority)))
@@ -604,7 +722,7 @@ mod tests {
         let hinted: Vec<&str> = hints(Context::Main).iter().map(|(h, _)| h.keys).collect();
         assert_eq!(
             hinted,
-            ["h/l", "v", "n", "space", "1-9", "y", "c", "?", "q"]
+            ["h/l", ".", "v", "n", "space", "y", "c", "esc", "?", "q"]
         );
     }
 

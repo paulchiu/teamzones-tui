@@ -14,7 +14,7 @@ use teamzones_core::fit::{day_start, slot_fits};
 use teamzones_core::question::{Row, evaluate, person_band};
 use teamzones_core::schedule::{Band, Level, band, is_day};
 
-use super::app::{App, Cursor, Lanes, Mode};
+use super::app::{App, Cursor, Lanes, Mode, RangeStyle};
 use super::glyphs::Glyphs;
 use super::layout::{Areas, MapChoice, layout};
 use super::say::{detail, duration_text, local_text, summary};
@@ -83,9 +83,75 @@ struct Track {
     minutes: u16,
     start: DateTime<Utc>,
     when: When,
+    /// How the range is marked, already fallen back for a theme without colour.
+    marking: RangeStyle,
+}
+
+/// The grid rows a range style can mark: the ruler, the track, a lane or an answer row.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Surface {
+    Ruler,
+    Track,
+    Lane,
+    Answer,
 }
 
 impl Track {
+    /// Cell `index`'s style on `surface`: `base` plus however this range style marks it.
+    fn marked(&self, theme: &Theme, surface: Surface, index: u16, base: Style) -> Style {
+        let selected = self.selected(index);
+        let shade = || base.patch(theme.selection);
+        match self.marking {
+            RangeStyle::Columns if selected => shade(),
+            RangeStyle::Edges if selected => match surface {
+                Surface::Ruler => shade(),
+                Surface::Track | Surface::Lane | Surface::Answer => base,
+            },
+            RangeStyle::Underline if selected => match surface {
+                Surface::Ruler | Surface::Lane | Surface::Answer => {
+                    base.add_modifier(Modifier::UNDERLINED)
+                }
+                Surface::Track => base,
+            },
+            RangeStyle::Dim if !selected => match surface {
+                Surface::Lane | Surface::Answer => base.add_modifier(Modifier::DIM),
+                Surface::Ruler | Surface::Track => base,
+            },
+            RangeStyle::Columns
+            | RangeStyle::Edges
+            | RangeStyle::Lines
+            | RangeStyle::Underline
+            | RangeStyle::Dim => base,
+        }
+    }
+
+    /// Draws the edge glyphs styles 2 and 3 put just outside the range on `surface`'s row `y`.
+    fn edges(&self, buf: &mut Buffer, area: Rect, y: u16, look: Look, surface: Surface) {
+        let glyphs = look.glyphs;
+        let pair = match self.marking {
+            RangeStyle::Edges => match surface {
+                Surface::Lane => Some((glyphs.edge_before, glyphs.edge_after)),
+                Surface::Ruler | Surface::Track | Surface::Answer => None,
+            },
+            RangeStyle::Lines => match surface {
+                Surface::Lane | Surface::Answer => Some((glyphs.edge_line, glyphs.edge_line)),
+                Surface::Ruler | Surface::Track => None,
+            },
+            RangeStyle::Columns | RangeStyle::Underline | RangeStyle::Dim => None,
+        };
+        let Some((before, after)) = pair else { return };
+        let mut selected = (0..self.cells).filter(|index| self.selected(*index));
+        let Some(first) = selected.next() else { return };
+        let last = selected.next_back().unwrap_or(first);
+        let style = look.theme.fg(Role::Accent);
+        if first > 0 {
+            set_char(buf, area, self.x + first - 1, y, before, style);
+        }
+        if last + 1 < self.cells {
+            set_char(buf, area, self.x + last + 1, y, after, style);
+        }
+    }
+
     fn cell_start(&self, index: u16) -> DateTime<Utc> {
         self.start + chrono::TimeDelta::minutes(i64::from(index) * i64::from(self.minutes))
     }
@@ -140,6 +206,7 @@ pub fn draw(frame: &mut Frame, app: &App, look: Look) {
         minutes: areas.columns.minutes,
         start: day_start(app.day(), app.roster().axis()),
         when: app.when(),
+        marking: app.range_style.without_colour(look.theme.is_mono()),
     };
     let buf = frame.buffer_mut();
     header(buf, clip(areas.header), app, look);
@@ -149,8 +216,10 @@ pub fn draw(frame: &mut Frame, app: &App, look: Look) {
     say_panel(buf, clip(areas.say), app, look);
     notice(buf, clip(areas.notice), app, look);
     footer_row(buf, clip(areas.footer), app, look);
-    if let Mode::Help(from) = app.mode {
-        help_overlay(buf, size, from, look);
+    match app.mode {
+        Mode::Help(from) => help_overlay(buf, size, from, look),
+        Mode::CopyMenu => copy_dialog(buf, size, app, look),
+        Mode::Normal | Mode::Prompt(_) | Mode::SortMenu => {}
     }
 }
 
@@ -279,19 +348,23 @@ fn slider(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
         }
     }
     for (index, column) in track.columns() {
-        if track.selected(index) {
-            patch(buf, area, column, ruler_y, theme.selection);
-        }
+        patch(
+            buf,
+            area,
+            column,
+            ruler_y,
+            track.marked(theme, Surface::Ruler, index, Style::new()),
+        );
     }
     let selected: Vec<u16> = track
         .columns()
         .filter(|(index, _)| track.selected(*index))
         .map(|(_, column)| column)
         .collect();
-    let mark = theme
-        .fg(Role::Accent)
-        .add_modifier(Modifier::BOLD)
-        .patch(theme.selection);
+    let mark = theme.fg(Role::Accent).add_modifier(Modifier::BOLD);
+    let mark = selected.first().map_or(mark, |first| {
+        track.marked(theme, Surface::Track, first - track.x, mark)
+    });
     match (app.shown_range(), selected.first(), selected.last()) {
         (Some(_), Some(first), Some(last)) if first != last => {
             for column in &selected {
@@ -352,12 +425,7 @@ fn lane(
 ) {
     let theme = look.theme;
     for ((index, column), (glyph, role)) in track.columns().zip(cells) {
-        let base = theme.fg(*role);
-        let style = if track.selected(index) {
-            base.patch(theme.selection)
-        } else {
-            base
-        };
+        let style = track.marked(theme, Surface::Lane, index, theme.fg(*role));
         set_char(buf, area, column, y, *glyph, style);
     }
     for (index, column) in track.columns() {
@@ -375,6 +443,7 @@ fn lane(
             );
         }
     }
+    track.edges(buf, area, y, look, Surface::Lane);
 }
 
 fn band_role(band: Band) -> Role {
@@ -389,17 +458,9 @@ fn band_role(band: Band) -> Role {
 
 fn level_role(level: Level) -> Role {
     match level {
-        Level::Quiet => Role::Quiet,
-        Level::OffPeak => Role::Dim,
-        Level::Peak => Role::Warn,
-    }
-}
-
-fn rule_word(rule: Rule) -> &'static str {
-    match rule {
-        Rule::OffPeak => "off-peak",
-        Rule::Quiet => "quiet",
-        Rule::Context => "context",
+        Level::Closed => Role::Quiet,
+        Level::Open => Role::Dim,
+        Level::Busy => Role::Warn,
     }
 }
 
@@ -511,6 +572,21 @@ fn person_cells(app: &App, track: &Track, look: Look, id: PersonId) -> Vec<(char
         .collect()
 }
 
+/// The city column: as wide as the longest city, cut only so every row keeps its time without
+/// the zone.
+fn city_width(app: &App, label_width: usize, names: usize) -> usize {
+    let roster = app.roster();
+    let longest = name_width(roster.people().map(|(_, p)| p.city.as_str()));
+    let time = roster
+        .people()
+        .map(|(_, person)| width_of(&time_candidates(app, person.location.tz)[1]))
+        .max()
+        .unwrap_or(0);
+    // The label keeps its last column free, and the mark, name and city each end with a gap.
+    let room = label_width.saturating_sub(1 + 2 + names + 1 + 1 + time);
+    longest.min(room)
+}
+
 fn name_width<'a>(names: impl Iterator<Item = &'a str>) -> usize {
     names.map(width_of).max().unwrap_or(0)
 }
@@ -571,13 +647,10 @@ fn answer(
                 })
                 .collect();
             for ((index, column), (glyph, role)) in track.columns().zip(cell_glyphs) {
-                let style = if track.selected(index) {
-                    theme.fg(role).patch(theme.selection)
-                } else {
-                    theme.fg(role)
-                };
+                let style = track.marked(theme, Surface::Answer, index, theme.fg(role));
                 set_char(buf, area, column, y, glyph, style);
             }
+            track.edges(buf, area, y, look, Surface::Answer);
         }
     }
 }
@@ -721,6 +794,7 @@ fn who(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
     let label_width = track.x.saturating_sub(area.x);
     let wide = label_width >= 32;
     let names = name_width(roster.people().map(|(_, p)| p.name.as_str()));
+    let city_width = city_width(app, usize::from(label_width), names);
     let draw_person = |buf: &mut Buffer, y: u16, id: PersonId| {
         let person = roster.person(id);
         let counted = app.is_counted(Row::Person(id));
@@ -740,8 +814,8 @@ fn who(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
                 mark_role,
                 name: &person.name,
                 name_width: names,
-                middle: wide.then(|| truncate_with_mark(&person.city, 9, ".")),
-                middle_width: 9,
+                middle: wide.then(|| truncate_with_mark(&person.city, city_width, ".")),
+                middle_width: city_width,
                 right: time_candidates(app, person.location.tz),
                 right_style: theme.fg(if counted || id == PersonId::HOME {
                     Role::Text
@@ -805,18 +879,19 @@ fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
     match (marks.asks_where(), marks.rule, marks.places.is_empty()) {
         (true, rule, _) => title.extend([
             Span::styled(" asks ", theme.fg(Role::Dim)),
-            Span::styled(rule_word(rule), theme.fg(Role::Accent)),
+            Span::styled(rule.word(), theme.fg(Role::Accent)),
         ]),
         (false, Rule::Context, false) => title.push(Span::styled(" context", theme.fg(Role::Dim))),
-        (false, Rule::Context, true) | (false, Rule::OffPeak | Rule::Quiet, _) => {
+        (false, Rule::Context, true) | (false, Rule::Open | Rule::Closed, _) => {
             title.push(Span::styled(" not asked", theme.fg(Role::Dim)));
         }
     }
     title.push(Span::raw(" "));
+    let words = roster.shared_labels();
     let items = [
-        (glyphs.quiet, Role::Quiet, "quiet"),
-        (glyphs.off_peak, Role::Dim, "off-peak"),
-        (glyphs.peak, Role::Warn, "peak"),
+        (glyphs.quiet, Role::Quiet, words.closed.as_str()),
+        (glyphs.off_peak, Role::Dim, words.open.as_str()),
+        (glyphs.peak, Role::Warn, words.busy.as_str()),
     ];
     block_with_legend(
         Borders::TOP | Borders::BOTTOM,
@@ -838,10 +913,10 @@ fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
         let counted = app.is_counted(row);
         let state = teamzones_core::question::place_state(roster, id, when);
         let right_style = match (state, counted) {
-            (Some(Level::Peak), true) => theme.fg(Role::Warn).add_modifier(Modifier::BOLD),
-            (Some(Level::Peak), false) => theme.fg(Role::Warn),
-            (Some(Level::OffPeak | Level::Quiet) | None, true) => theme.fg(Role::Text),
-            (Some(Level::OffPeak | Level::Quiet) | None, false) => theme.fg(Role::Dim),
+            (Some(Level::Busy), true) => theme.fg(Role::Warn).add_modifier(Modifier::BOLD),
+            (Some(Level::Busy), false) => theme.fg(Role::Warn),
+            (Some(Level::Open | Level::Closed) | None, true) => theme.fg(Role::Text),
+            (Some(Level::Open | Level::Closed) | None, false) => theme.fg(Role::Dim),
         };
         let clock = time_candidates(app, tz);
         label(
@@ -861,9 +936,10 @@ fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
                 name_width: names + 1,
                 middle: wide.then(|| clock[0].clone()),
                 middle_width: width_of(&clock[0]),
-                right: vec![
-                    state.map_or_else(|| clock[1].clone(), |level| level.word().to_owned()),
-                ],
+                right: vec![state.map_or_else(
+                    || clock[1].clone(),
+                    |level| place.labels().word(level).to_owned(),
+                )],
                 right_style,
                 counted,
                 focused: app.focus == row,
@@ -916,7 +992,7 @@ fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
             })
         }
     };
-    let word = answer_now.map_or("where", |block| rule_word(block.rule));
+    let word = answer_now.map_or("where", |block| block.rule.word());
     answer(buf, area, y, look, track, word, result);
     y += 1;
     for row in &rows.below {
@@ -925,11 +1001,21 @@ fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
     }
 }
 
+/// The copy box and the dim detail line above it: the box holds only the line `y` copies.
 fn say_panel(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
     let theme = look.theme;
+    detail_line(buf, Rect { height: 1, ..area }, app, look);
+    let area = Rect {
+        y: area.y + 1,
+        height: area.height.saturating_sub(1),
+        ..area
+    };
     let drift = app.drift();
     let mut title = vec![
-        Span::styled(" say ", theme.fg(Role::Text).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            " times for ",
+            theme.fg(Role::Text).add_modifier(Modifier::BOLD),
+        ),
         Span::styled(app.lens_name(), theme.fg(Role::Accent)),
     ];
     if !drift.is_empty() {
@@ -939,6 +1025,7 @@ fn say_panel(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
         ));
     }
     title.push(Span::raw(" "));
+    let line = app.say_line();
     let block = Block::bordered()
         .border_set(look.glyphs.rounded)
         .border_style(theme.fg(Role::Dim))
@@ -946,8 +1033,15 @@ fn say_panel(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
         .title_top(
             Line::from(vec![
                 Span::styled(" y", theme.fg(Role::Accent)),
-                Span::styled(" copies this line ", theme.fg(Role::Dim)),
+                Span::styled(" copy ", theme.fg(Role::Dim)),
             ])
+            .right_aligned(),
+        )
+        .title_bottom(
+            Line::from(Span::styled(
+                format!(" {} ", summary(app)),
+                theme.fg(Role::Dim),
+            ))
             .right_aligned(),
         );
     let inner = block.inner(area);
@@ -958,9 +1052,7 @@ fn say_panel(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
         inner.width.saturating_sub(2),
         inner.height,
     );
-    let line = app.say_line();
-    let room = usize::from(inner.width);
-    let x = put(
+    put(
         buf,
         inner,
         inner.x,
@@ -968,27 +1060,21 @@ fn say_panel(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
         &look.glyphs.text(&line),
         theme.fg(Role::Text).add_modifier(Modifier::BOLD),
     );
-    let tail = format!("   {}", summary(app));
-    if width_of(&line) + width_of(&tail) <= room {
-        put(buf, inner, x, inner.y, &tail, theme.fg(Role::Dim));
-    }
+}
+
+/// The focused row's detail, dim, with pieces dropped whole from the right; never copied.
+fn detail_line(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
+    let style = look.theme.fg(Role::Dim);
     let (name, pieces) = detail(app);
-    let y = inner.y + 1;
-    let x = put(
-        buf,
-        inner,
-        inner.x,
-        y,
-        &format!("{} ", look.glyphs.detail),
-        theme.fg(Role::Accent),
-    );
-    let mut x = put(buf, inner, x, y, &name, theme.fg(Role::Text));
+    let (x, y) = (area.x, area.y);
+    let x = put(buf, area, x, y, &format!("{} ", look.glyphs.detail), style);
+    let mut x = put(buf, area, x, y, &name, style);
     for piece in pieces {
         let text = format!("  {piece}");
-        if usize::from(x) + width_of(&text) > usize::from(inner.right()) {
+        if usize::from(x) + width_of(&text) > usize::from(area.right()) {
             break;
         }
-        x = put(buf, inner, x, y, &text, theme.fg(Role::Dim));
+        x = put(buf, area, x, y, &text, style);
     }
 }
 
@@ -1012,19 +1098,93 @@ fn notice(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
 
 fn footer_row(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
     let theme = look.theme;
-    let hints = footer::fit(&keys::hints(context(&app.mode)), area.width);
-    let spans: Vec<Span> = hints
-        .iter()
-        .enumerate()
-        .flat_map(|(index, hint)| {
+    let context = context(app);
+    let main = context == keys::Context::Main;
+    let situation = footer::Situation {
+        range: main && app.range.is_some(),
+        away: main && !app.at_now(),
+    };
+    let debug = app.debug.then(|| app.range_style.label());
+    let room = debug.as_ref().map_or(area.width, |label| {
+        area.width
+            .saturating_sub(u16::try_from(label.len() + 2).unwrap_or(u16::MAX))
+    });
+    if let Some(label) = &debug {
+        let x = area
+            .right()
+            .saturating_sub(u16::try_from(label.len()).unwrap_or(0));
+        put(buf, area, x, area.y, label, theme.fg(Role::Warn));
+    }
+    let footer::Footer { badge, hints } = footer::line(context, situation, room);
+    let badge = badge.into_iter().flat_map(|badge| {
+        [
+            Span::styled(
+                badge,
+                theme
+                    .fg(Role::Accent)
+                    .add_modifier(Modifier::BOLD | Modifier::REVERSED),
+            ),
+            Span::raw("  "),
+        ]
+    });
+    let spans: Vec<Span> = badge
+        .chain(hints.iter().enumerate().flat_map(|(index, hint)| {
             let gap = if index + 1 < hints.len() { "  " } else { "" };
             [
                 Span::styled(hint.keys, theme.fg(Role::Accent)),
                 Span::styled(format!(" {}{gap}", hint.label), theme.fg(Role::Dim)),
             ]
-        })
+        }))
         .collect();
-    Line::from(spans).render(area, buf);
+    Line::from(spans).render(
+        Rect {
+            width: room,
+            ..area
+        },
+        buf,
+    );
+}
+
+/// The copy-as dialog: each format's key and the line it copies, with a dim description under it.
+fn copy_dialog(buf: &mut Buffer, size: Rect, app: &App, look: Look) {
+    let theme = look.theme;
+    let rows = app.copy_menu();
+    let width = size.width.min(110);
+    let height = size
+        .height
+        .min(u16::try_from(rows.len() * 2 + 2).unwrap_or(u16::MAX));
+    let area = Rect::new(
+        size.x + (size.width - width) / 2,
+        size.y + (size.height - height) / 2,
+        width,
+        height,
+    );
+    Clear.render(area, buf);
+    let block = Block::bordered()
+        .border_set(look.glyphs.line)
+        .border_style(theme.fg(Role::Accent))
+        .title(Span::styled(
+            " copy as ",
+            theme.fg(Role::Text).add_modifier(Modifier::BOLD),
+        ))
+        .title_bottom(
+            Line::from(vec![
+                Span::styled(" esc", theme.fg(Role::Accent)),
+                Span::styled(" close ", theme.fg(Role::Dim)),
+            ])
+            .right_aligned(),
+        );
+    let inner = block.inner(area);
+    block.render(area, buf);
+    let x = inner.x + 1;
+    let room = usize::from(inner.width.saturating_sub(5));
+    let mark = look.glyphs.text("…");
+    for ((key, line, about), y) in rows.iter().zip((inner.top()..inner.bottom()).step_by(2)) {
+        put(buf, inner, x, y, &key.to_string(), theme.fg(Role::Accent));
+        let preview = truncate_with_mark(&look.glyphs.text(line), room, &mark);
+        put(buf, inner, x + 3, y, &preview, theme.fg(Role::Text));
+        put(buf, inner, x + 3, y + 1, about, theme.fg(Role::Dim));
+    }
 }
 
 fn help_overlay(buf: &mut Buffer, size: Rect, from: keys::Context, look: Look) {

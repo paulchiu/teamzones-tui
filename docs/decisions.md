@@ -46,6 +46,8 @@ Held by: nothing yet
 
 ## D6: Off-peak means not at peak (2026-10-24)
 
+Superseded by D17, which renames the keywords to `open` and `closed` and keeps this meaning.
+
 Decision: `where = "off-peak"` (the default) counts a place that is not at peak. `where = "quiet"` counts a place only while it is closed.
 
 Why: With the sample profiles, AU, UK and US are never all closed at once.
@@ -131,3 +133,51 @@ Decision: When there is no config file, or the file holds only comments and blan
 Why: The commented template `config init` writes has to behave exactly like no file, and an unreadable file answering as "nothing there" is the defect blubat fixed twice.
 
 Held by: `config::tests` in `teamzones-core` (no file, a file of only comments, a table without home) and `write::tests::the_template_as_written_is_the_same_config_as_no_file` in `teamzones`
+
+## D17: Place levels are closed, open and busy, and a trading profile may rename them (2026-10-25)
+
+Decision: The default level words are `closed`, `open` and `busy`, replacing `quiet`, `off-peak` and `peak`, and `where` takes `open` and `closed`. A trading profile's `labels` renames the three words wherever its places appear, and the where legend shows them only when every place shares them. The old keywords still load as aliases (`off-peak` as `open`, `quiet` as `closed`), and D6's meaning is unchanged: `open` as a question counts a place that is not busy, closed included. The say clause names each place by its real state, so a closed place that counts reads `closed in UK`, never `open in UK`. See [config](spec/config.md#data-model-and-config) and [copy](spec/copy.md).
+
+Why: The old words are hospitality words, and an office or support desk reads better as "office hours" or "trading hours". Paul chose the generic defaults at the hands-on round after M3. `off-peak` was true of a closed place, but `open` and a profile's label name a level, so the clause must use the place's own level to stay true.
+
+Held by: `config::tests::where_takes_the_new_keywords_and_the_old_ones_as_aliases` and the `labels` tests in `config::tests` in `teamzones-core`, `copy::tests::each_place_speaks_its_own_profile_s_labels` and `a_counting_place_is_named_by_its_real_state_not_the_question`, the copy and CLI golden tables, and `tui::tests::the_where_legend_shows_labels_every_place_shares_and_the_defaults_otherwise` in `teamzones`
+
+## D18: City names show in full whenever the label has room (2026-10-25)
+
+Decision: The who block's city column is sized to the longest city and cuts with a mark only when a row would otherwise lose its time. When the column appears at all is unchanged, and the widths are in the row label and columns rules of [screen](spec/screen.md).
+
+Why: A fixed 9-column cap cut `Johannesburg` to `Johannes.` on wide terminals with plenty of spare room.
+
+Held by: `tui::tests::the_city_column_shows_the_whole_city_when_the_label_has_room` and `the_city_column_cuts_with_a_mark_only_when_the_times_need_the_room` in `teamzones`
+
+## D19: The copy box holds only what y copies (2026-10-25)
+
+Decision: The box at the bottom is titled `times for <group>` and contains only the say line. The focused row's detail sits on its own dim line directly above it, and the summary sits in the box's bottom border, so nothing inside the box is left out of the copy. See the say panel in [screen](spec/screen.md).
+
+Why: With the detail inside a border that said `y copies this line`, the box read as if all of it was copied.
+
+Held by: `tui::tests::the_copy_box_holds_only_the_line_y_copies_and_the_detail_sits_above_it` in `teamzones`
+
+## D20: The footer follows the mode (2026-10-25)
+
+Decision: The footer shows the keys that matter for the current mode: a `range` badge and only the range keys while drawing a range, `esc clear range` with a committed range, and `. now` away from now. Mode hints drop last, after everything but `? help` and `q quit`. `1-9 group` leaves the footer and stays in help. See the footer in [screen](spec/screen.md).
+
+Why: A footer that never changed never said what mode you were in or how to get out of it.
+
+Held by: the `footer::tests` mode tests and `tui::tests::range_mode_leads_the_footer_with_its_badge_and_keys_and_keeps_the_main_keys` in `teamzones`, plus the binding meta-test `every_hinted_key_dispatches_in_its_context`
+
+## D21: Copy-as shows exactly what each key copies (2026-10-25)
+
+Decision: The `c` menu is a dialog that previews every format's line for the current time or range, with a short description under each. The preview and the copy come from one function, so what is shown is what is copied, and only the preview is ever cut to fit. See the copy-as dialog in [screen](spec/screen.md).
+
+Why: A menu of format names made you try each one to see what it copied.
+
+Held by: `tui::tests::each_copy_as_key_copies_its_preview_and_closes_the_dialog` and `a_preview_too_wide_for_the_dialog_is_cut_with_a_mark_but_copies_whole` in `teamzones`
+
+## D22: The range's columns may carry the selection background, provisionally (2026-10-25)
+
+Decision: The selection background covers the focused row and the range's columns (every lane, the ruler and the answer rows), as the mockups always drew it. This is provisional: the shading is hard to read, so with `TEAMZONES_DEBUG=1`, `F2` cycles five range-marking styles (columns, edges, lines, underline, dim) and the footer names the current one. Under `NO_COLOR` the styles that need colour (columns, edges and dim) fall back to lines. The choice is local and never saved. Once Paul picks a style, a follow-up removes the others and the debug key. See [theme](spec/theme.md).
+
+Why: The theme text said the selected row was the only background, while the screen mockups shaded the range's columns too. Paul kept the shading at the hands-on round after M3, pending a side-by-side comparison.
+
+Held by: `tui::tests::each_range_style_marks_the_range_its_own_way`, `under_no_color_the_styles_that_need_colour_fall_back_to_edge_lines` and `f2_cycles_the_range_styles_only_in_debug_and_the_footer_names_the_style` in `teamzones`

@@ -160,6 +160,7 @@ pub struct TradingDay {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Trading {
     pub days: [TradingDay; 7],
+    pub labels: Labels,
 }
 
 impl Trading {
@@ -212,17 +213,35 @@ impl Band {
 /// A place's trading load at a slot, ordered so the worst level is the greatest.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Level {
-    Quiet,
-    OffPeak,
-    Peak,
+    Closed,
+    Open,
+    Busy,
 }
 
-impl Level {
-    pub fn word(self) -> &'static str {
-        match self {
-            Self::Quiet => "quiet",
-            Self::OffPeak => "off-peak",
-            Self::Peak => "peak",
+/// The words a trading profile shows for its three levels, `closed`, `open` and `busy` unless set.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Labels {
+    pub closed: String,
+    pub open: String,
+    pub busy: String,
+}
+
+impl Default for Labels {
+    fn default() -> Self {
+        Self {
+            closed: "closed".to_owned(),
+            open: "open".to_owned(),
+            busy: "busy".to_owned(),
+        }
+    }
+}
+
+impl Labels {
+    pub fn word(&self, level: Level) -> &str {
+        match level {
+            Level::Closed => &self.closed,
+            Level::Open => &self.open,
+            Level::Busy => &self.busy,
         }
     }
 }
@@ -269,10 +288,10 @@ pub fn level(trading: &Trading, tz: Tz, slot: Slot) -> Level {
     let minute = local_minute(local);
     let day = trading.on(local.weekday());
     match day.open {
-        None => Level::Quiet,
-        Some(_) if day.peaks.iter().any(|peak| peak.contains(minute)) => Level::Peak,
-        Some(open) if open.contains(minute) => Level::OffPeak,
-        Some(_) => Level::Quiet,
+        None => Level::Closed,
+        Some(_) if day.peaks.iter().any(|peak| peak.contains(minute)) => Level::Busy,
+        Some(open) if open.contains(minute) => Level::Open,
+        Some(_) => Level::Closed,
     }
 }
 
@@ -439,7 +458,7 @@ mod tests {
     }
 
     #[test]
-    fn a_place_is_peak_then_off_peak_then_quiet() {
+    fn a_place_is_busy_then_open_then_closed() {
         let day = TradingDay {
             open: Some(LocalSpan {
                 start: 7 * 60,
@@ -452,12 +471,13 @@ mod tests {
         };
         let trading = Trading {
             days: std::array::from_fn(|_| day.clone()),
+            labels: Labels::default(),
         };
         let level_at = |utc| level(&trading, chrono_tz::Europe::London, slot(utc));
         // Mon 26 Oct 2026 in London (GMT).
-        assert_eq!(level_at("2026-10-26T12:00:00Z"), Level::Peak);
-        assert_eq!(level_at("2026-10-26T15:00:00Z"), Level::OffPeak);
-        assert_eq!(level_at("2026-10-26T03:00:00Z"), Level::Quiet);
-        assert!(Level::Peak > Level::OffPeak && Level::OffPeak > Level::Quiet);
+        assert_eq!(level_at("2026-10-26T12:00:00Z"), Level::Busy);
+        assert_eq!(level_at("2026-10-26T15:00:00Z"), Level::Open);
+        assert_eq!(level_at("2026-10-26T03:00:00Z"), Level::Closed);
+        assert!(Level::Busy > Level::Open && Level::Open > Level::Closed);
     }
 }

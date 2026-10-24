@@ -60,6 +60,62 @@ pub enum Lanes {
     Plain,
 }
 
+/// How the range is marked across the grid, cycled with `F2` under `TEAMZONES_DEBUG=1` until
+/// one is picked.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RangeStyle {
+    /// The selection background on every in-range cell.
+    Columns,
+    /// The selection background on the ruler (the time axis row) only, and edge bars on every lane.
+    Edges,
+    /// Edge lines through every lane and answer row, with no fill.
+    Lines,
+    /// In-range cells underlined.
+    Underline,
+    /// Cells outside the range dimmed.
+    Dim,
+}
+
+impl RangeStyle {
+    const COUNT: usize = 5;
+
+    /// The style's 1-based place in the `F2` cycle and its footer name.
+    fn position(self) -> (usize, &'static str) {
+        match self {
+            Self::Columns => (1, "columns"),
+            Self::Edges => (2, "edges"),
+            Self::Lines => (3, "lines"),
+            Self::Underline => (4, "underline"),
+            Self::Dim => (5, "dim"),
+        }
+    }
+
+    pub fn next(self) -> Self {
+        match self {
+            Self::Columns => Self::Edges,
+            Self::Edges => Self::Lines,
+            Self::Lines => Self::Underline,
+            Self::Underline => Self::Dim,
+            Self::Dim => Self::Columns,
+        }
+    }
+
+    /// The footer's name for it, such as `range style 2/5: edges`.
+    pub fn label(self) -> String {
+        let (index, name) = self.position();
+        format!("range style {index}/{}: {name}", Self::COUNT)
+    }
+
+    /// The style to draw when the theme has no colour: those that need a background or a dim
+    /// foreground fall back to edge lines.
+    pub fn without_colour(self, mono: bool) -> Self {
+        match self {
+            Self::Columns | Self::Edges | Self::Dim if mono => Self::Lines,
+            Self::Columns | Self::Edges | Self::Lines | Self::Underline | Self::Dim => self,
+        }
+    }
+}
+
 /// The one level of undo: the lens and marks a group switch dropped, until it expires.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Undo {
@@ -98,6 +154,9 @@ pub struct App {
     pub lanes: Lanes,
     pub sort: Sort,
     pub running: bool,
+    /// Whether `TEAMZONES_DEBUG=1` turned on the debug keys.
+    pub debug: bool,
+    pub range_style: RangeStyle,
 }
 
 impl App {
@@ -124,6 +183,8 @@ impl App {
             lanes: Lanes::Hours,
             sort: Sort::Offset,
             running: true,
+            debug: false,
+            range_style: RangeStyle::Columns,
         }
     }
 
@@ -134,6 +195,11 @@ impl App {
     /// The range on screen: the visual range while drawing one, else the committed range.
     pub fn shown_range(&self) -> Option<Range> {
         self.visual.map(Visual::range).or(self.range)
+    }
+
+    /// Whether the view sits on exact now, with no range drawn or committed.
+    pub fn at_now(&self) -> bool {
+        self.cursor == Cursor::Now && self.shown_range().is_none()
     }
 
     /// What the say line and labels are about: the range, or the cursor's instant.
@@ -220,6 +286,7 @@ impl App {
             clause,
         };
         match variant {
+            CopyAs::Plain => self.say_line(),
             CopyAs::Date => say_line(
                 roster,
                 &self.marks,
@@ -247,6 +314,31 @@ impl App {
             CopyAs::ThisRow => focus_line(roster, self.focus, when),
             CopyAs::All => say_line(roster, &Marks::all(roster), when, Variant::default()),
         }
+    }
+
+    /// The copy-as dialog's rows, in key order: each format's key, the exact line it copies now,
+    /// and a short description.
+    pub fn copy_menu(&self) -> Vec<(char, String, String)> {
+        let focused = match self.focus {
+            Row::Person(id) => self.roster().person(id).name.clone(),
+            Row::Place(id) => self.roster().place(id).name.clone(),
+        };
+        [
+            ('y', CopyAs::Plain, "marked, ttz format".to_owned()),
+            ('d', CopyAs::Date, "with the date".to_owned()),
+            ('w', CopyAs::Names, "with names".to_owned()),
+            (
+                't',
+                CopyAs::ThisRow,
+                format!("for {focused}, their time first"),
+            ),
+            ('z', CopyAs::Zones, "with place zones".to_owned()),
+            ('s', CopyAs::Short, "without the clause".to_owned()),
+            ('a', CopyAs::All, "everyone".to_owned()),
+        ]
+        .into_iter()
+        .map(|(key, variant, about)| (key, self.copy_as(variant), about))
+        .collect()
     }
 
     /// Whether `row` sits above its block's line: home when the marks ask who, or a marked row.

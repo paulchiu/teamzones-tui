@@ -4,7 +4,7 @@ use chrono::{DateTime, NaiveDate, Offset, Timelike, Utc};
 use chrono_tz::Tz;
 
 use crate::clock::When;
-use crate::config::{Roster, Rule};
+use crate::config::{Place, Roster, Rule};
 use crate::question::{Marks, Row, place_state};
 use crate::schedule::Level;
 
@@ -132,38 +132,40 @@ fn and_list(names: &[&str]) -> String {
     }
 }
 
-/// The places' states, counting places first, as in `off-peak in UK, peak in AU`.
+/// Levels in clause order: the ones the rule counts first, then the rest.
+fn clause_order(rule: Rule) -> &'static [Level] {
+    match rule {
+        Rule::Open => &[Level::Open, Level::Closed, Level::Busy],
+        Rule::Closed => &[Level::Closed, Level::Busy, Level::Open],
+        Rule::Context => &[],
+    }
+}
+
+/// The places' states, as in `open in AU and US, closed in UK`.
+///
+/// Each place is named by its real state in its own profile's labels, so the line never calls a
+/// closed place open. Places that share a state but not its word form separate groups, in
+/// config order.
 fn clause(roster: &Roster, marks: &Marks, when: When) -> Option<String> {
-    let states: Vec<(&str, Level)> = marks
+    let states: Vec<(&Place, Level)> = marks
         .counted_places()
         .into_iter()
-        .filter_map(|id| {
-            place_state(roster, id, when).map(|level| (roster.place(id).name.as_str(), level))
-        })
+        .filter_map(|id| place_state(roster, id, when).map(|level| (roster.place(id), level)))
         .collect();
-    let named = |wanted: &dyn Fn(Level) -> bool| {
-        states
-            .iter()
-            .filter(|(_, level)| wanted(*level))
-            .map(|(name, _)| *name)
-            .collect::<Vec<_>>()
-    };
-    let counts = |level| marks.rule.admits(level);
-    let groups = match marks.rule {
-        Rule::OffPeak => vec![
-            ("off-peak", named(&counts)),
-            ("peak", named(&|l| !counts(l))),
-        ],
-        Rule::Quiet => vec![
-            ("quiet", named(&counts)),
-            ("peak", named(&|l| !counts(l) && l == Level::Peak)),
-            ("open", named(&|l| !counts(l) && l == Level::OffPeak)),
-        ],
-        Rule::Context => Vec::new(),
-    };
+    let mut groups: Vec<(&str, Vec<&str>)> = Vec::new();
+    for &section in clause_order(marks.rule) {
+        let first = groups.len();
+        let listed = states.iter().filter(|(_, level)| *level == section);
+        for (place, _) in listed {
+            let word = place.labels().word(section);
+            match groups[first..].iter_mut().find(|(known, _)| *known == word) {
+                Some((_, names)) => names.push(&place.name),
+                None => groups.push((word, vec![&place.name])),
+            }
+        }
+    }
     let parts: Vec<String> = groups
         .into_iter()
-        .filter(|(_, names)| !names.is_empty())
         .map(|(word, names)| format!("{word} in {}", and_list(&names)))
         .collect();
     (!parts.is_empty()).then(|| parts.join(", "))
@@ -226,4 +228,68 @@ pub fn focus_line(roster: &Roster, row: Row, when: When) -> String {
         entry(when, tz, axis_date),
         entry(when, roster.axis(), axis_date)
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+    use crate::time::Moment;
+
+    const FIXTURE: &str = include_str!("../tests/fixtures/sample.toml");
+    const VENUE: &str = "name  = \"venue\"\nkind  = \"trading\"\n";
+
+    /// The fixture with the venue profile labelled, and US moved to an unlabelled copy of it.
+    fn labelled() -> Roster {
+        let text = FIXTURE
+            .replacen(
+                VENUE,
+                &format!("{VENUE}labels = {{ open = \"trading hours\", busy = \"rush\" }}\n"),
+                1,
+            )
+            .replacen(
+                "tz      = \"America/Chicago\"\ntrading = \"venue\"",
+                "tz      = \"America/Chicago\"\ntrading = \"desk\"",
+                1,
+            )
+            + "\n[[profile]]\nname = \"desk\"\nkind = \"trading\"\nopen = \"7am-11pm\"\n";
+        Config::parse(&text).unwrap().roster
+    }
+
+    /// The say line `teamzones say <words>` prints at the golden instant.
+    fn line(roster: &Roster, words: &str) -> String {
+        let tokens: Vec<&str> = words.split(' ').collect();
+        let now = "2026-10-23T22:04:00Z".parse().unwrap();
+        let expr = crate::expr::parse_expr(&tokens, roster, now).unwrap();
+        let Moment::Fixed(when) = expr.moment else {
+            panic!("{words} has no fixed time");
+        };
+        say_line(roster, &expr.marks, when, Variant::default())
+    }
+
+    #[test]
+    fn a_counting_place_is_named_by_its_real_state_not_the_question() {
+        let roster = Config::parse(FIXTURE).unwrap().roster;
+        assert_eq!(
+            line(&roster, "apps 3pm"),
+            "3pm AEDT, open in AU, closed in UK and US"
+        );
+        assert_eq!(
+            line(&roster, "regions 2-4pm mon"),
+            "2-4pm AEDT, open in AU and US, closed in UK"
+        );
+    }
+
+    #[test]
+    fn each_place_speaks_its_own_profile_s_labels() {
+        let roster = labelled();
+        assert_eq!(
+            line(&roster, "regions -@us 5:30pm mon"),
+            "5:30pm AEDT, closed in UK, rush in AU"
+        );
+        assert_eq!(
+            line(&roster, "regions 2-4pm mon"),
+            "2-4pm AEDT, trading hours in AU, open in US, closed in UK"
+        );
+    }
 }

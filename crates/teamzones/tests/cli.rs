@@ -168,7 +168,7 @@ fn groups_prints_one_line_per_group_in_the_form_the_spec_shows() {
             /* Characterisation: the spec gives no example for these two. */
             "2 au: Priya, Sam  asks who",
             examples[1].as_str(),
-            "4 deploy: Priya, Thandi, @AU, @UK  asks who and off-peak",
+            "4 deploy: Priya, Thandi, @AU, @UK  asks who and open",
         ]
     );
 }
@@ -430,4 +430,69 @@ fn with_no_command_and_no_tty_it_prints_help_and_exits_2() {
     let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
     assert!(stdout.contains("Usage: teamzones"), "{stdout}");
     assert!(stdout.contains("say"), "{stdout}");
+}
+
+#[test]
+fn config_check_passes_on_the_fixture_and_on_the_old_where_keywords() {
+    teamzones().args(["config", "check"]).assert().success();
+    for keyword in ["off-peak", "quiet", "open", "closed"] {
+        let (path, original) = fixture_copy(&format!("check-where-{keyword}"));
+        let edited = original.replace(
+            "places  = [\"AU\", \"UK\", \"US\"]",
+            &format!("places  = [\"AU\", \"UK\", \"US\"]\nwhere   = \"{keyword}\""),
+        );
+        assert_ne!(edited, original);
+        std::fs::write(&path, edited).unwrap();
+        teamzones_on(&path)
+            .args(["config", "check"])
+            .assert()
+            .success();
+    }
+}
+
+#[test]
+fn config_check_rejects_an_unknown_label_key() {
+    let (path, original) = fixture_copy("check-labels");
+    let edited = original.replace(
+        "kind  = \"trading\"\n",
+        "kind  = \"trading\"\nlabels = { peak = \"rush\" }\n",
+    );
+    std::fs::write(&path, &edited).unwrap();
+    let line = edited
+        .lines()
+        .position(|line| line.starts_with("labels"))
+        .unwrap()
+        + 1;
+    teamzones_on(&path)
+        .args(["config", "check"])
+        .assert()
+        .code(2)
+        .stderr(format!(
+            "{}: line {line}: unknown key \"peak\"\n",
+            path.display()
+        ));
+}
+
+#[test]
+fn say_and_status_use_a_profile_s_labels() {
+    let (path, original) = fixture_copy("say-labels");
+    let edited = original.replace(
+        "kind  = \"trading\"\n",
+        "kind  = \"trading\"\nlabels = { open = \"trading hours\", busy = \"rush\" }\n",
+    );
+    std::fs::write(&path, edited).unwrap();
+    teamzones_on(&path)
+        .args(["say", "regions", "-@us", "5:30pm", "mon", "--no-copy"])
+        .assert()
+        .success()
+        .stdout("5:30pm AEDT, closed in UK, rush in AU\n");
+    let status = teamzones_on(&path)
+        .args(["status", "regions"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(status.get_output().stdout.clone()).unwrap();
+    assert!(
+        stdout.starts_with("AU  trading hours  Sat 9:04am AEDT  rush 11:30am-2:30pm\n"),
+        "{stdout}"
+    );
 }
