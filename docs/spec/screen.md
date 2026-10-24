@@ -11,7 +11,7 @@ The layout runs top to bottom with no outer frame and a horizontal margin of 0:
 * slider: ruler and track (2)
 * who block: top border holding the lens strip, every person, and the answer row (people + 2)
 * where block: top border, every place, answer row, bottom border (places + 3)
-* say panel (4)
+* say panel (4): the detail line, then the copy box (3)
 * notice row (1)
 * footer (1)
 
@@ -85,9 +85,9 @@ h/l time  v range  n next fit  space mark  1-9 group  w save  tab groups  y copy
   + The label reads `≡ <rule>` with the count right-aligned (`≡ in hours 5/5`).
   + Each cell shows `·` when no row counts, a braille fill by fraction (`⡀ ⡄ ⡆ ⡇ ⣇ ⣧ ⣷`, nearest seventh), or `━` in ok colour when all count.
   + When the block is not asked, the row reads `-- not asked: team has no places (space on a place adds one)`, or the people version of that text.
-* **Say panel**: a rounded block titled `say <expression>`, with `y copies this line` right-aligned in the title.
-  + Line 1 is the say line followed by a dim summary (`3 zones for 5 people, 2 places`).
-  + Line 2 is `▶` plus the focused row's detail. For a person: city, zone, offset, hours, groups and state. For a place: state, what comes next, zone, profile and groups. Pieces drop whole from the right when there is no room.
+* **Say panel**: the detail line, then the copy box under it.
+  + The copy box is a rounded block titled `times for <expression>` (`times for all` on the `0 all` lens), with `y copy` right-aligned in the title. It holds only the say line, exactly what `y` copies. A dim summary (`3 zones for 5 people, 2 places`) sits right-aligned in its bottom border.
+  + The detail line, directly above the box, is a dim `▶` plus the focused row's detail. It is never copied. For a person: city, zone, offset, hours, groups and state. For a place: state, what comes next, zone, profile and groups. Pieces drop whole from the right when there is no room.
 * **Notice row**: blank unless there is something to say. A notice starts with its key, two spaces, then the text, plus a clickable `u undo` where it applies. It clears on the next key or after 10 s, whichever comes first. Clearing a notice does not cancel undo: `u` stays live for 10 s after the action. The texts are:
   + `n  next fit for deploy: Mon 5-5:30pm AEDT, range shortened from 1h to 30m (AU busy from 5:30pm)`
   + `3  dropped team +@UK  u undo`

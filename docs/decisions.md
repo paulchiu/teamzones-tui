@@ -147,3 +147,11 @@ Decision: The who block's city column is sized to the longest city and cuts with
 Why: A fixed 9-column cap cut `Johannesburg` to `Johannes.` on wide terminals with plenty of spare room.
 
 Held by: `tui::tests::the_city_column_shows_the_whole_city_when_the_label_has_room` and `the_city_column_cuts_with_a_mark_only_when_the_times_need_the_room` in `teamzones`
+
+## D19: The copy box holds only what y copies (2026-10-25)
+
+Decision: The box at the bottom is titled `times for <group>` and contains only the say line. The focused row's detail sits on its own dim line directly above it, and the summary sits in the box's bottom border, so nothing inside the box is left out of the copy. See the say panel in [screen](spec/screen.md).
+
+Why: With the detail inside a border that said `y copies this line`, the box read as if all of it was copied.
+
+Held by: `tui::tests::the_copy_box_holds_only_the_line_y_copies_and_the_detail_sits_above_it` in `teamzones`

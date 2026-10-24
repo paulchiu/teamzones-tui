@@ -100,7 +100,7 @@ fn y_of(buf: &Buffer, needle: &str) -> u16 {
 
 /// The say line: the say panel's first inner row, up to the summary.
 fn say_line(buf: &Buffer) -> String {
-    let y = y_of(buf, " say ") + 1;
+    let y = y_of(buf, " times for ") + 1;
     row(buf, y)
         .trim_start_matches(['│', '|', ' '])
         .split("   ")
@@ -126,7 +126,8 @@ fn the_team_frame_at_120_by_36_sits_on_the_row_budget() {
     assert!(row(&buf, 21).starts_with("≡ in hours          5/5"));
     assert!(row(&buf, 24).starts_with(" where  not asked"));
     assert!(row(&buf, 25).starts_with("≡ where              --  not asked: team has no places"));
-    assert!(row(&buf, 30).starts_with("╭ say team "));
+    assert!(row(&buf, 30).starts_with("▶ Paul"));
+    assert!(row(&buf, 31).starts_with("╭ times for team "));
     assert_eq!(say_line(&buf), "5-6pm AEDT / 4-5pm AEST / 8-9am SAST");
     assert_eq!(row(&buf, 34), "");
     assert!(row(&buf, 35).starts_with("h/l time"));
@@ -136,7 +137,7 @@ fn the_team_frame_at_120_by_36_sits_on_the_row_budget() {
 /// The rows that must hold still: the ruler, both blocks' top borders, the where block's bottom
 /// border and the say panel's top border.
 fn anchors(buf: &Buffer) -> [u16; 5] {
-    let say = y_of(buf, " say ");
+    let say = y_of(buf, " times for ");
     [
         y_of(buf, " AEDT    "),
         y_of(buf, " who "),
@@ -362,7 +363,7 @@ fn a_copy_raises_copied_or_shows_the_line_when_no_clipboard_works() {
 fn space_on_uk_in_team_drifts_and_a_switch_drops_it_until_u() {
     let marked = press(focus_on(team_monday(), "UK"), &chars(" "));
     let buf = render(&marked, 120, 36);
-    assert!(row(&buf, y_of(&buf, " say ")).contains("say team +@UK"));
+    assert!(row(&buf, y_of(&buf, " times for ")).contains("times for team +@UK"));
     assert!(row(&buf, y_of(&buf, " where ")).contains("asks open"));
     let golden = copy_rows()
         .into_iter()
@@ -550,9 +551,9 @@ fn the_frames_at_120_by_24_and_80_by_24_sit_on_the_row_budget() {
             (
                 y_of(&buf, " who "),
                 y_of(&buf, " where "),
-                y_of(&buf, " say ")
+                y_of(&buf, " times for ")
             ),
-            (3, 12, 18),
+            (3, 12, 19),
             "{cols} columns"
         );
         assert!(row(&buf, 1).starts_with("Sat 24 Oct AEDT"));
@@ -889,4 +890,44 @@ fn the_city_column_cuts_with_a_mark_only_when_the_times_need_the_room() {
     let wide = render(&team_monday(), 80, 24);
     let thandi = row(&wide, y_of(&wide, "● Thandi"));
     assert!(thandi.starts_with("● Thandi Johannesburg"), "{thandi}");
+}
+
+#[test]
+fn the_copy_box_holds_only_the_line_y_copies_and_the_detail_sits_above_it() {
+    let app = focus_on(team_monday(), "Priya");
+    for (cols, rows) in [(120, 36), (80, 24)] {
+        let buf = render(&app, cols, rows);
+        let top = y_of(&buf, " times for team ");
+        assert!(row(&buf, top).ends_with(" y copy ╮"), "{}", row(&buf, top));
+        assert!(
+            row(&buf, top - 1).starts_with("▶ Priya  Brisbane"),
+            "{cols}"
+        );
+        let inside: Vec<String> = (top + 1..)
+            .take_while(|y| !row(&buf, *y).starts_with('╰'))
+            .map(|y| row(&buf, y))
+            .collect();
+        assert_eq!(
+            inside,
+            [format!(
+                "│ {:<width$} │",
+                "5-6pm AEDT / 4-5pm AEST / 8-9am SAST",
+                width = usize::from(cols) - 4
+            )],
+            "{cols}"
+        );
+        assert_eq!(
+            row(&buf, rows - 1).is_empty(),
+            false,
+            "the footer still fits"
+        );
+    }
+    let detail_style = render(&app, 120, 36)[(2, 30)].fg;
+    assert_eq!(detail_style, ratatui::style::Color::DarkGray);
+}
+
+#[test]
+fn the_copy_box_is_titled_times_for_all_on_the_all_lens() {
+    let buf = render(&press(team_monday(), &chars("0")), 120, 36);
+    assert!(row(&buf, y_of(&buf, " times for ")).starts_with("╭ times for all "));
 }

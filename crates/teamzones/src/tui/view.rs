@@ -935,11 +935,21 @@ fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
     }
 }
 
+/// The copy box and the dim detail line above it: the box holds only the line `y` copies.
 fn say_panel(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
     let theme = look.theme;
+    detail_line(buf, Rect { height: 1, ..area }, app, look);
+    let area = Rect {
+        y: area.y + 1,
+        height: area.height.saturating_sub(1),
+        ..area
+    };
     let drift = app.drift();
     let mut title = vec![
-        Span::styled(" say ", theme.fg(Role::Text).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            " times for ",
+            theme.fg(Role::Text).add_modifier(Modifier::BOLD),
+        ),
         Span::styled(app.lens_name(), theme.fg(Role::Accent)),
     ];
     if !drift.is_empty() {
@@ -949,6 +959,7 @@ fn say_panel(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
         ));
     }
     title.push(Span::raw(" "));
+    let line = app.say_line();
     let block = Block::bordered()
         .border_set(look.glyphs.rounded)
         .border_style(theme.fg(Role::Dim))
@@ -956,8 +967,15 @@ fn say_panel(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
         .title_top(
             Line::from(vec![
                 Span::styled(" y", theme.fg(Role::Accent)),
-                Span::styled(" copies this line ", theme.fg(Role::Dim)),
+                Span::styled(" copy ", theme.fg(Role::Dim)),
             ])
+            .right_aligned(),
+        )
+        .title_bottom(
+            Line::from(Span::styled(
+                format!(" {} ", summary(app)),
+                theme.fg(Role::Dim),
+            ))
             .right_aligned(),
         );
     let inner = block.inner(area);
@@ -968,9 +986,7 @@ fn say_panel(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
         inner.width.saturating_sub(2),
         inner.height,
     );
-    let line = app.say_line();
-    let room = usize::from(inner.width);
-    let x = put(
+    put(
         buf,
         inner,
         inner.x,
@@ -978,27 +994,21 @@ fn say_panel(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
         &look.glyphs.text(&line),
         theme.fg(Role::Text).add_modifier(Modifier::BOLD),
     );
-    let tail = format!("   {}", summary(app));
-    if width_of(&line) + width_of(&tail) <= room {
-        put(buf, inner, x, inner.y, &tail, theme.fg(Role::Dim));
-    }
+}
+
+/// The focused row's detail, dim, with pieces dropped whole from the right; never copied.
+fn detail_line(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
+    let style = look.theme.fg(Role::Dim);
     let (name, pieces) = detail(app);
-    let y = inner.y + 1;
-    let x = put(
-        buf,
-        inner,
-        inner.x,
-        y,
-        &format!("{} ", look.glyphs.detail),
-        theme.fg(Role::Accent),
-    );
-    let mut x = put(buf, inner, x, y, &name, theme.fg(Role::Text));
+    let (x, y) = (area.x, area.y);
+    let x = put(buf, area, x, y, &format!("{} ", look.glyphs.detail), style);
+    let mut x = put(buf, area, x, y, &name, style);
     for piece in pieces {
         let text = format!("  {piece}");
-        if usize::from(x) + width_of(&text) > usize::from(inner.right()) {
+        if usize::from(x) + width_of(&text) > usize::from(area.right()) {
             break;
         }
-        x = put(buf, inner, x, y, &text, theme.fg(Role::Dim));
+        x = put(buf, area, x, y, &text, style);
     }
 }
 
