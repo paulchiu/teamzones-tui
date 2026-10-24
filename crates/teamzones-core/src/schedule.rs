@@ -137,7 +137,16 @@ pub struct Trading {
 
 impl Trading {
     pub fn on(&self, day: Weekday) -> &TradingDay {
-        &self.days[day.num_days_from_monday() as usize]
+        let index = match day {
+            Weekday::Mon => 0,
+            Weekday::Tue => 1,
+            Weekday::Wed => 2,
+            Weekday::Thu => 3,
+            Weekday::Fri => 4,
+            Weekday::Sat => 5,
+            Weekday::Sun => 6,
+        };
+        &self.days[index]
     }
 }
 

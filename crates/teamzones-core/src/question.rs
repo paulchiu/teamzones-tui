@@ -136,11 +136,7 @@ pub fn person_qualifies(roster: &Roster, id: PersonId, slot: Slot) -> bool {
 
 /// Whether a counted place qualifies at a slot under `rule`; a place without trading never does.
 pub fn place_qualifies(roster: &Roster, id: PlaceId, rule: Rule, slot: Slot) -> bool {
-    match (place_level(roster, id, slot), rule) {
-        (None, _) | (Some(_), Rule::Context) => false,
-        (Some(level), Rule::OffPeak) => level != Level::Peak,
-        (Some(level), Rule::Quiet) => level == Level::Quiet,
-    }
+    place_level(roster, id, slot).is_some_and(|level| rule.admits(level))
 }
 
 /// How many counted rows qualify, out of how many are counted.
@@ -328,6 +324,14 @@ mod tests {
         assert_eq!(
             evaluate(&roster, &mixed, when).who.unwrap().rule,
             WhoRule::HoursOrDay
+        );
+        let home_without_hours =
+            FIXTURE.replacen("hours = \"9am-6pm\"\ndays  = \"Mon-Fri\"\n", "", 1);
+        let roster = Config::parse(&home_without_hours).unwrap().roster;
+        assert_eq!(roster.person(PersonId::HOME).hours, None);
+        assert_eq!(
+            evaluate(&roster, &mixed, when).who.unwrap().rule,
+            WhoRule::Daytime
         );
     }
 }

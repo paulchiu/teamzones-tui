@@ -10,7 +10,7 @@ use toml::Spanned;
 
 use crate::cities::{self, CityError};
 use crate::schedule::{
-    Daylight, Days, Hours, LocalSpan, Location, ScheduleError, Trading, TradingDay,
+    Daylight, Days, Hours, Level, LocalSpan, Location, ScheduleError, Trading, TradingDay,
 };
 
 /// A config error: the line it is on and the reason, displayed as `line N: reason`.
@@ -44,6 +44,11 @@ pub enum Reason {
     WrongProfileKind { name: String, kind: &'static str },
     #[error("profile \"{0}\" needs {1}")]
     IncompleteProfile(String, &'static str),
+    #[error("\"{key}\" does not belong in a {kind} profile")]
+    ForeignKey {
+        key: &'static str,
+        kind: &'static str,
+    },
     #[error(transparent)]
     City(#[from] CityError),
     #[error("unknown time zone \"{0}\"")]
@@ -113,6 +118,18 @@ pub enum Rule {
     OffPeak,
     Quiet,
     Context,
+}
+
+impl Rule {
+    /// Whether a counted place at `level` qualifies under this rule; under `context` none does.
+    pub fn admits(self, level: Level) -> bool {
+        match (self, level) {
+            (Self::OffPeak, Level::OffPeak | Level::Quiet) | (Self::Quiet, Level::Quiet) => true,
+            (Self::OffPeak, Level::Peak)
+            | (Self::Quiet, Level::Peak | Level::OffPeak)
+            | (Self::Context, Level::Peak | Level::OffPeak | Level::Quiet) => false,
+        }
+    }
 }
 
 /// A named, ordered list of people and places.
@@ -443,14 +460,18 @@ fn build(raw: RawConfig, lines: &Lines) -> Result<Config, ConfigError> {
     } = raw;
     let home = home.map_or_else(|| fail(1, Reason::MissingHome), Ok)?;
     let daylight = match bands
-        .and_then(|bands| bands.source)
+        .and_then(|RawBands { source }| source)
         .map(|source| *source.get_ref())
     {
         None | Some(RawSource::Sun) => Daylight::Sun,
         Some(RawSource::Clock) => Daylight::Clock,
     };
     check_names(&home, &person, &place, &profile, &group, lines)?;
-    let profiles = &profile;
+    let profiles = profile
+        .iter()
+        .map(|raw| resolve_profile(raw, lines))
+        .collect::<Result<Vec<_>, _>>()?;
+    let profiles = profiles.as_slice();
     let people = std::iter::once(&home)
         .chain(&person)
         .map(|raw| resolve_person(raw, profiles, lines))
@@ -471,7 +492,7 @@ fn build(raw: RawConfig, lines: &Lines) -> Result<Config, ConfigError> {
         .collect::<Result<_, _>>()?;
     Ok(Config {
         roster,
-        map: map.and_then(|map| map.show).unwrap_or_default(),
+        map: map.and_then(|RawMap { show }| show).unwrap_or_default(),
         travel: travel.map(|raw| resolve_travel(&raw, lines)).transpose()?,
         theme: theme
             .map(|raw| resolve_theme(raw, lines))
@@ -534,43 +555,33 @@ fn check_names(
     Ok(())
 }
 
-fn find_profile<'a>(
-    name: &Spanned<String>,
-    profiles: &'a [RawProfile],
-    want: ProfileKind,
-    lines: &Lines,
-) -> Result<&'a RawProfile, ConfigError> {
-    let profile = profiles
-        .iter()
-        .find(|profile| profile.name.get_ref() == name.get_ref())
-        .map_or_else(
-            || {
-                fail(
-                    lines.of(name),
-                    Reason::UnknownProfile(name.get_ref().clone()),
-                )
-            },
-            Ok,
-        )?;
-    match (*profile.kind.get_ref(), want) {
-        (ProfileKind::Hours, ProfileKind::Hours) | (ProfileKind::Trading, ProfileKind::Trading) => {
-            Ok(profile)
+/// A `[[profile]]` resolved once, whether or not anything references it.
+#[derive(Clone, Debug)]
+enum Profile {
+    Hours { span: LocalSpan, days: Option<Days> },
+    Trading(Box<Trading>),
+}
+
+impl Profile {
+    fn kind(&self) -> &'static str {
+        match self {
+            Self::Hours { .. } => "hours",
+            Self::Trading(_) => "trading",
         }
-        (ProfileKind::Hours, ProfileKind::Trading) => fail(
-            lines.of(name),
-            Reason::WrongProfileKind {
-                name: name.get_ref().clone(),
-                kind: "hours",
-            },
-        ),
-        (ProfileKind::Trading, ProfileKind::Hours) => fail(
-            lines.of(name),
-            Reason::WrongProfileKind {
-                name: name.get_ref().clone(),
-                kind: "trading",
-            },
-        ),
     }
+}
+
+/// A resolved profile and the name it was declared with.
+struct NamedProfile<'a> {
+    name: &'a str,
+    profile: Profile,
+}
+
+/// The profile `name` refers to, ignoring case like every other name.
+fn find_profile<'a>(profiles: &'a [NamedProfile], name: &str) -> Option<&'a NamedProfile<'a>> {
+    profiles
+        .iter()
+        .find(|profile| profile.name.eq_ignore_ascii_case(name))
 }
 
 fn span(text: &Spanned<String>, lines: &Lines) -> Result<LocalSpan, ConfigError> {
@@ -581,6 +592,86 @@ fn days(text: &Spanned<String>, lines: &Lines) -> Result<Days, ConfigError> {
     Days::parse(text.get_ref()).or_else(|error| fail(lines.of(text), error))
 }
 
+/// Fails on the first key present that belongs to the other kind of profile.
+fn reject_foreign(
+    keys: &[(&'static str, Option<usize>)],
+    kind: &'static str,
+) -> Result<(), ConfigError> {
+    keys.iter()
+        .find_map(|&(key, line)| line.map(|line| (key, line)))
+        .map_or(Ok(()), |(key, line)| {
+            fail(line, Reason::ForeignKey { key, kind })
+        })
+}
+
+fn resolve_profile<'a>(
+    raw: &'a RawProfile,
+    lines: &Lines,
+) -> Result<NamedProfile<'a>, ConfigError> {
+    let RawProfile {
+        name,
+        kind,
+        hours,
+        days: profile_days,
+        open,
+        peak,
+        on,
+    } = raw;
+    let line_of = |text: &Spanned<String>| lines.of(text);
+    let profile = match kind.get_ref() {
+        ProfileKind::Hours => {
+            reject_foreign(
+                &[
+                    ("open", open.as_ref().map(line_of)),
+                    (
+                        "peak",
+                        peak.as_ref()
+                            .map(|peaks| peaks.first().map_or(lines.of(name), line_of)),
+                    ),
+                    ("on", on.first().map(|entry| lines.of(&entry.days))),
+                ],
+                "hours",
+            )?;
+            let hours = hours.as_ref().map_or_else(
+                || {
+                    fail(
+                        lines.of(name),
+                        Reason::IncompleteProfile(name.get_ref().clone(), "hours"),
+                    )
+                },
+                Ok,
+            )?;
+            Profile::Hours {
+                span: span(hours, lines)?,
+                days: profile_days
+                    .as_ref()
+                    .map(|text| days(text, lines))
+                    .transpose()?,
+            }
+        }
+        ProfileKind::Trading => {
+            reject_foreign(
+                &[
+                    ("hours", hours.as_ref().map(line_of)),
+                    ("days", profile_days.as_ref().map(line_of)),
+                ],
+                "trading",
+            )?;
+            Profile::Trading(Box::new(resolve_trading(
+                name,
+                open.as_ref(),
+                peak.as_ref(),
+                on,
+                lines,
+            )?))
+        }
+    };
+    Ok(NamedProfile {
+        name: name.get_ref(),
+        profile,
+    })
+}
+
 /// A range starts with a digit or is noon/midnight; anything else names a profile.
 fn looks_like_range(text: &str) -> bool {
     text.starts_with(|c: char| c.is_ascii_digit())
@@ -588,47 +679,43 @@ fn looks_like_range(text: &str) -> bool {
         || text.starts_with("midnight")
 }
 
+fn wrong_kind(name: &Spanned<String>, profile: &Profile, lines: &Lines) -> ConfigError {
+    ConfigError {
+        line: lines.of(name),
+        reason: Reason::WrongProfileKind {
+            name: name.get_ref().clone(),
+            kind: profile.kind(),
+        },
+    }
+}
+
+/// A person's hours: a profile of that name if there is one, otherwise a range.
 fn resolve_hours(
-    raw: &RawPerson,
-    profiles: &[RawProfile],
+    hours: Option<&Spanned<String>>,
+    own_days: Option<&Spanned<String>>,
+    profiles: &[NamedProfile],
     lines: &Lines,
 ) -> Result<Option<Hours>, ConfigError> {
-    let Some(hours) = &raw.hours else {
+    let Some(hours) = hours else {
         return Ok(None);
     };
-    let own_days = raw
-        .days
-        .as_ref()
-        .map(|text| days(text, lines))
-        .transpose()?;
-    if looks_like_range(hours.get_ref()) {
-        return Ok(Some(Hours {
-            span: span(hours, lines)?,
-            days: own_days.unwrap_or(Days::MON_FRI),
-        }));
-    }
-    let profile = find_profile(hours, profiles, ProfileKind::Hours, lines)?;
-    let RawProfile {
-        name,
-        hours: profile_hours,
-        days: profile_days,
-        ..
-    } = profile;
-    let profile_hours = profile_hours.as_ref().map_or_else(
-        || {
-            fail(
-                lines.of(name),
-                Reason::IncompleteProfile(name.get_ref().clone(), "hours"),
-            )
-        },
-        Ok,
-    )?;
-    let profile_days = profile_days
-        .as_ref()
-        .map(|text| days(text, lines))
-        .transpose()?;
+    let own_days = own_days.map(|text| days(text, lines)).transpose()?;
+    let (span, profile_days) = match find_profile(profiles, hours.get_ref()) {
+        Some(NamedProfile {
+            profile: Profile::Hours { span, days },
+            ..
+        }) => (*span, *days),
+        Some(NamedProfile { profile, .. }) => return Err(wrong_kind(hours, profile, lines)),
+        None if looks_like_range(hours.get_ref()) => (span(hours, lines)?, None),
+        None => {
+            return fail(
+                lines.of(hours),
+                Reason::UnknownProfile(hours.get_ref().clone()),
+            );
+        }
+    };
     Ok(Some(Hours {
-        span: span(profile_hours, lines)?,
+        span,
         days: own_days.or(profile_days).unwrap_or(Days::MON_FRI),
     }))
 }
@@ -650,7 +737,7 @@ fn coordinates(at: &Spanned<[f64; 2]>, lines: &Lines) -> Result<(f64, f64), Conf
 
 fn resolve_person(
     raw: &RawPerson,
-    profiles: &[RawProfile],
+    profiles: &[NamedProfile],
     lines: &Lines,
 ) -> Result<Person, ConfigError> {
     let RawPerson {
@@ -659,8 +746,8 @@ fn resolve_person(
         label,
         tz,
         at,
-        hours: _,
-        days: _,
+        hours,
+        days,
     } = raw;
     let (city, location) = match (city, label, tz, at) {
         (Some(city), None, None, None) => {
@@ -692,21 +779,18 @@ fn resolve_person(
         name: name.get_ref().clone(),
         city,
         location,
-        hours: resolve_hours(raw, profiles, lines)?,
+        hours: resolve_hours(hours.as_ref(), days.as_ref(), profiles, lines)?,
     })
 }
 
-fn resolve_trading(profile: &RawProfile, lines: &Lines) -> Result<Trading, ConfigError> {
-    let RawProfile {
-        name,
-        kind: _,
-        hours: _,
-        days: _,
-        open,
-        peak,
-        on,
-    } = profile;
-    let open = open.as_ref().map_or_else(
+fn resolve_trading(
+    name: &Spanned<String>,
+    open: Option<&Spanned<String>>,
+    peak: Option<&Vec<Spanned<String>>>,
+    on: &[RawProfileOn],
+    lines: &Lines,
+) -> Result<Trading, ConfigError> {
+    let open = open.map_or_else(
         || {
             fail(
                 lines.of(name),
@@ -721,7 +805,7 @@ fn resolve_trading(profile: &RawProfile, lines: &Lines) -> Result<Trading, Confi
             .map(|text| span(text, lines))
             .collect::<Result<Vec<_>, _>>()
     };
-    let peaks = peak.as_ref().map(spans).transpose()?.unwrap_or_default();
+    let peaks = peak.map(spans).transpose()?.unwrap_or_default();
     let overrides = on
         .iter()
         .map(|entry| {
@@ -781,7 +865,7 @@ fn resolve_trading(profile: &RawProfile, lines: &Lines) -> Result<Trading, Confi
 
 fn resolve_place(
     raw: &RawPlace,
-    profiles: &[RawProfile],
+    profiles: &[NamedProfile],
     lines: &Lines,
 ) -> Result<Place, ConfigError> {
     let RawPlace {
@@ -793,8 +877,21 @@ fn resolve_place(
     let (lat, lon) = coordinates(at, lines)?;
     let profile = trading
         .as_ref()
-        .map(|profile| find_profile(profile, profiles, ProfileKind::Trading, lines))
+        .map(
+            |reference| match find_profile(profiles, reference.get_ref()) {
+                Some(NamedProfile {
+                    name,
+                    profile: Profile::Trading(trading),
+                }) => Ok(((*name).to_owned(), Trading::clone(trading))),
+                Some(NamedProfile { profile, .. }) => Err(wrong_kind(reference, profile, lines)),
+                None => fail(
+                    lines.of(reference),
+                    Reason::UnknownProfile(reference.get_ref().clone()),
+                ),
+            },
+        )
         .transpose()?;
+    let (profile, trading) = profile.unzip();
     Ok(Place {
         name: name.get_ref().clone(),
         location: Location {
@@ -802,10 +899,8 @@ fn resolve_place(
             lat,
             lon,
         },
-        trading: profile
-            .map(|profile| resolve_trading(profile, lines))
-            .transpose()?,
-        profile: trading.as_ref().map(|profile| profile.get_ref().clone()),
+        trading,
+        profile,
     })
 }
 
@@ -1160,6 +1255,123 @@ mod tests {
             rejection(&text).reason,
             Reason::UnknownPerson("Samuel".into())
         );
+    }
+
+    /// A minimal config whose one place trades on `profile`, given as the body of a `[[profile]]`.
+    fn with_trading(profile: &str) -> String {
+        format!(
+            "[home]\nname = \"Paul\"\ncity = \"Melbourne\"\n\n[[place]]\nname = \"AU\"\n\
+             tz = \"Australia/Melbourne\"\ntrading = \"venue\"\nat = [-24.0, 134.0]\n\n\
+             [[profile]]\nname = \"venue\"\nkind = \"trading\"\nopen = \"7am-11pm\"\n{profile}"
+        )
+    }
+
+    fn trading_of(text: &str) -> Trading {
+        let roster = Config::parse(text).unwrap().roster;
+        let au = roster.place_named("AU").unwrap();
+        roster.place(au).trading.clone().unwrap()
+    }
+
+    fn peak(start: u32, end: u32) -> Vec<LocalSpan> {
+        vec![LocalSpan {
+            start: start * 60,
+            end: end * 60,
+        }]
+    }
+
+    #[test]
+    fn a_narrower_on_entry_wins_over_a_wider_one_listed_before_it() {
+        let trading = trading_of(&with_trading(
+            "[[profile.on]]\ndays = \"Mon-Fri\"\npeak = [\"9am-10am\"]\n\
+             [[profile.on]]\ndays = \"Mon\"\npeak = [\"1pm-2pm\"]\n",
+        ));
+        assert_eq!(trading.on(Weekday::Mon).peaks, peak(13, 14));
+        assert_eq!(trading.on(Weekday::Tue).peaks, peak(9, 10));
+    }
+
+    #[test]
+    fn a_narrower_on_entry_wins_over_a_wider_one_listed_after_it() {
+        let trading = trading_of(&with_trading(
+            "[[profile.on]]\ndays = \"Mon\"\npeak = [\"1pm-2pm\"]\n\
+             [[profile.on]]\ndays = \"Mon-Fri\"\npeak = [\"9am-10am\"]\n",
+        ));
+        assert_eq!(trading.on(Weekday::Mon).peaks, peak(13, 14));
+    }
+
+    #[test]
+    fn the_later_of_two_equally_wide_on_entries_wins() {
+        let trading = trading_of(&with_trading(
+            "[[profile.on]]\ndays = \"Mon,Tue\"\npeak = [\"9am-10am\"]\n\
+             [[profile.on]]\ndays = \"Mon-Tue\"\npeak = [\"1pm-2pm\"]\n",
+        ));
+        assert_eq!(trading.on(Weekday::Mon).peaks, peak(13, 14));
+    }
+
+    #[test]
+    fn a_closed_on_entry_has_no_open_hours_or_peaks() {
+        let trading = trading_of(&with_trading(
+            "peak = [\"noon-1pm\"]\n[[profile.on]]\ndays = \"Sun\"\nclosed = true\n",
+        ));
+        let closed = TradingDay {
+            open: None,
+            peaks: Vec::new(),
+        };
+        assert_eq!(trading.on(Weekday::Sun), &closed);
+        assert_eq!(trading.on(Weekday::Sat).peaks, peak(12, 13));
+    }
+
+    #[test]
+    fn a_bad_value_in_an_unreferenced_profile_is_rejected() {
+        let text = format!(
+            "{FIXTURE}\n[[profile]]\nname = \"spare\"\nkind = \"trading\"\nopen = \"garbage\"\n"
+        );
+        assert_eq!(rejection(&text).line, line_of(&text, "open = \"garbage\""));
+    }
+
+    #[test]
+    fn a_key_from_the_other_kind_of_profile_is_rejected_on_its_line() {
+        let trading_with_days = edited(
+            "kind  = \"trading\"",
+            "kind  = \"trading\"\ndays  = \"Mon-Fri\"",
+        );
+        assert_eq!(
+            rejection(&trading_with_days),
+            ConfigError {
+                line: line_of(&trading_with_days, "kind  = \"trading\"") + 1,
+                reason: Reason::ForeignKey {
+                    key: "days",
+                    kind: "trading"
+                }
+            }
+        );
+        let hours_with_open = edited(
+            "kind  = \"hours\"",
+            "kind  = \"hours\"\nopen  = \"7am-11pm\"",
+        );
+        assert_eq!(
+            rejection(&hours_with_open).reason,
+            Reason::ForeignKey {
+                key: "open",
+                kind: "hours"
+            }
+        );
+    }
+
+    #[test]
+    fn a_profile_reference_ignores_case_like_every_other_name() {
+        let text = edited(
+            "trading = \"venue\"\nat      = [54.5",
+            "trading = \"Venue\"\nat      = [54.5",
+        );
+        assert!(Config::parse(&text).is_ok(), "{:?}", Config::parse(&text));
+    }
+
+    #[test]
+    fn a_profile_whose_name_starts_with_a_digit_is_a_profile_not_a_range() {
+        let text = FIXTURE.replace("jnb-office", "24x7");
+        let roster = Config::parse(&text).unwrap().roster;
+        let thandi = roster.person(roster.person_named("Thandi").unwrap());
+        assert_eq!(thandi.hours.unwrap().span.start, 8 * 60);
     }
 
     #[test]

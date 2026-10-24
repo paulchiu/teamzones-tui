@@ -31,6 +31,11 @@ pub enum TimeError {
         abbreviation: String,
         candidates: Vec<String>,
     },
+    #[error("{abbreviation} is not in use on {}", .date.format("%a %-d %b"))]
+    AbbreviationNotInUse {
+        abbreviation: String,
+        date: NaiveDate,
+    },
     #[error(transparent)]
     City(#[from] CityError),
     #[error("{text} is not a date")]
@@ -258,12 +263,27 @@ enum TimeOfDay {
     Range(u32, u32),
 }
 
-#[derive(Clone, Copy, Debug)]
+impl TimeOfDay {
+    fn start(self) -> u32 {
+        match self {
+            Self::Clock(minutes) | Self::Range(minutes, _) => minutes,
+        }
+    }
+}
+
+/// A zone as typed: fixed by name, or an abbreviation that only the typed instant can resolve.
+#[derive(Clone, Debug)]
+enum ZoneToken {
+    Fixed(Tz),
+    Abbreviation(String),
+}
+
+#[derive(Clone, Debug)]
 enum Token {
     Anchor(Moment),
     Time(TimeOfDay),
     Day(NaiveDate),
-    Zone(Tz),
+    Zone(ZoneToken),
 }
 
 /// The typed-time parts found so far, with the text each came from.
@@ -272,7 +292,7 @@ struct Parts {
     anchor: Option<(Moment, String)>,
     time: Option<(TimeOfDay, String)>,
     day: Option<(NaiveDate, String)>,
-    zone: Option<(Tz, String)>,
+    zone: Option<(ZoneToken, String)>,
 }
 
 fn place_once<T>(
@@ -401,18 +421,33 @@ fn utc_offset_label(seconds: i32) -> String {
     }
 }
 
-/// The zone whose abbreviation on `date` is `abbreviation`, from `zones`, or an ambiguity error.
-fn zone_by_abbreviation(
+/// Whether any zone uses `token` as an abbreviation now or half a year from now.
+fn is_abbreviation(token: &str, now: DateTime<Utc>) -> bool {
+    let half_year_on = now + chrono::Duration::days(182);
+    TZ_VARIANTS.iter().any(|zone| {
+        [now, half_year_on].iter().any(|instant| {
+            zone.offset_from_utc_datetime(&instant.naive_utc())
+                .abbreviation()
+                .is_some_and(|abbr| abbr.eq_ignore_ascii_case(token))
+        })
+    })
+}
+
+/// The one zone, of `zones`, whose abbreviation at the typed instant is `abbreviation`.
+///
+/// `start_in` gives the typed instant read in a candidate zone. Several matching UTC offsets
+/// are an ambiguity error naming the first zone found for each.
+fn match_abbreviation(
     abbreviation: &str,
     zones: &[Tz],
-    date: NaiveDate,
+    start_in: impl Fn(Tz) -> Result<DateTime<Utc>, TimeError>,
 ) -> Result<Option<Tz>, TimeError> {
-    let noon = date
-        .and_time(NaiveTime::from_hms_opt(12, 0, 0).unwrap_or(NaiveTime::MIN))
-        .and_utc();
     let mut by_offset: Vec<(i32, Tz)> = Vec::new();
     for zone in zones {
-        let offset = zone.offset_from_utc_datetime(&noon.naive_utc());
+        let Ok(instant) = start_in(*zone) else {
+            continue;
+        };
+        let offset = zone.offset_from_utc_datetime(&instant.naive_utc());
         let matches = offset
             .abbreviation()
             .is_some_and(|abbr| abbr.eq_ignore_ascii_case(abbreviation));
@@ -434,32 +469,54 @@ fn zone_by_abbreviation(
     }
 }
 
-/// Resolves a zone token: `@place` (then `@city`), an abbreviation, an IANA name or a city.
-fn resolve_zone(token: &str, ctx: &Context) -> Result<Option<Tz>, TimeError> {
+/// Every chrono-tz zone, with the canonical zones the bundled cities use ahead of legacy links.
+fn ranked_zones() -> Vec<Tz> {
+    let listed: Vec<Tz> = cities::all().iter().map(|city| city.tz).collect();
+    let mut zones = TZ_VARIANTS.to_vec();
+    zones.sort_by_key(|zone| !listed.contains(zone));
+    zones
+}
+
+/// Resolves an abbreviation at the typed instant: configured zones first, then every zone.
+fn resolve_abbreviation(
+    abbreviation: &str,
+    ctx: &Context,
+    date: NaiveDate,
+    start_in: impl Fn(Tz) -> Result<DateTime<Utc>, TimeError> + Copy,
+) -> Result<Tz, TimeError> {
+    match match_abbreviation(abbreviation, &ctx.roster.zones(), start_in)? {
+        Some(zone) => Ok(zone),
+        None => match_abbreviation(abbreviation, &ranked_zones(), start_in)?.ok_or_else(|| {
+            TimeError::AbbreviationNotInUse {
+                abbreviation: abbreviation.to_owned(),
+                date,
+            }
+        }),
+    }
+}
+
+/// Reads a zone token: `@place` (then `@city`), an abbreviation, an IANA name or a city.
+fn resolve_zone(token: &str, ctx: &Context) -> Result<Option<ZoneToken>, TimeError> {
     if let Some(name) = token.strip_prefix('@') {
         if let Some(place) = ctx.roster.place_named(name) {
-            return Ok(Some(ctx.roster.place(place).location.tz));
+            return Ok(Some(ZoneToken::Fixed(ctx.roster.place(place).location.tz)));
         }
-        return Ok(Some(cities::lookup(name)?.tz));
+        return Ok(Some(ZoneToken::Fixed(cities::lookup(name)?.tz)));
     }
     if token.starts_with(['+', '-']) || token.is_empty() {
         return Ok(None);
     }
-    let date = ctx.now.with_timezone(&ctx.roster.axis()).date_naive();
-    if let Some(zone) = zone_by_abbreviation(token, &ctx.roster.zones(), date)? {
-        return Ok(Some(zone));
-    }
-    if let Some(zone) = zone_by_abbreviation(token, &TZ_VARIANTS, date)? {
-        return Ok(Some(zone));
+    if is_abbreviation(token, ctx.now) {
+        return Ok(Some(ZoneToken::Abbreviation(token.to_ascii_lowercase())));
     }
     if let Some(zone) = TZ_VARIANTS
         .iter()
         .find(|zone| zone.name().eq_ignore_ascii_case(token))
     {
-        return Ok(Some(*zone));
+        return Ok(Some(ZoneToken::Fixed(*zone)));
     }
     match cities::lookup(token) {
-        Ok(city) => Ok(Some(city.tz)),
+        Ok(city) => Ok(Some(ZoneToken::Fixed(city.tz))),
         Err(CityError::Unknown { .. }) => Ok(None),
         Err(error) => Err(error.into()),
     }
@@ -498,25 +555,35 @@ fn assemble(parts: Parts, ctx: &Context) -> Result<Moment, TimeError> {
             None => Ok(anchor),
         };
     }
-    let zone = parts.zone.map_or(ctx.roster.axis(), |(zone, _)| zone);
-    let Some((time, _)) = parts.time else {
-        return match parts.day {
-            None => Ok(Moment::Now),
-            Some((day, _)) => {
-                let local = ctx.now.with_timezone(&zone);
-                let minutes = local
-                    .time()
-                    .signed_duration_since(NaiveTime::MIN)
-                    .num_minutes();
-                let at = at_local(zone, day, u32::try_from(minutes).unwrap_or(0))?;
-                Ok(Moment::Fixed(When::At(at)))
-            }
-        };
+    let time = parts.time.map(|(time, _)| time);
+    let day = parts.day.map(|(day, _)| day);
+    let start_in = |zone: Tz| match (time, day) {
+        (None, None) => Ok(ctx.now),
+        (None, Some(day)) => {
+            let minutes = ctx
+                .now
+                .with_timezone(&zone)
+                .time()
+                .signed_duration_since(NaiveTime::MIN)
+                .num_minutes();
+            at_local(zone, day, u32::try_from(minutes).unwrap_or(0))
+        }
+        (Some(time), day) => at_local(zone, day.unwrap_or(ctx.today), time.start()),
     };
-    let day = parts.day.map_or(ctx.today, |(day, _)| day);
-    match time {
-        TimeOfDay::Clock(minutes) => Ok(Moment::Fixed(When::At(at_local(zone, day, minutes)?))),
-        TimeOfDay::Range(start, end) => {
+    let zone = match parts.zone {
+        None => ctx.roster.axis(),
+        Some((ZoneToken::Fixed(zone), _)) => zone,
+        Some((ZoneToken::Abbreviation(abbreviation), _)) => {
+            resolve_abbreviation(&abbreviation, ctx, day.unwrap_or(ctx.today), start_in)?
+        }
+    };
+    match (time, day) {
+        (None, None) => Ok(Moment::Now),
+        (None, Some(_)) | (Some(TimeOfDay::Clock(_)), _) => {
+            Ok(Moment::Fixed(When::At(start_in(zone)?)))
+        }
+        (Some(TimeOfDay::Range(start, end)), day) => {
+            let day = day.unwrap_or(ctx.today);
             let end_day = if end <= start {
                 day + ChronoDays::new(1)
             } else {
@@ -675,6 +742,22 @@ mod tests {
         assert!(
             message.contains("(UTC-6)") && message.contains("(UTC+8)"),
             "{message}"
+        );
+    }
+
+    #[test]
+    fn an_abbreviation_is_matched_on_the_typed_date_not_today() {
+        assert_eq!(error("3pm tomorrow bst"), "bst is not in use on Sun 25 Oct");
+        assert_eq!(at("3pm tomorrow gmt"), utc("2026-10-25T15:00:00Z"));
+        assert_eq!(error("9am 2 nov cdt"), "cdt is not in use on Mon 2 Nov");
+        assert_eq!(at("9am 2 nov cst"), utc("2026-11-02T15:00:00Z"));
+    }
+
+    #[test]
+    fn ambiguity_candidates_use_canonical_zone_names() {
+        assert_eq!(
+            error("3pm ist"),
+            "ist is ambiguous: Asia/Kolkata (UTC+5:30), Europe/Dublin (UTC+1)"
         );
     }
 

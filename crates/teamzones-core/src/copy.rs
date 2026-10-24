@@ -141,22 +141,23 @@ fn clause(roster: &Roster, marks: &Marks, when: When) -> Option<String> {
             place_state(roster, id, when).map(|level| (roster.place(id).name.as_str(), level))
         })
         .collect();
-    let named = |wanted: fn(Level) -> bool| {
+    let named = |wanted: &dyn Fn(Level) -> bool| {
         states
             .iter()
             .filter(|(_, level)| wanted(*level))
             .map(|(name, _)| *name)
             .collect::<Vec<_>>()
     };
+    let counts = |level| marks.rule.admits(level);
     let groups = match marks.rule {
         Rule::OffPeak => vec![
-            ("off-peak", named(|l| l != Level::Peak)),
-            ("peak", named(|l| l == Level::Peak)),
+            ("off-peak", named(&counts)),
+            ("peak", named(&|l| !counts(l))),
         ],
         Rule::Quiet => vec![
-            ("quiet", named(|l| l == Level::Quiet)),
-            ("peak", named(|l| l == Level::Peak)),
-            ("open", named(|l| l == Level::OffPeak)),
+            ("quiet", named(&counts)),
+            ("peak", named(&|l| !counts(l) && l == Level::Peak)),
+            ("open", named(&|l| !counts(l) && l == Level::OffPeak)),
         ],
         Rule::Context => Vec::new(),
     };
