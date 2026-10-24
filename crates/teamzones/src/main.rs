@@ -1,12 +1,47 @@
 //! The `teamzones` binary: the TUI and the headless CLI over `teamzones-core`.
 
+mod cli;
+mod clipboard;
+mod paths;
+mod write;
+
+use std::io::IsTerminal;
+use std::process::ExitCode;
+
 use clap::Parser;
 
-/// Who's available and where it's busy, on one time axis.
-#[derive(Parser)]
-#[command(name = "teamzones", version, about)]
-struct Cli {}
-
-fn main() {
-    Cli::parse();
+fn main() -> ExitCode {
+    let argv = cli::hoist_flags(
+        std::env::args_os()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect(),
+    );
+    let parsed = cli::Cli::parse_from(argv);
+    let config_path = match paths::config_path() {
+        Ok(path) => path,
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::from(2);
+        }
+    };
+    let mut clipboard = clipboard::Fallback(clipboard::System, clipboard::Terminal);
+    let mut stdout = std::io::stdout();
+    let mut stderr = std::io::stderr();
+    let mut io = cli::Io {
+        out: &mut stdout,
+        err: &mut stderr,
+        stdout_is_tty: std::io::stdout().is_terminal(),
+        system_zone: paths::system_zone(),
+        config_path,
+        clipboard: &mut clipboard,
+    };
+    let code = match cli::run(parsed, &mut io) {
+        Ok(()) => 0,
+        Err(cli::Failure::HelpShown) => 2,
+        Err(failure) => {
+            eprintln!("{failure}");
+            failure.code()
+        }
+    };
+    ExitCode::from(code)
 }

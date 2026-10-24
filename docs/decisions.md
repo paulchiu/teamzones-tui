@@ -58,7 +58,7 @@ Decision: Repo `paulchiu/teamzones-tui`, crates `teamzones` and `teamzones-core`
 
 Why: "teamzones TUI" as agreed. The old project's binary is `tz`, so nothing collides.
 
-Held by: `crates/teamzones/tests/version.rs` holds the binary name; nothing yet holds the paths
+Held by: `crates/teamzones/tests/version.rs` holds the binary name, and `config_path_prints_the_resolved_path` in `crates/teamzones/tests/cli.rs` holds the `TEAMZONES_CONFIG` override; nothing yet holds the default config and state paths
 
 ## D8: Mouse capture is on by default (2026-10-24)
 
@@ -74,7 +74,7 @@ Decision: Copying tries `arboard` first, then OSC 52. If both fail, the notice r
 
 Why: mossmd already uses arboard, and OSC 52 reaches the local machine over SSH.
 
-Held by: nothing yet
+Held by: `clipboard::tests::the_fallback_gets_the_text_only_when_the_primary_fails` in `teamzones` holds the arboard then OSC 52 order; nothing yet holds the notice row (the TUI milestone)
 
 ## D10: say prints and copies (2026-10-24)
 
@@ -82,7 +82,7 @@ Decision: `teamzones say` prints the line to stdout and copies it unless `--no-c
 
 Why: Keeps the `ttz` habit and keeps stdout clean for scripts.
 
-Held by: nothing yet
+Held by: `cli::tests` in `teamzones` (`say_on_a_tty_copies_the_line_and_says_so_on_stderr`, `say_with_no_copy_on_a_tty_copies_nothing`, `say_into_a_pipe_copies_nothing`)
 
 ## D11: Travel is set in config, never inferred (2026-10-24)
 
@@ -90,7 +90,7 @@ Decision: Travel is `[travel] here` plus `until`, written by `teamzones here`. I
 
 Why: Paul's Mac reports `Australia/Brisbane` all year.
 
-Held by: nothing yet
+Held by: `here_writes_travel_after_the_untouched_file_and_clear_removes_it` in `crates/teamzones/tests/cli.rs` holds the write by `teamzones here`; nothing yet holds that the system zone is never consulted while travelling
 
 ## D12: Time is computed on a 15-minute grid (2026-10-24)
 
@@ -123,3 +123,11 @@ Decision: `update(state, msg)` returns the new state and a list of effects. Clip
 Why: A pure update is testable without a terminal, a clipboard or a file system.
 
 Held by: nothing yet (the TUI milestone adds a source-scan test that the update module names no I/O crate)
+
+## D16: No config file, or one holding only comments, means the defaults (2026-10-24)
+
+Decision: When there is no config file, or the file holds only comments and blank lines, home is the system zone (named after it, with no hours) and there are no people, places or groups. A file with any table in it must have `[home]`, and a file that exists but cannot be read or parsed is an error naming its path, never the defaults.
+
+Why: The commented template `config init` writes has to behave exactly like no file, and an unreadable file answering as "nothing there" is the defect blubat fixed twice.
+
+Held by: `config::tests` in `teamzones-core` (no file, a file of only comments, a table without home) and `write::tests::the_template_as_written_is_the_same_config_as_no_file` in `teamzones`

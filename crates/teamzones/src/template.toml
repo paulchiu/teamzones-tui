@@ -1,0 +1,76 @@
+## teamzones configuration
+##
+## Every key teamzones reads is below, behind a single # and showing its default or an example,
+## so this file behaves exactly like no file until a line is uncommented. Lines starting with ##
+## are prose and stay comments. `teamzones config check` validates the result.
+##
+## Without a [home], home is the system time zone with no hours, and there are no people,
+## places or groups. Once any table is uncommented, [home] is required.
+
+## Day and night come from local sunrise and sunset ("sun"), or from a fixed 6am-6pm ("clock").
+# [bands]
+# source = "sun"
+
+## You. Home is the axis zone, the zone typed times are read in, and the first entry in every
+## copy. Give a city from the bundled list, or label, tz and at = [lat, lon] for one it lacks.
+# [home]
+# name = "Kim"
+# city = "Melbourne"
+# hours = "9am-6pm"
+# days = "Mon-Fri"
+
+## Someone you tell. hours is a range or the name of an hours profile, and days defaults to
+## Mon-Fri. A person without hours is reachable in daylight.
+# [[person]]
+# name = "Alex"
+# city = "Johannesburg"
+# hours = "office"
+
+## A region you operate in, with one zone and an optional trading profile.
+# [[place]]
+# name = "UK"
+# tz = "Europe/London"
+# trading = "venue"
+# at = [54.5, -2.5]
+
+## A named weekly schedule on a local clock: kind = "hours" (office hours) or "trading" (open
+## hours and peaks, with [[profile.on]] entries overriding them on some days).
+# [[profile]]
+# name = "office"
+# kind = "hours"
+# hours = "8am-4pm"
+# days = "Mon-Fri"
+
+# [[profile]]
+# name = "venue"
+# kind = "trading"
+# open = "7am-11pm"
+# peak = ["11:30am-2pm", "5:30-9pm"]
+# [[profile.on]]
+# days = "Fri-Sat"
+# peak = ["11:30am-2:30pm", "6-10pm"]
+
+## A named, ordered list of people and places, numbered 1-9 in file order. It asks who when it
+## lists people, and where when it lists places. where is "off-peak", "quiet" or "context".
+# [[group]]
+# name = "crew"
+# aliases = ["c"]
+# people = ["Alex"]
+# places = ["UK"]
+# where = "off-peak"
+
+## Whether the map shows: "auto" hides it when the terminal is too small.
+# [map]
+# show = "auto"
+
+## A dated travel override, written by `teamzones here`. It is active through the end of until
+## in that city's local date.
+# [travel]
+# here = "London"
+# until = 2026-11-01
+
+## scheme is "dark", "light" or "mono", and glyphs is "full" or "ascii". Any colour role can be
+## overridden by its name as #rrggbb, such as accent = "#0969da".
+# [theme]
+# scheme = "dark"
+# glyphs = "full"
