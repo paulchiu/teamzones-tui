@@ -916,11 +916,7 @@ fn the_copy_box_holds_only_the_line_y_copies_and_the_detail_sits_above_it() {
             )],
             "{cols}"
         );
-        assert_eq!(
-            row(&buf, rows - 1).is_empty(),
-            false,
-            "the footer still fits"
-        );
+        assert!(!row(&buf, rows - 1).is_empty(), "the footer still fits");
     }
     let detail_style = render(&app, 120, 36)[(2, 30)].fg;
     assert_eq!(detail_style, ratatui::style::Color::DarkGray);
