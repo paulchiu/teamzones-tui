@@ -15,7 +15,7 @@ use teamzones_core::status::status_lines;
 use teamzones_core::time::Moment;
 use thiserror::Error;
 
-use crate::paths;
+use crate::{paths, write};
 
 /// Who's available and where it's busy, on one time axis.
 #[derive(Debug, Parser)]
@@ -40,6 +40,23 @@ enum Command {
     },
     /// Print one line per group: its members and the question it asks.
     Groups,
+    /// Find, create, edit or validate the config file.
+    Config {
+        #[command(subcommand)]
+        action: ConfigAction,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum ConfigAction {
+    /// Print the config file's path.
+    Path,
+    /// Write the commented template; fails if a file exists.
+    Init,
+    /// Open the file in $VISUAL, then $EDITOR, then vi, seeding the template first.
+    Edit,
+    /// Validate the file.
+    Check,
 }
 
 #[derive(Debug, Args)]
@@ -156,6 +173,7 @@ pub fn run(cli: Cli, io: &mut Io) -> Result<(), Failure> {
         Some(Command::Say(args)) => say(&args, now, io),
         Some(Command::Status { words: tokens }) => status(&tokens, now, io),
         Some(Command::Groups) => groups(io),
+        Some(Command::Config { action }) => config(&action, io),
         None => Err(usage(
             "teamzones needs a command for now: try teamzones --help",
         )),
@@ -301,4 +319,104 @@ fn groups(io: &mut Io) -> Result<(), Failure> {
         .enumerate()
         .try_for_each(|(index, group)| writeln!(io.out, "{}", group_line(roster, index, group)))
         .map_err(output)
+}
+
+/// The editor program and its arguments for `path`: `$VISUAL`, then `$EDITOR`, then `vi`, split
+/// on whitespace.
+fn editor_command(
+    visual: Option<&str>,
+    editor: Option<&str>,
+    path: &std::path::Path,
+) -> (String, Vec<String>) {
+    let mut words = [visual, editor]
+        .into_iter()
+        .flatten()
+        .find(|command| !command.trim().is_empty())
+        .unwrap_or("vi")
+        .split_whitespace()
+        .map(str::to_owned);
+    let program = words.next().unwrap_or_else(|| "vi".to_owned());
+    let args = words
+        .chain(std::iter::once(path.display().to_string()))
+        .collect();
+    (program, args)
+}
+
+fn config(action: &ConfigAction, io: &mut Io) -> Result<(), Failure> {
+    let path = paths::config_path().map_err(usage)?;
+    let shown = path.display();
+    match action {
+        ConfigAction::Path => writeln!(io.out, "{shown}").map_err(output),
+        ConfigAction::Init => write::create_new(&path, write::TEMPLATE).map_err(|error| {
+            if error.kind() == std::io::ErrorKind::AlreadyExists {
+                usage(format!("{shown} already exists"))
+            } else {
+                usage(format!("{shown}: {error}"))
+            }
+        }),
+        ConfigAction::Edit => {
+            if paths::read(&path).map_err(usage)?.is_none() {
+                write::create_new(&path, write::TEMPLATE)
+                    .map_err(|error| usage(format!("{shown}: {error}")))?;
+            }
+            let visual = std::env::var("VISUAL").ok();
+            let editor = std::env::var("EDITOR").ok();
+            let (program, args) = editor_command(visual.as_deref(), editor.as_deref(), &path);
+            let status = std::process::Command::new(&program)
+                .args(&args)
+                .status()
+                .map_err(|error| usage(format!("cannot run {program}: {error}")))?;
+            if status.success() {
+                Ok(())
+            } else {
+                Err(usage(format!("{program} exited with {status}")))
+            }
+        }
+        ConfigAction::Check => {
+            let exists = paths::read(&path).map_err(usage)?.is_some();
+            paths::load(&path, io.system_zone).map_err(usage)?;
+            let verdict = if exists {
+                "ok"
+            } else {
+                "no file, so the defaults apply"
+            };
+            writeln!(io.out, "{shown}: {verdict}").map_err(output)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    fn strings(words: &[&str]) -> Vec<String> {
+        words.iter().map(|word| (*word).to_owned()).collect()
+    }
+
+    #[test]
+    fn hoisting_moves_trailing_flags_and_now_ahead_of_the_words() {
+        let argv = strings(&["teamzones", "say", "team", "-@au", "3pm", "--no-copy", "--now", "X"]);
+        assert_eq!(
+            hoist_flags(argv),
+            strings(&["teamzones", "say", "--no-copy", "--now", "X", "team", "-@au", "3pm"])
+        );
+    }
+
+    #[test]
+    fn visual_wins_over_editor_and_its_arguments_are_kept() {
+        let path = Path::new("/c.toml");
+        assert_eq!(
+            editor_command(Some("code -w"), Some("nano"), path),
+            ("code".to_owned(), strings(&["-w", "/c.toml"]))
+        );
+        assert_eq!(
+            editor_command(Some(" "), Some("nano"), path),
+            ("nano".to_owned(), strings(&["/c.toml"]))
+        );
+        assert_eq!(
+            editor_command(None, None, path),
+            ("vi".to_owned(), strings(&["/c.toml"]))
+        );
+    }
 }

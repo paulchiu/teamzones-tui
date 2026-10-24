@@ -158,3 +158,81 @@ fn groups_prints_one_line_per_group_in_the_form_the_spec_shows() {
     assert_eq!(lines[0], examples[0]);
     assert_eq!(lines[2], examples[1]);
 }
+
+/// A fresh, empty directory for one test, under the system temp dir.
+fn scratch(name: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir()
+        .join("teamzones-cli-tests")
+        .join(format!("{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+/// The binary on the config at `path`, at the golden instant, with stdin from `/dev/null`.
+fn teamzones_on(path: &std::path::Path) -> Command {
+    let mut command = teamzones();
+    command.env("TEAMZONES_CONFIG", path);
+    command
+}
+
+#[test]
+fn config_path_prints_the_resolved_path() {
+    let path = scratch("config-path").join("config.toml");
+    teamzones_on(&path)
+        .args(["config", "path"])
+        .assert()
+        .success()
+        .stdout(format!("{}\n", path.display()));
+}
+
+#[test]
+fn config_init_writes_a_commented_template_that_check_accepts() {
+    let path = scratch("config-init").join("nested").join("config.toml");
+    teamzones_on(&path).args(["config", "init"]).assert().success();
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(text.starts_with("## teamzones configuration"), "{text}");
+    assert!(
+        text.lines().all(|line| line.is_empty() || line.starts_with('#')),
+        "every line is a comment:\n{text}"
+    );
+    teamzones_on(&path).args(["config", "check"]).assert().success();
+}
+
+#[test]
+fn config_init_exits_2_and_leaves_an_existing_file_alone() {
+    let path = scratch("config-init-exists").join("config.toml");
+    std::fs::write(&path, "# mine\n").unwrap();
+    teamzones_on(&path)
+        .args(["config", "init"])
+        .assert()
+        .code(2)
+        .stderr(format!("{} already exists\n", path.display()));
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "# mine\n");
+}
+
+#[test]
+fn config_check_exits_2_naming_the_path_and_line_of_a_broken_file() {
+    let path = scratch("config-check-broken").join("config.toml");
+    std::fs::write(&path, "[home]\nname = \"Kim\"\ncity = \"Melbourne\"\ncolour = 1\n").unwrap();
+    teamzones_on(&path)
+        .args(["config", "check"])
+        .assert()
+        .code(2)
+        .stderr(format!(
+            "{}: line 4: unknown key \"colour\"\n",
+            path.display()
+        ));
+}
+
+#[test]
+fn config_edit_seeds_the_template_before_opening_the_editor() {
+    let path = scratch("config-edit").join("config.toml");
+    teamzones_on(&path)
+        .env("VISUAL", "true")
+        .args(["config", "edit"])
+        .assert()
+        .success();
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(text.starts_with("## teamzones configuration"), "{text}");
+}

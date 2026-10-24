@@ -2,6 +2,7 @@
 
 mod cli;
 mod paths;
+mod write;
 
 use std::io::IsTerminal;
 use std::process::ExitCode;
