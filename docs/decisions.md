@@ -6,7 +6,7 @@ Each entry has three lines. `Held by` names the test, lint or `just` recipe that
 
 ## D1: A region is a load, not a clock (2026-10-24)
 
-Decision: `teamzones say apps 3pm` prints `3pm AEDT, off-peak in AU, UK and US`. Places add a trading state to the say line, never a zone, and `--zones` (and `c z`) gives the old `ttz` shape.
+Decision: a place adds a trading state to the say line, never a zone, and `--zones` (and `c z`) gives the old `ttz` shape. The `say apps 3pm` row of the [CLI golden table](spec/cli.md#cli-golden-table) shows it.
 
 Why: Paul picked concept V3-B, which makes this the deciding call.
 

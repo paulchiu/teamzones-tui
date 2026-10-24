@@ -6,13 +6,13 @@ Seeded from the shared contract of the teamzones build spec (2026-10-24). Where 
 * An entry gets a weekday prefix (`Sun 10pm-12am CDT`) when its local start date differs from the axis zone's local start date.
 * **Order**: the axis zone first, then descending UTC offset at the range start, with ties broken by config order. Entries that render identically are merged (Melbourne and Brisbane outside DST). The separator is `" / "`.
 * **Who contributes zones**: counted people (whether or not they qualify), home whenever the marks ask who, and any `+@city` clock. A places-only group contributes the axis zone alone. Places never add a zone except under `c z`.
-* **Clause**: when the marks ask where (and `where` is not `context`), add `,`  followed by the states, grouped and joined as `A, B and C`.
+* **Clause**: when the marks ask where (and `where` is not `context`), add `", "` (a comma and a space) followed by the states, grouped and joined as `A, B and C`.
   + Counting places come first: `off-peak in …`, or `quiet in …` under `where = "quiet"`.
   + Then the rest: `peak in …`, and under `quiet` also `open in …`.
   + Places within a group keep config order.
   + The state is the range state.
 * **Variants**:
-  + `c d` prefixes the axis zone's date, as in `Mon 26 Oct,` .
+  + `c d` prefixes the axis zone's date, as in `"Mon 26 Oct, "` (the date, a comma and a space).
   + `c w` adds names after each zone entry, as in `(Paul)` or `(Priya, Sam)`, with home's name included.
   + `c t` is only the focused row's entry, followed by the axis entry in parentheses, with no clause.
   + `c z` replaces the clause with the counted places' zone entries.

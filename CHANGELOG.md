@@ -9,4 +9,3 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 ### Added
 
 - The `teamzones` binary, which so far prints its version with `teamzones --version`.
-- The product specification in `docs/spec/` and the decision log in `docs/decisions.md`.

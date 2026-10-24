@@ -2,6 +2,8 @@
 
 Seeded from the shared contract of the teamzones build spec (2026-10-24). Where a mockup and the text disagree, the text wins.
 
+Mockup lines are right-trimmed: trailing spaces were dropped from every frame line, so a test comparing a frame with a mockup pads each mockup line back to the frame width (120 or 80 columns) first.
+
 The layout runs top to bottom with no outer frame and a horizontal margin of 0:
 
 * header (1 row)
@@ -66,14 +68,14 @@ h/l time  v range  n next fit  space mark  1-9 group  w save  tab groups  y copy
   + When now is outside the viewed day, a `◂` sits in the last column of the track label, and clicking it returns to now.
   + The fit marks (`═`, `╌`) are drawn first, then the cursor or range glyphs over them.
 * **Who block**:
-  + The top border holds  `who` , then the lens strip `1 team  2 au  3 regions  4 deploy  0 all  +  ⋯`. The active group is accent, bold and underlined, followed by any drift in warn colour, such as `+@UK` or `-Sam`.
+  + The top border holds `  who  ` (padded with a space each side), then the lens strip `1 team  2 au  3 regions  4 deploy  0 all  +  ⋯`. The active group is accent, bold and underlined, followed by any drift in warn colour, such as `+@UK` or `-Sam`.
   + The people legend is right-aligned in the border and lists only the bands on screen.
   + Rows go home first, then counted people, then the `≡` answer row, then the uncounted people dimmed.
   + Rows within each section are ordered by descending UTC offset, then config order.
 * **Row label**: the mark (`⌂ ● ○`), the name, and the person's local time for the range, right-aligned (`4-5pm AEST`). A weekday prefix is added when the date differs from the axis date. When `L ≥ 32`, a city column sits after the name. City names longer than 9 characters are cut to 8 plus `.`, so the 80-column mockup's `Jo'burg` is illustrative and the build shows `Johannes.`. When the label is short of room, drop the zone first, then the minutes.
 * **Person lane**: `░` night, `▒` day, `▚` morning or evening, `▓` working, `╌` off. A 3-letter weekday tag (`Mon`) is overwritten into the lane at local midnight.
 * **Where block**:
-  + The top border holds  `where`  and `asks off-peak`, `asks quiet`, `context` or `not asked`, plus the load legend `▁ quiet  ▄ off-peak  █ peak`.
+  + The top border holds `  where  ` (padded with a space each side) and `asks off-peak`, `asks quiet`, `context` or `not asked`, plus the load legend `▁ quiet  ▄ off-peak  █ peak`.
   + Rows go counted places (`◆`), the answer row, then the other places (`◇`) dimmed.
   + A place label is its range state word, worst over the range, with `peak` in warn bold. At 80 columns the label also shows the place's local clock.
   + Lanes draw `▁` quiet (night colour), `▄` off-peak (dim), `█` peak (warn), with day tags as for people.
