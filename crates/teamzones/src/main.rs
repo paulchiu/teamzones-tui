@@ -3,6 +3,7 @@
 mod cli;
 mod clipboard;
 mod paths;
+mod tui;
 mod write;
 
 use std::io::IsTerminal;
@@ -25,6 +26,9 @@ fn main() -> ExitCode {
         }
     };
     let mut clipboard = clipboard::Fallback(clipboard::System, clipboard::Terminal);
+    if parsed.opens_tui() && std::io::stdin().is_terminal() && std::io::stdout().is_terminal() {
+        return open_tui(&parsed, &config_path, &mut clipboard);
+    }
     let mut stdout = std::io::stdout();
     let mut stderr = std::io::stderr();
     let mut io = cli::Io {
@@ -44,4 +48,31 @@ fn main() -> ExitCode {
         }
     };
     ExitCode::from(code)
+}
+
+/// Loads config and runs the TUI, exiting 2 on a config error and 1 on a terminal error.
+fn open_tui(
+    parsed: &cli::Cli,
+    config_path: &std::path::Path,
+    clipboard: &mut dyn clipboard::Clipboard,
+) -> ExitCode {
+    let config = match paths::load(config_path, paths::system_zone()) {
+        Ok(config) => config,
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::from(2);
+        }
+    };
+    match tui::run(
+        config,
+        parsed.clock(),
+        clipboard,
+        tui::TerminalEnv::from_env(),
+    ) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("terminal error: {error}");
+            ExitCode::from(1)
+        }
+    }
 }

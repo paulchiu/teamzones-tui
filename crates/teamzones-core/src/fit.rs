@@ -37,7 +37,7 @@ pub fn slot_fits(roster: &Roster, marks: &Marks, slot: Slot) -> bool {
 }
 
 /// The first instant of `day` in `tz`; a zone that skips midnight starts its day at 1am.
-fn day_start(day: NaiveDate, tz: Tz) -> DateTime<Utc> {
+pub fn day_start(day: NaiveDate, tz: Tz) -> DateTime<Utc> {
     let midnight = day.and_time(NaiveTime::MIN);
     [midnight, midnight + Duration::hours(1)]
         .into_iter()

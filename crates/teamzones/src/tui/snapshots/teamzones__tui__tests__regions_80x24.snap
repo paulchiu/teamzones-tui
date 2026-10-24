@@ -1,0 +1,28 @@
+---
+source: crates/teamzones/src/tui/tests.rs
+expression: text(&buf)
+---
+teamzones   now Sat 24 Oct 9:04am AEDT                          ⌂ Melbourne AEDT
+Sat 24 Oct AEDT                 12a · · · · 6a· · · · · 12p · · · · 6p· · · · ·
+▸ 9:04am AEDT now               ─══════─────────══┃═─────────═══════────────────
+ who   1 team  2 au  3 regions  4 deploy  0 all  ───────────────────────────────
+⌂ Paul   Melbourne  9:04am AEDT Sat░░░░░░░░░░╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌░░░░░░░░
+≡ who                        --  not asked: regions has no people
+○ Priya  Brisbane   8:04am AEST ░░Sat░░░░░░░░╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌░░░░░░░░░░
+○ Sam    Brisbane   8:04am AEST ░░Sat░░░░░░░░╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌░░░░░░░░░░
+○ Thandi Johannes. 12:04am SAST ▓▓▚▚▚▚▚░░░░░░░░░░░Sat░░░░░░░░╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+○ Johan  Johannes. 12:04am SAST ▓▓▚▚▚▚▚░░░░░░░░░░░Sat░░░░░░░░╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+○ Ellie  London     Fri 11:04pm ▒▒▒▒▒▒▒▒░░░░░░░░░░░░Sat░░░░░░░░░░░░░▒▒▒▒▒▒▒▒▒▒▒▒
+○ Marcus Austin      Fri 5:04pm ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒░░░░░░░░░░Sat░░░░░░░░░░░░░
+ where  asks off-peak ───────────────────────────── ▁ quiet  ▄ off-peak  █ peak
+◆ AU  9:04am AEDT      off-peak Sat▁▁▁▁▁▁▁▁▁▁▁▄▄▄▄▄▄▄▄▄██████▄▄▄▄▄▄▄████████▄▄▁▁
+◆ UK  Fri 11:04pm BST     quiet █▄▄▄▄▄▄▄████████▄▄▁▁Sat▁▁▁▁▁▁▁▁▁▁▁▄▄▄▄▄▄▄▄▄█████
+◆ US  Fri 5:04pm CDT   off-peak ▄▄▄▄▄▄▄██████▄▄▄▄▄▄▄████████▄▄▁▁Sat▁▁▁▁▁▁▁▁▁▁▁▄▄
+≡ off-peak                  3/3 ⣇━━━━━━⣇⡄⡄⡄⡄⡄⣇⣇⣇━━━━⣇⣇⣇⡄⡄⡄⡄⡄⣇━━━━━━━⣇⣇⣇⣇⣇⣇⣇⡄⣇⣇⣇⣇
+────────────────────────────────────────────────────────────────────────────────
+╭ say regions ───────────────────────────────────────────── y copies this line ╮
+│ 9:04am AEDT, off-peak in AU, UK and US   home zone, 3 places                 │
+│ ▶ Paul  Melbourne  AEDT UTC+11  hours 9am-6pm                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+h/l time  v range  n next fit  space mark  1-9 group  y copy  ? help  q quit

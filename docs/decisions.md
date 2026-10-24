@@ -114,7 +114,7 @@ Decision: Every key's footer hint, help line and dispatch come from one `BINDING
 
 Why: Hints that are separate strings drift from what the keys do.
 
-Held by: nothing yet (the TUI milestone adds the keymap spec test and the binding meta-tests)
+Held by: `tui::keys::tests::compiled_table_matches_the_keymap_spec_row_for_row` and `a_row_dispatches_only_when_its_milestone_names_m3` in `teamzones`, plus the binding meta-tests `every_hinted_key_dispatches_in_its_context`, `no_advertised_key_acts_inside_a_prompt_and_each_is_typed_instead` and `each_modal_context_swallows_the_keys_it_does_not_advertise`
 
 ## D15: update is pure and effects run in one layer (2026-10-24)
 
@@ -122,7 +122,7 @@ Decision: `update(state, msg)` returns the new state and a list of effects. Clip
 
 Why: A pure update is testable without a terminal, a clipboard or a file system.
 
-Held by: nothing yet (the TUI milestone adds a source-scan test that the update module names no I/O crate)
+Held by: `tui::tests::the_update_module_names_no_io_crate` in `teamzones`
 
 ## D16: No config file, or one holding only comments, means the defaults (2026-10-24)
 

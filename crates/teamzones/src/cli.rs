@@ -106,6 +106,18 @@ struct SayArgs {
     words: Vec<String>,
 }
 
+impl Cli {
+    /// Whether no subcommand was given, so the TUI opens when the terminal allows it.
+    pub fn opens_tui(&self) -> bool {
+        self.command.is_none()
+    }
+
+    /// The clock every read of "now" goes through: fixed by `--now`, else the system's.
+    pub fn clock(&self) -> Clock {
+        self.now.map_or(Clock::System, Clock::Fixed)
+    }
+}
+
 fn parse_now(text: &str) -> Result<DateTime<Utc>, chrono::ParseError> {
     DateTime::parse_from_rfc3339(text).map(|instant| instant.with_timezone(&Utc))
 }
@@ -201,7 +213,7 @@ fn output(error: std::io::Error) -> Failure {
 ///
 /// A [`Failure`] carrying the exit code and the text for stderr.
 pub fn run(cli: Cli, io: &mut Io) -> Result<(), Failure> {
-    let now = cli.now.map_or(Clock::System, Clock::Fixed).now();
+    let now = cli.clock().now();
     match cli.command {
         Some(Command::Say(args)) => say(&args, now, io),
         Some(Command::Status { words: tokens }) => status(&tokens, now, io),
