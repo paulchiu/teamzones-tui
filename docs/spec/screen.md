@@ -17,6 +17,8 @@ The layout runs top to bottom with no outer frame and a horizontal margin of 0:
 
 The fixture has 7 people (home included) and 3 places, so the fixed rows total 24. Block heights come from the whole roster, never from the active group.
 
+The mockups below predate the hands-on round after M3 ([D17 to D22](../decisions.md)): they still show the old level words (`quiet`, `off-peak`, `peak`), the `say` panel with the detail line inside it and the old footer. Where they disagree with this text, the text wins.
+
 ```
 teamzones   now Sat 24 Oct 9:04am AEDT   viewing Mon 26 Oct +2d                                         ⌂ Melbourne AEDT
 ⣀⡀   ⢀⣀⣀⣀⣀⡀⣀⣀   ⣀⣀⣠⣲⣶⣶⣾⣿⡾⣿⣾⣿⣿⣷⣶⣿⡶⣶⣿⡙⡛⡒⠓⠐⠠⣤⣀⡀       ⣀⣴⠿         ⠉⠚⠓⡛⣛⣊⣀⣀      ⣤⣤⡆⡆⠒⣰⢄⣤⣀⣠⡄⠤⠔⠘⠘⠓⠛⠙⠒⠴⠴⠄⠤⠠⠠⢤⣀⣀⢔⡶⠤⠤⢤⢄ ⣀⡀  ⢀⢀⡀⣀
@@ -75,10 +77,10 @@ h/l time  v range  n next fit  space mark  1-9 group  w save  tab groups  y copy
 * **Row label**: the mark (`⌂ ● ○`), the name, and the person's local time for the range, right-aligned (`4-5pm AEST`). A weekday prefix is added when the date differs from the axis date. When `L ≥ 32`, a city column sits after the name. City names longer than 9 characters are cut to 8 plus `.`, so the 80-column mockup's `Jo'burg` is illustrative and the build shows `Johannes.`. When the label is short of room, drop the zone first, then the minutes.
 * **Person lane**: `░` night, `▒` day, `▚` morning or evening, `▓` working, `╌` off. A 3-letter weekday tag (`Mon`) is overwritten into the lane at local midnight.
 * **Where block**:
-  + The top border holds `  where  ` (padded with a space each side) and `asks off-peak`, `asks quiet`, `context` or `not asked`, plus the load legend `▁ quiet  ▄ off-peak  █ peak`.
+  + The top border holds `  where  ` (padded with a space each side) and `asks open`, `asks closed`, `context` or `not asked`, plus the load legend `▁ closed  ▄ open  █ busy`. When every place uses the same `labels`, the legend shows those words instead.
   + Rows go counted places (`◆`), the answer row, then the other places (`◇`) dimmed.
-  + A place label is its range state word, worst over the range, with `peak` in warn bold. At 80 columns the label also shows the place's local clock.
-  + Lanes draw `▁` quiet (night colour), `▄` off-peak (dim), `█` peak (warn), with day tags as for people.
+  + A place label is its range state word (its profile's label for the level), worst over the range, with `busy` in warn bold. At 80 columns the label also shows the place's local clock.
+  + Lanes draw `▁` closed (night colour), `▄` open (dim), `█` busy (warn), with day tags as for people.
 * **Answer row**:
   + The label reads `≡ <rule>` with the count right-aligned (`≡ in hours 5/5`).
   + Each cell shows `·` when no row counts, a braille fill by fraction (`⡀ ⡄ ⡆ ⡇ ⣇ ⣧ ⣷`, nearest seventh), or `━` in ok colour when all count.
@@ -87,7 +89,7 @@ h/l time  v range  n next fit  space mark  1-9 group  w save  tab groups  y copy
   + Line 1 is the say line followed by a dim summary (`3 zones for 5 people, 2 places`).
   + Line 2 is `▶` plus the focused row's detail. For a person: city, zone, offset, hours, groups and state. For a place: state, what comes next, zone, profile and groups. Pieces drop whole from the right when there is no room.
 * **Notice row**: blank unless there is something to say. A notice starts with its key, two spaces, then the text, plus a clickable `u undo` where it applies. It clears on the next key or after 10 s, whichever comes first. Clearing a notice does not cancel undo: `u` stays live for 10 s after the action. The texts are:
-  + `n  next fit for deploy: Mon 5-5:30pm AEDT, range shortened from 1h to 30m (AU peak from 5:30pm)`
+  + `n  next fit for deploy: Mon 5-5:30pm AEDT, range shortened from 1h to 30m (AU busy from 5:30pm)`
   + `3  dropped team +@UK  u undo`
   + `w  team: +@UK saved  u undo`
   + `x  closed deploy: its people and places stay  u undo`

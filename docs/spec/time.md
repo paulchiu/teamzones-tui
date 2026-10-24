@@ -9,8 +9,8 @@ Seeded from the shared contract of the teamzones build spec (2026-10-24). Where 
   + Without hours: `day` or `night`.
   + The sun is up when its elevation at the slot's start is above -0.833°, using the NOAA approximation (the POC's `sun_up`). Ignoring the equation of time is fine.
 * **A counted person qualifies** when their band is `working`, or `day` if they have no hours. The who answer label is `in hours` if every counted person has hours, `daytime` if none do, and `hours or day` if it is mixed.
-* **Place level at an instant**: `peak` inside a peak range for that local weekday, `off-peak` inside open hours otherwise, and `quiet` outside open hours or when `closed = true`. The level over a range is the worst slot (peak, then off-peak, then quiet).
-* **A counted place qualifies** when it is not at peak (`where = "off-peak"`) or when it is quiet (`where = "quiet"`). The where answer label is `off-peak` or `quiet`.
+* **Place level at an instant**: `busy` inside a peak range for that local weekday, `open` inside open hours otherwise, and `closed` outside open hours or when `closed = true`. The level over a range is the worst slot (busy, then open, then closed). These are the default words, and a trading profile's `labels` renames them for its places.
+* **A counted place qualifies** when it is not busy (`where = "open"`, the default) or when it is closed (`where = "closed"`). The where answer label is `open` or `closed`.
 * **Home** is counted whenever the active marks ask *who*. When they ask only *where*, home is the axis only.
 * **A fit** is a slot where every counted row in every asked block qualifies. A range fits when every slot in it fits. The answer row's `k/n` counts the counted rows that qualify over the whole current range (or the cursor's slot).
 * **The cursor** sits on exact now when viewing now (labels show `9:04am`, and states use the slot containing now). Any move snaps it to the grid: `l` from 9:04 goes to 9:15, and `h` goes to 9:00.

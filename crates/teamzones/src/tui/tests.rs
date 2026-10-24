@@ -156,11 +156,11 @@ fn switching_groups_never_moves_the_ruler_the_borders_or_the_say_panel() {
     assert_eq!(anchors(&regions), anchors(&deploy));
     assert_eq!(
         say_line(&regions),
-        "5-6pm AEDT, off-peak in UK and US, peak in AU"
+        "5-6pm AEDT, open in UK and US, busy in AU"
     );
     assert_eq!(
         say_line(&deploy),
-        "5-6pm AEDT / 4-5pm AEST / 8-9am SAST, off-peak in UK, peak in AU"
+        "5-6pm AEDT / 4-5pm AEST / 8-9am SAST, open in UK, busy in AU"
     );
 }
 
@@ -170,7 +170,7 @@ fn n_from_saturday_on_deploy_lands_on_monday_and_shortens_the_range() {
     let buf = render(&app, 120, 36);
     assert_eq!(
         row(&buf, 34),
-        "n  next fit for deploy: Mon 5-5:30pm AEDT, range shortened from 1h to 30m (AU peak from 5:30pm)"
+        "n  next fit for deploy: Mon 5-5:30pm AEDT, range shortened from 1h to 30m (AU busy from 5:30pm)"
     );
     let axis = app.roster().axis();
     let fits: Vec<String> = teamzones_core::fit::fits(app.roster(), &app.marks, app.day())
@@ -192,13 +192,13 @@ fn n_from_saturday_on_deploy_lands_on_monday_and_shortens_the_range() {
 #[test]
 fn repeated_n_steps_run_by_run() {
     let app = press(go_to(press(fixture(), &chars("3")), "mon 2pm"), &chars("n"));
-    assert_eq!(app.say_line(), "9-10pm AEDT, off-peak in AU, UK and US");
+    assert_eq!(app.say_line(), "9-10pm AEDT, open in AU, UK and US");
 }
 
 #[test]
 fn shift_n_lands_on_the_start_of_the_previous_run() {
     let app = press(go_to(press(fixture(), &chars("3")), "mon 9pm"), &chars("N"));
-    assert_eq!(app.say_line(), "2-3pm AEDT, off-peak in AU, UK and US");
+    assert_eq!(app.say_line(), "2-3pm AEDT, open in AU, UK and US");
 }
 
 #[test]
@@ -216,7 +216,7 @@ fn n_with_nothing_in_seven_days_says_so_and_moves_to_the_best_slot() {
         app.notice.as_ref().unwrap().text,
         "n  no full slot in 7 days, best 2/3 at Sat 3pm AEDT"
     );
-    assert_eq!(app.say_line(), "3pm AEDT, quiet in UK and US, open in AU");
+    assert_eq!(app.say_line(), "3pm AEDT, closed in UK and US, open in AU");
 }
 
 /// Moves focus down until it sits on the row named `name`.
@@ -326,7 +326,7 @@ fn c_a_copies_the_line_for_all() {
     assert_eq!(
         copied(&press_all(app, &chars("ca")).1),
         [
-            "5-6pm AEDT / 4-5pm AEST / 8-9am SAST / 6-7am GMT / 1-2am CDT, off-peak in UK and US, peak in AU"
+            "5-6pm AEDT / 4-5pm AEST / 8-9am SAST / 6-7am GMT / 1-2am CDT, open in UK and US, busy in AU"
         ]
     );
 }
@@ -363,7 +363,7 @@ fn space_on_uk_in_team_drifts_and_a_switch_drops_it_until_u() {
     let marked = press(focus_on(team_monday(), "UK"), &chars(" "));
     let buf = render(&marked, 120, 36);
     assert!(row(&buf, y_of(&buf, " say ")).contains("say team +@UK"));
-    assert!(row(&buf, y_of(&buf, " where ")).contains("asks off-peak"));
+    assert!(row(&buf, y_of(&buf, " where ")).contains("asks open"));
     let golden = copy_rows()
         .into_iter()
         .find(|[setup, _, _]| setup.contains("`space` on UK"))
@@ -812,4 +812,63 @@ fn capital_n_names_the_previous_fit() {
             .text
             .starts_with("N  previous fit for team: Mon 5-6pm AEDT"),
     );
+}
+
+const VENUE: &str = "name  = \"venue\"\nkind  = \"trading\"\n";
+
+/// The fixture with the venue profile, which every place uses, given `labels`.
+fn venue_labelled(labels: &str) -> String {
+    FIXTURE.replacen(VENUE, &format!("{VENUE}labels = {labels}\n"), 1)
+}
+
+fn where_border(app: &App) -> String {
+    let buf = render(app, 120, 36);
+    row(&buf, y_of(&buf, " where "))
+}
+
+#[test]
+fn the_where_legend_names_the_default_levels() {
+    assert!(
+        where_border(&team_monday()).ends_with("▁ closed  ▄ open  █ busy"),
+        "{}",
+        where_border(&team_monday())
+    );
+}
+
+#[test]
+fn the_where_legend_shows_labels_every_place_shares_and_the_defaults_otherwise() {
+    let labels = "{ closed = \"shut\", open = \"trading hours\", busy = \"rush\" }";
+    let shared = Config::parse(&venue_labelled(labels)).unwrap();
+    let app = go_to(App::new(shared, now()), "26 oct 5-6pm");
+    assert!(
+        where_border(&app).ends_with("▁ shut  ▄ trading hours  █ rush"),
+        "{}",
+        where_border(&app)
+    );
+    let mixed = venue_labelled(labels).replacen(
+        "tz      = \"America/Chicago\"\ntrading = \"venue\"",
+        "tz      = \"America/Chicago\"\ntrading = \"desk\"",
+        1,
+    ) + "\n[[profile]]\nname = \"desk\"\nkind = \"trading\"\nopen = \"7am-11pm\"\n";
+    let app = go_to(
+        App::new(Config::parse(&mixed).unwrap(), now()),
+        "26 oct 5-6pm",
+    );
+    assert!(
+        where_border(&app).ends_with("▁ closed  ▄ open  █ busy"),
+        "{}",
+        where_border(&app)
+    );
+}
+
+#[test]
+fn a_place_row_shows_its_profile_s_word_for_its_state() {
+    let labels = "{ closed = \"shut\", open = \"trading hours\", busy = \"rush\" }";
+    let app = go_to(
+        App::new(Config::parse(&venue_labelled(labels)).unwrap(), now()),
+        "26 oct 5-6pm",
+    );
+    let buf = render(&app, 120, 36);
+    assert!(row(&buf, y_of(&buf, "◇ AU")).contains("rush"));
+    assert!(row(&buf, y_of(&buf, "◇ UK")).contains("shut"));
 }

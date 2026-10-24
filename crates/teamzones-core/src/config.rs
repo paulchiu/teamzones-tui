@@ -1,6 +1,7 @@
 //! Loading and validating `config.toml` into a [`Roster`] of resolved people, places and groups.
 
 use std::collections::BTreeMap;
+use std::sync::LazyLock;
 
 use chrono::{NaiveDate, Weekday};
 use chrono_tz::Tz;
@@ -10,7 +11,7 @@ use toml::Spanned;
 
 use crate::cities::{self, CityError};
 use crate::schedule::{
-    Daylight, Days, Hours, Level, LocalSpan, Location, ScheduleError, Trading, TradingDay,
+    Daylight, Days, Hours, Labels, Level, LocalSpan, Location, ScheduleError, Trading, TradingDay,
 };
 
 /// A config error: the line it is on and the reason, displayed as `line N: reason`.
@@ -69,6 +70,10 @@ pub enum Reason {
     BadUntil,
     #[error("\"{0}\" is not a colour such as #fb923c")]
     BadColour(String),
+    #[error("labels.{0} is empty")]
+    EmptyLabel(&'static str),
+    #[error("\"{0}\" labels two levels")]
+    RepeatedLabel(String),
 }
 
 fn fail<T>(line: usize, reason: impl Into<Reason>) -> Result<T, ConfigError> {
@@ -110,25 +115,52 @@ pub struct Place {
     pub profile: Option<String>,
 }
 
-/// What a group's places are for: counted when off-peak, counted when quiet, or context only.
+/// What a group's places are for: counted while open (not busy), counted while closed, or context
+/// only. The keywords before the rename, `off-peak` and `quiet`, still load.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Rule {
     #[default]
-    OffPeak,
-    Quiet,
+    #[serde(alias = "off-peak")]
+    Open,
+    #[serde(alias = "quiet")]
+    Closed,
     Context,
 }
 
 impl Rule {
+    /// The keyword `where` takes for this rule, as screens and the CLI name the question.
+    pub fn word(self) -> &'static str {
+        match self {
+            Self::Open => "open",
+            Self::Closed => "closed",
+            Self::Context => "context",
+        }
+    }
+
     /// Whether a counted place at `level` qualifies under this rule; under `context` none does.
     pub fn admits(self, level: Level) -> bool {
         match (self, level) {
-            (Self::OffPeak, Level::OffPeak | Level::Quiet) | (Self::Quiet, Level::Quiet) => true,
-            (Self::OffPeak, Level::Peak)
-            | (Self::Quiet, Level::Peak | Level::OffPeak)
-            | (Self::Context, Level::Peak | Level::OffPeak | Level::Quiet) => false,
+            (Self::Open, Level::Open | Level::Closed) | (Self::Closed, Level::Closed) => true,
+            (Self::Open, Level::Busy)
+            | (Self::Closed, Level::Busy | Level::Open)
+            | (Self::Context, Level::Busy | Level::Open | Level::Closed) => false,
         }
+    }
+}
+
+impl Place {
+    /// The words this place's trading profile shows for each level, or the defaults.
+    pub fn labels(&self) -> &Labels {
+        match &self.trading {
+            Some(trading) => &trading.labels,
+            None => Self::default_labels(),
+        }
+    }
+
+    fn default_labels() -> &'static Labels {
+        static DEFAULT: LazyLock<Labels> = LazyLock::new(Labels::default);
+        &DEFAULT
     }
 }
 
@@ -171,6 +203,15 @@ impl Roster {
             .iter()
             .enumerate()
             .map(|(index, person)| (PersonId(index), person))
+    }
+
+    /// The level words every place uses, when they all use the same ones, else the defaults.
+    pub fn shared_labels(&self) -> &Labels {
+        let mut places = self.places.iter().map(Place::labels);
+        match places.next() {
+            Some(first) if places.all(|labels| labels == first) => first,
+            Some(_) | None => Place::default_labels(),
+        }
     }
 
     /// Every place in config order.
@@ -342,6 +383,15 @@ struct RawProfile {
     peak: Option<Vec<Spanned<String>>>,
     #[serde(default)]
     on: Vec<RawProfileOn>,
+    labels: Option<Spanned<RawLabels>>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawLabels {
+    closed: Option<Spanned<String>>,
+    open: Option<Spanned<String>>,
+    busy: Option<Spanned<String>>,
 }
 
 #[derive(Deserialize)]
@@ -677,6 +727,7 @@ fn resolve_profile<'a>(
         open,
         peak,
         on,
+        labels,
     } = raw;
     let line_of = |text: &Spanned<String>| lines.of(text);
     let profile = match kind.get_ref() {
@@ -690,6 +741,7 @@ fn resolve_profile<'a>(
                             .map(|peaks| peaks.first().map_or(lines.of(name), line_of)),
                     ),
                     ("on", on.first().map(|entry| lines.of(&entry.days))),
+                    ("labels", labels.as_ref().map(|labels| lines.of(labels))),
                 ],
                 "hours",
             )?;
@@ -718,13 +770,12 @@ fn resolve_profile<'a>(
                 ],
                 "trading",
             )?;
-            Profile::Trading(Box::new(resolve_trading(
-                name,
-                open.as_ref(),
-                peak.as_ref(),
-                on,
-                lines,
-            )?))
+            Profile::Trading(Box::new(Trading {
+                labels: labels
+                    .as_ref()
+                    .map_or_else(|| Ok(Labels::default()), |raw| resolve_labels(raw, lines))?,
+                ..resolve_trading(name, open.as_ref(), peak.as_ref(), on, lines)?
+            }))
         }
     };
     Ok(NamedProfile {
@@ -921,7 +972,37 @@ fn resolve_trading(
             },
         }
     });
-    Ok(Trading { days })
+    Ok(Trading {
+        days,
+        labels: Labels::default(),
+    })
+}
+
+/// A profile's level words: each one set replaces its default, and none may be empty or repeat.
+fn resolve_labels(raw: &Spanned<RawLabels>, lines: &Lines) -> Result<Labels, ConfigError> {
+    let RawLabels { closed, open, busy } = raw.get_ref();
+    let defaults = Labels::default();
+    let word = |key: &'static str, set: &Option<Spanned<String>>, default: String| match set {
+        Some(text) if text.get_ref().trim().is_empty() => {
+            fail(lines.of(text), Reason::EmptyLabel(key))
+        }
+        Some(text) => Ok(text.get_ref().trim().to_owned()),
+        None => Ok(default),
+    };
+    let labels = Labels {
+        closed: word("closed", closed, defaults.closed)?,
+        open: word("open", open, defaults.open)?,
+        busy: word("busy", busy, defaults.busy)?,
+    };
+    let words = [&labels.closed, &labels.open, &labels.busy];
+    match words.iter().enumerate().find(|(index, word)| {
+        words[..*index]
+            .iter()
+            .any(|earlier| earlier.eq_ignore_ascii_case(word))
+    }) {
+        Some((_, repeated)) => fail(lines.of(raw), Reason::RepeatedLabel((*repeated).clone())),
+        None => Ok(labels),
+    }
 }
 
 fn resolve_place(
@@ -1491,5 +1572,115 @@ mod tests {
         // 11:30pm GMT on 1 Nov is still the 1st in London, though it is the 2nd in Melbourne.
         assert!(travel.is_active("2026-11-01T23:30:00Z".parse().unwrap()));
         assert!(!travel.is_active("2026-11-02T00:00:00Z".parse().unwrap()));
+    }
+
+    /// The fixture with `labels` added to the venue profile.
+    fn venue_labelled(labels: &str) -> String {
+        edited(
+            "name  = \"venue\"\nkind  = \"trading\"\n",
+            &format!("name  = \"venue\"\nkind  = \"trading\"\nlabels = {labels}\n"),
+        )
+    }
+
+    fn labels_of_uk(text: &str) -> Labels {
+        let roster = Config::parse(text).unwrap().roster;
+        let uk = roster.place_named("UK").unwrap();
+        roster.place(uk).labels().clone()
+    }
+
+    #[test]
+    fn a_place_without_labels_says_closed_open_and_busy() {
+        assert_eq!(
+            labels_of_uk(FIXTURE),
+            Labels {
+                closed: "closed".into(),
+                open: "open".into(),
+                busy: "busy".into()
+            }
+        );
+    }
+
+    #[test]
+    fn a_profile_s_labels_replace_the_words_they_set_and_keep_the_rest() {
+        let text = venue_labelled("{ open = \"trading hours\", busy = \"rush\" }");
+        assert_eq!(
+            labels_of_uk(&text),
+            Labels {
+                closed: "closed".into(),
+                open: "trading hours".into(),
+                busy: "rush".into()
+            }
+        );
+    }
+
+    #[test]
+    fn an_unknown_key_in_labels_is_rejected_on_its_line() {
+        let text = venue_labelled("{ closed = \"shut\", quiet = \"calm\" }");
+        assert_eq!(
+            rejection(&text),
+            ConfigError {
+                line: line_of(&text, "labels ="),
+                reason: Reason::UnknownKey("quiet".into())
+            }
+        );
+    }
+
+    #[test]
+    fn an_empty_label_is_rejected() {
+        let text = venue_labelled("{ open = \"  \" }");
+        assert_eq!(
+            rejection(&text).to_string(),
+            format!("line {}: labels.open is empty", line_of(&text, "labels ="))
+        );
+    }
+
+    #[test]
+    fn a_label_used_for_two_levels_is_rejected_even_against_a_default() {
+        for labels in [
+            "{ closed = \"shut\", open = \"Shut\" }",
+            "{ open = \"busy\" }",
+        ] {
+            let text = venue_labelled(labels);
+            assert_eq!(
+                rejection(&text).line,
+                line_of(&text, "labels ="),
+                "{labels}"
+            );
+            assert!(
+                matches!(rejection(&text).reason, Reason::RepeatedLabel(_)),
+                "{labels}"
+            );
+        }
+    }
+
+    #[test]
+    fn labels_do_not_belong_in_an_hours_profile() {
+        let text = edited(
+            "kind  = \"hours\"\n",
+            "kind  = \"hours\"\nlabels = { open = \"in\" }\n",
+        );
+        assert_eq!(
+            rejection(&text).to_string(),
+            format!(
+                "line {}: \"labels\" does not belong in a hours profile",
+                line_of(&text, "labels =")
+            )
+        );
+    }
+
+    #[test]
+    fn where_takes_the_new_keywords_and_the_old_ones_as_aliases() {
+        let rule_of = |keyword: &str| {
+            let text = edited(
+                "places  = [\"AU\", \"UK\", \"US\"]",
+                &format!("places  = [\"AU\", \"UK\", \"US\"]\nwhere   = \"{keyword}\""),
+            );
+            Config::parse(&text).unwrap().roster.groups[2].rule
+        };
+        assert_eq!(
+            ["open", "off-peak", "closed", "quiet"].map(rule_of),
+            [Rule::Open, Rule::Open, Rule::Closed, Rule::Closed]
+        );
+        assert_eq!(Rule::default(), Rule::Open);
     }
 }

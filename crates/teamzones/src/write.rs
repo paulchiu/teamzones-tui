@@ -172,7 +172,7 @@ mod tests {
     fn the_uncommented_home_days_and_group_where_are_the_defaults_they_name() {
         let full = uncommented();
         let without_days = full.replacen("days = \"Mon-Fri\"\n", "", 1);
-        let without = without_days.replacen("where = \"off-peak\"\n", "", 1);
+        let without = without_days.replacen("where = \"open\"\n", "", 1);
         assert!(
             full.find("days =") < full.find("[[person]]"),
             "home's days goes first"

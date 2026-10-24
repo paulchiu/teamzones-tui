@@ -448,7 +448,8 @@ fn ends_because(app: &App, slot: Slot) -> Option<String> {
         Row::Place(id) => format!(
             "{} {} from {from}",
             roster.place(id).name,
-            place_level(roster, id, slot).map_or("closed", |level| level.word())
+            place_level(roster, id, slot)
+                .map_or("closed", |level| roster.place(id).labels().word(level))
         ),
     })
 }

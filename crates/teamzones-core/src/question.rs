@@ -56,7 +56,7 @@ impl Marks {
             people: roster.people().map(|(id, _)| id).collect(),
             places: roster.places().map(|(id, _)| id).collect(),
             clocks: Vec::new(),
-            rule: Rule::OffPeak,
+            rule: Rule::Open,
         }
     }
 
@@ -123,7 +123,7 @@ pub fn place_state(roster: &Roster, id: PlaceId, when: When) -> Option<Level> {
     when.slots()
         .into_iter()
         .map(|slot| place_level(roster, id, slot))
-        .try_fold(Level::Quiet, |worst, level| level.map(|l| worst.max(l)))
+        .try_fold(Level::Closed, |worst, level| level.map(|l| worst.max(l)))
 }
 
 /// Whether a counted person qualifies at a slot: working, or in daylight without hours.
@@ -303,7 +303,7 @@ mod tests {
         assert_eq!(
             answer.place,
             Some(BlockAnswer {
-                rule: Rule::OffPeak,
+                rule: Rule::Open,
                 score: Score {
                     qualifying: 1,
                     counted: 2

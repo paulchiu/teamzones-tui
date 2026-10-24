@@ -35,7 +35,7 @@ pub fn lines(context: Context, glyphs: &Glyphs) -> Vec<Line> {
             glyphs.day, glyphs.dawn, glyphs.work, glyphs.night, glyphs.off
         ),
         format!(
-            "{} quiet  {} off-peak  {} peak",
+            "{} closed  {} open  {} busy",
             glyphs.quiet, glyphs.off_peak, glyphs.peak
         ),
         format!(

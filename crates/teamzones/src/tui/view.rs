@@ -389,17 +389,9 @@ fn band_role(band: Band) -> Role {
 
 fn level_role(level: Level) -> Role {
     match level {
-        Level::Quiet => Role::Quiet,
-        Level::OffPeak => Role::Dim,
-        Level::Peak => Role::Warn,
-    }
-}
-
-fn rule_word(rule: Rule) -> &'static str {
-    match rule {
-        Rule::OffPeak => "off-peak",
-        Rule::Quiet => "quiet",
-        Rule::Context => "context",
+        Level::Closed => Role::Quiet,
+        Level::Open => Role::Dim,
+        Level::Busy => Role::Warn,
     }
 }
 
@@ -805,18 +797,19 @@ fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
     match (marks.asks_where(), marks.rule, marks.places.is_empty()) {
         (true, rule, _) => title.extend([
             Span::styled(" asks ", theme.fg(Role::Dim)),
-            Span::styled(rule_word(rule), theme.fg(Role::Accent)),
+            Span::styled(rule.word(), theme.fg(Role::Accent)),
         ]),
         (false, Rule::Context, false) => title.push(Span::styled(" context", theme.fg(Role::Dim))),
-        (false, Rule::Context, true) | (false, Rule::OffPeak | Rule::Quiet, _) => {
+        (false, Rule::Context, true) | (false, Rule::Open | Rule::Closed, _) => {
             title.push(Span::styled(" not asked", theme.fg(Role::Dim)));
         }
     }
     title.push(Span::raw(" "));
+    let words = roster.shared_labels();
     let items = [
-        (glyphs.quiet, Role::Quiet, "quiet"),
-        (glyphs.off_peak, Role::Dim, "off-peak"),
-        (glyphs.peak, Role::Warn, "peak"),
+        (glyphs.quiet, Role::Quiet, words.closed.as_str()),
+        (glyphs.off_peak, Role::Dim, words.open.as_str()),
+        (glyphs.peak, Role::Warn, words.busy.as_str()),
     ];
     block_with_legend(
         Borders::TOP | Borders::BOTTOM,
@@ -838,10 +831,10 @@ fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
         let counted = app.is_counted(row);
         let state = teamzones_core::question::place_state(roster, id, when);
         let right_style = match (state, counted) {
-            (Some(Level::Peak), true) => theme.fg(Role::Warn).add_modifier(Modifier::BOLD),
-            (Some(Level::Peak), false) => theme.fg(Role::Warn),
-            (Some(Level::OffPeak | Level::Quiet) | None, true) => theme.fg(Role::Text),
-            (Some(Level::OffPeak | Level::Quiet) | None, false) => theme.fg(Role::Dim),
+            (Some(Level::Busy), true) => theme.fg(Role::Warn).add_modifier(Modifier::BOLD),
+            (Some(Level::Busy), false) => theme.fg(Role::Warn),
+            (Some(Level::Open | Level::Closed) | None, true) => theme.fg(Role::Text),
+            (Some(Level::Open | Level::Closed) | None, false) => theme.fg(Role::Dim),
         };
         let clock = time_candidates(app, tz);
         label(
@@ -861,9 +854,10 @@ fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
                 name_width: names + 1,
                 middle: wide.then(|| clock[0].clone()),
                 middle_width: width_of(&clock[0]),
-                right: vec![
-                    state.map_or_else(|| clock[1].clone(), |level| level.word().to_owned()),
-                ],
+                right: vec![state.map_or_else(
+                    || clock[1].clone(),
+                    |level| place.labels().word(level).to_owned(),
+                )],
                 right_style,
                 counted,
                 focused: app.focus == row,
@@ -916,7 +910,7 @@ fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
             })
         }
     };
-    let word = answer_now.map_or("where", |block| rule_word(block.rule));
+    let word = answer_now.map_or("where", |block| block.rule.word());
     answer(buf, area, y, look, track, word, result);
     y += 1;
     for row in &rows.below {

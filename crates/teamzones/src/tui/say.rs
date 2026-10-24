@@ -139,7 +139,8 @@ pub fn detail(app: &App) -> (String, Vec<String>) {
             let place = roster.place(id);
             let tz = place.location.tz;
             let local = start.with_timezone(&tz);
-            let state = place_state(roster, id, when).map_or("clock", |level| level.word());
+            let state =
+                place_state(roster, id, when).map_or("clock", |level| place.labels().word(level));
             let next: Vec<String> = match (&place.trading, place_level(roster, id, slot)) {
                 (Some(trading), Some(level)) => place_next(trading, tz, level, start)
                     .split(", ")

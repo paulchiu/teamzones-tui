@@ -136,9 +136,9 @@ impl Glyphs {
 
     pub fn level(&self, level: Level) -> char {
         match level {
-            Level::Quiet => self.quiet,
-            Level::OffPeak => self.off_peak,
-            Level::Peak => self.peak,
+            Level::Closed => self.quiet,
+            Level::Open => self.off_peak,
+            Level::Busy => self.peak,
         }
     }
 

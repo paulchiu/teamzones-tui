@@ -7,7 +7,7 @@ Seeded from the shared contract of the teamzones build spec (2026-10-24). Where 
 | `teamzones` | Opens the TUI on the last used group (from state), or the first group. If stdin or stdout is not a TTY, it prints the help and exits 2. |
 | `teamzones say [EXPR] [TIME] [--zones] [--names] [--date] [--no-clause] [--no-copy]` | Prints the say line (default TIME is now, default EXPR is the first group) and copies it (D10). `--zones`, `--names`, `--date` and `--no-clause` are `c z`, `c w`, `c d` and `c s`. A TIME of `next` prints the next fit, dated. |
 | `teamzones status [EXPR \| @place]` | Prints one line per row of the expression (default: the first group), people first and home left out. A blank line separates the people from the places. The format is shown below. |
-| `teamzones groups` | Prints one line per group: `1 team: Priya, Sam, Thandi, Johan  asks who`, or `3 regions (apps): @AU, @UK, @US  asks off-peak`. |
+| `teamzones groups` | Prints one line per group: `1 team: Priya, Sam, Thandi, Johan  asks who`, or `3 regions (apps): @AU, @UK, @US  asks open`. |
 | `teamzones config path \| init \| edit \| check` | Prints the path; writes the commented template (exits 2 if a file exists); opens `$VISUAL`, then `$EDITOR`, then `vi` (seeding the template first); or validates the file (exits 2 with the error). |
 | `teamzones here [CITY --until DATE \| --clear]` | With no arguments, prints `here London until 2026-11-01` or `home Melbourne`. `--until` is required when setting. Otherwise it sets or clears `[travel]` through toml_edit. |
 | `--now RFC3339` (hidden, global) | Fixes "now" for tests and demos. Every clock read goes through one `Clock` value. |
@@ -25,23 +25,23 @@ Fixture config, `--now 2026-10-23T22:04:00Z`, `--no-copy`.
 | `say team 3pm` | `3pm AEDT / 2pm AEST / 6am SAST` |
 | `say au 3pm` | `3pm AEDT / 2pm AEST` |
 | `say 3pm` | `3pm AEDT / 2pm AEST / 6am SAST` (first group is team) |
-| `say apps 3pm` | `3pm AEDT, off-peak in AU, UK and US` |
+| `say apps 3pm` | `3pm AEDT, open in AU, UK and US` |
 | `say apps 3pm --zones` | `3pm AEDT / 5am BST / Fri 11pm CDT` |
-| `say regions 2-4pm mon` | `2-4pm AEDT, off-peak in AU, UK and US` |
-| `say regions -@us 5:30pm mon` | `5:30pm AEDT, off-peak in UK, peak in AU` |
-| `say regions -@au 5:30pm mon` | `5:30pm AEDT, off-peak in UK and US` |
-| `say team +@uk 5pm mon` | `5pm AEDT / 4pm AEST / 8am SAST, off-peak in UK` |
-| `say deploy next` | `Mon 26 Oct, 5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST, off-peak in AU and UK` |
-| `say regions next` | `Sat 24 Oct, 9:15-10am AEDT, off-peak in AU, UK and US` |
+| `say regions 2-4pm mon` | `2-4pm AEDT, open in AU, UK and US` |
+| `say regions -@us 5:30pm mon` | `5:30pm AEDT, open in UK, busy in AU` |
+| `say regions -@au 5:30pm mon` | `5:30pm AEDT, open in UK and US` |
+| `say team +@uk 5pm mon` | `5pm AEDT / 4pm AEST / 8am SAST, open in UK` |
+| `say deploy next` | `Mon 26 Oct, 5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST, open in AU and UK` |
+| `say regions next` | `Sat 24 Oct, 9:15-10am AEDT, open in AU, UK and US` |
 | `say team next` | `Mon 26 Oct, 5-6pm AEDT / 4-5pm AEST / 8-9am SAST` |
 | `say uk now` | (stderr) `uk is a place: did you mean @uk?`, exit 2 |
 | `say regions -au 5pm` | (stderr) `regions -au: none of au's people are in regions; did you mean -@au?`, exit 2 |
 
 ```
 $ teamzones status regions --now 2026-10-23T22:04:00Z
-AU  off-peak  Sat 9:04am AEDT  peak 11:30am-2:30pm
-UK  quiet     Fri 11:04pm BST  opens Sat 7am, next peak Sat 11:30am-2:30pm
-US  off-peak  Fri 5:04pm CDT   peak 6-10pm
+AU  open    Sat 9:04am AEDT  busy 11:30am-2:30pm
+UK  closed  Fri 11:04pm BST  opens Sat 7am, next busy Sat 11:30am-2:30pm
+US  open    Fri 5:04pm CDT   busy 6-10pm
 $ teamzones status team --now 2026-10-23T22:04:00Z
 Priya   Sat 8:04am AEST   day off
 Sam     Sat 8:04am AEST   day off
@@ -49,4 +49,4 @@ Thandi  Sat 12:04am SAST  night
 Johan   Sat 12:04am SAST  night
 ```
 
-Every column except the last is padded to its longest value, and columns are separated by two spaces. A place line ends with what comes next: the peak in progress or coming up today, or `opens …` while quiet. A person line ends with the band, where the `off` band prints as `day off`.
+Every column except the last is padded to its longest value, and columns are separated by two spaces. A place line ends with what comes next: the busy spell in progress or coming up today, or `opens …` while closed. A person line ends with the band, where the `off` band prints as `day off`.

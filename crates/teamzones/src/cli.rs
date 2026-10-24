@@ -325,11 +325,11 @@ fn status(tokens: &[String], now: DateTime<Utc>, io: &mut Io) -> Result<(), Fail
         .map_err(output)
 }
 
-/// The word for what a group's places count as.
+/// The word for what a group's places count as; a context group asks only who.
 fn rule_word(rule: Rule) -> &'static str {
     match rule {
-        Rule::OffPeak | Rule::Context => "off-peak",
-        Rule::Quiet => "quiet",
+        Rule::Open | Rule::Context => Rule::Open.word(),
+        Rule::Closed => Rule::Closed.word(),
     }
 }
 
