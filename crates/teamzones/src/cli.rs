@@ -4,7 +4,7 @@ use std::io::Write;
 
 use chrono::{DateTime, NaiveDate, Utc};
 use chrono_tz::Tz;
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, CommandFactory, Parser, Subcommand};
 use teamzones_core::cities;
 use teamzones_core::clock::Clock;
 use teamzones_core::config::{Config, Group, PersonId, Roster, Rule};
@@ -158,6 +158,9 @@ pub enum Failure {
     /// A usage or config error: exit 2.
     #[error("{0}")]
     Usage(String),
+    /// The help went to stdout because there was nothing to run: exit 2 with nothing on stderr.
+    #[error("")]
+    HelpShown,
 }
 
 impl Failure {
@@ -165,7 +168,7 @@ impl Failure {
     pub fn code(&self) -> u8 {
         match self {
             Self::Nothing(_) => 1,
-            Self::Usage(_) => 2,
+            Self::Usage(_) | Self::HelpShown => 2,
         }
     }
 }
@@ -191,9 +194,10 @@ pub fn run(cli: Cli, io: &mut Io) -> Result<(), Failure> {
         Some(Command::Groups) => groups(io),
         Some(Command::Config { action }) => config(&action, io),
         Some(Command::Here(args)) => here(&args, now, io),
-        None => Err(usage(
-            "teamzones needs a command for now: try teamzones --help",
-        )),
+        None => {
+            write!(io.out, "{}", Cli::command().render_help()).map_err(output)?;
+            Err(Failure::HelpShown)
+        }
     }
 }
 

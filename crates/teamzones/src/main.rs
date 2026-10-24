@@ -26,6 +26,7 @@ fn main() -> ExitCode {
     };
     let code = match cli::run(parsed, &mut io) {
         Ok(()) => 0,
+        Err(cli::Failure::HelpShown) => 2,
         Err(failure) => {
             eprintln!("{failure}");
             failure.code()

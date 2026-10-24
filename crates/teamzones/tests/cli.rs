@@ -311,3 +311,58 @@ fn here_needs_until_when_setting() {
     teamzones_on(&path).args(["here", "london"]).assert().code(2);
     assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
 }
+
+#[test]
+fn exit_0_when_there_is_a_line_to_say() {
+    teamzones()
+        .args(["say", "team", "3pm", "--no-copy"])
+        .assert()
+        .code(0);
+}
+
+#[test]
+fn exit_1_with_the_best_slot_on_stderr_when_nothing_fits_in_7_days() {
+    let (path, original) = fixture_copy("exit-1-no-fit");
+    let quiet = original.replace(
+        "places  = [\"AU\", \"UK\", \"US\"]",
+        "places  = [\"AU\", \"UK\", \"US\"]\nwhere   = \"quiet\"",
+    );
+    assert_ne!(quiet, original, "the regions group gained where = quiet");
+    std::fs::write(&path, quiet).unwrap();
+    let assert = teamzones_on(&path)
+        .args(["say", "regions", "next", "--no-copy"])
+        .assert()
+        .code(1)
+        .stdout("");
+    let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
+    assert!(
+        stderr.starts_with("no full slot in 7 days, best 2/3 at "),
+        "{stderr}"
+    );
+}
+
+#[test]
+fn exit_2_on_a_usage_error() {
+    teamzones()
+        .args(["say", "uk", "now", "--no-copy"])
+        .assert()
+        .code(2);
+}
+
+#[test]
+fn exit_2_on_a_config_error() {
+    let path = scratch("exit-2-config").join("config.toml");
+    std::fs::write(&path, "[home]\n").unwrap();
+    teamzones_on(&path)
+        .args(["say", "3pm", "--no-copy"])
+        .assert()
+        .code(2);
+}
+
+#[test]
+fn with_no_command_and_no_tty_it_prints_help_and_exits_2() {
+    let assert = teamzones().assert().code(2);
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+    assert!(stdout.contains("Usage: teamzones"), "{stdout}");
+    assert!(stdout.contains("say"), "{stdout}");
+}
