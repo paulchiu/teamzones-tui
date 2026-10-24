@@ -10,6 +10,8 @@ use teamzones_core::config::Config;
 use teamzones_core::copy::{Clause, Variant, say_line};
 use teamzones_core::expr::{ExprError, parse_expr};
 use teamzones_core::fit::resolve;
+use teamzones_core::question::Marks;
+use teamzones_core::status::status_lines;
 use teamzones_core::time::Moment;
 use thiserror::Error;
 
@@ -30,6 +32,12 @@ pub struct Cli {
 enum Command {
     /// Print the say line for a who-expression and a time, and copy it.
     Say(SayArgs),
+    /// Print where each row of a who-expression, or one place, is now and what comes next.
+    Status {
+        /// The who-expression or `@place`; the first group by default.
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, value_name = "EXPR | @place")]
+        words: Vec<String>,
+    },
 }
 
 #[derive(Debug, Args)]
@@ -144,6 +152,7 @@ pub fn run(cli: Cli, io: &mut Io) -> Result<(), Failure> {
     let now = cli.now.map_or(Clock::System, Clock::Fixed).now();
     match cli.command {
         Some(Command::Say(args)) => say(&args, now, io),
+        Some(Command::Status { words: tokens }) => status(&tokens, now, io),
         None => Err(usage(
             "teamzones needs a command for now: try teamzones --help",
         )),
@@ -193,4 +202,42 @@ fn say(args: &SayArgs, now: DateTime<Utc>, io: &mut Io) -> Result<(), Failure> {
     };
     let line = say_line(roster, &expr.marks, when, variant);
     writeln!(io.out, "{line}").map_err(output)
+}
+
+/// The marks `status` reports on: one `@place` alone, or a who-expression at now.
+fn status_marks(tokens: &[&str], config: &Config, now: DateTime<Utc>) -> Result<Marks, Failure> {
+    let roster = &config.roster;
+    if let [token] = tokens
+        && let Some(name) = token.strip_prefix('@')
+    {
+        let place = roster
+            .place_named(name)
+            .ok_or_else(|| usage(format!("@{name}: no place has that name")))?;
+        return Ok(Marks {
+            places: [place].into(),
+            ..Marks::default()
+        });
+    }
+    let expr = parse_expr(tokens, roster, now).map_err(expr_failure)?;
+    match expr.moment {
+        Moment::Now => Ok(expr.marks),
+        Moment::Next | Moment::Fixed(_) => Err(usage(
+            "status shows now, so it takes a who-expression but no time",
+        )),
+    }
+}
+
+fn status(tokens: &[String], now: DateTime<Utc>, io: &mut Io) -> Result<(), Failure> {
+    let config = load(io)?;
+    let marks = status_marks(&words(tokens), &config, now)?;
+    let lines = status_lines(&config.roster, &marks, now);
+    if lines.is_empty() {
+        return Err(Failure::Nothing(
+            "nothing to show: the expression has no rows besides home".to_owned(),
+        ));
+    }
+    lines
+        .iter()
+        .try_for_each(|line| writeln!(io.out, "{line}"))
+        .map_err(output)
 }

@@ -93,3 +93,44 @@ golden! { cli_row:
 fn the_cli_golden_table_has_one_named_test_per_row() {
     assert_eq!(table_rows(CLI_SPEC, "## CLI golden table").len(), 14);
 }
+
+/// The `$ teamzones status ...` blocks in the CLI spec, as (command words, expected stdout).
+fn status_blocks() -> Vec<(String, String)> {
+    let fence = CLI_SPEC
+        .split_once("```\n$ teamzones status")
+        .unwrap()
+        .1
+        .split_once("```")
+        .unwrap()
+        .0;
+    format!("$ teamzones status{fence}")
+        .split("$ teamzones ")
+        .skip(1)
+        .map(|block| {
+            let (command, lines) = block.split_once('\n').unwrap();
+            (command.to_owned(), lines.to_owned())
+        })
+        .collect()
+}
+
+fn status_block(index: usize) {
+    let (command, expected) = &status_blocks()[index];
+    let (words, now) = command.split_once(" --now ").unwrap();
+    assert_eq!(now, NOW, "status blocks are at the golden instant");
+    teamzones()
+        .args(words.split(' '))
+        .assert()
+        .success()
+        .stdout(expected.clone())
+        .stderr("");
+}
+
+golden! { status_block:
+    status_regions = 0;
+    status_team = 1;
+}
+
+#[test]
+fn the_cli_spec_has_two_status_blocks() {
+    assert_eq!(status_blocks().len(), 2);
+}
