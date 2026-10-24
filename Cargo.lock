@@ -250,7 +250,7 @@ dependencies = [
 
 [[package]]
 name = "teamzones"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -259,7 +259,7 @@ dependencies = [
 
 [[package]]
 name = "teamzones-core"
-version = "0.0.0"
+version = "0.1.0"
 
 [[package]]
 name = "termtree"
