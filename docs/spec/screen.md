@@ -1,0 +1,209 @@
+# Screen
+
+Seeded from the shared contract of the teamzones build spec (2026-10-24). Where a mockup and the text disagree, the text wins.
+
+The layout runs top to bottom with no outer frame and a horizontal margin of 0:
+
+* header (1 row)
+* map (rest of the height, or hidden)
+* slider: ruler and track (2)
+* who block: top border holding the lens strip, every person, and the answer row (people + 2)
+* where block: top border, every place, answer row, bottom border (places + 3)
+* say panel (4)
+* notice row (1)
+* footer (1)
+
+The fixture has 7 people (home included) and 3 places, so the fixed rows total 24. Block heights come from the whole roster, never from the active group.
+
+```
+teamzones   now Sat 24 Oct 9:04am AEDT   viewing Mon 26 Oct +2d                                         ⌂ Melbourne AEDT
+⣀⡀   ⢀⣀⣀⣀⣀⡀⣀⣀   ⣀⣀⣠⣲⣶⣶⣾⣿⡾⣿⣾⣿⣿⣷⣶⣿⡶⣶⣿⡙⡛⡒⠓⠐⠠⣤⣀⡀       ⣀⣴⠿         ⠉⠚⠓⡛⣛⣊⣀⣀      ⣤⣤⡆⡆⠒⣰⢄⣤⣀⣠⡄⠤⠔⠘⠘⠓⠛⠙⠒⠴⠴⠄⠤⠠⠠⢤⣀⣀⢔⡶⠤⠤⢤⢄ ⣀⡀  ⢀⢀⡀⣀
+⠓⠛⠻⠶⣾⣿⣶⣀⢀⣀⣄⣀⣀⣉⣉⡉  ⠉⠁⠉⠉⠉⠉⠉⠉⠉⠉⢉⡭⠛⠿⠾⢷⡿⠿⢤⣿⣿⡃ ⠈⠻⢥⢀⣠⠖⠒⠐⠉⠈⠘⠒⠶⠖⠂  ⣀⡀ ⢠⣠⣂⠊⢡⡠⣖⣂⣀⠁⠓⠗⠛⠛⠋ ⠈⠁⠉⠁⠉⠉⠐⠋                      ⡀⡀⣀⣀⡀⢤⣩⣥⡉⣉⠤⠰⠿
+     ⠚⠋⠉⠉⠁     ⠘⠓⠶⣤⡀         ⠉⠉⠉⠙⠴⠉ ⣀⣠⣤⣭⣵⣶⣄             ⠰⠟◇●⠶⠔⠚⠛⠛⠓⠚⠉⠁ ⣀⢀⣀   ⣀⣀                          ⠐⢒⡳⣶⡀  ⠸⠵⠚⠁
+                  ⠸⢄       ●      ⣤⠖⠚⠉⠉⠉⠁               ⠰⣏⣉⣩⡖⣊⣻⣗⢿⡷⠦⣴⣶⣛⣛⣛⡛⠓ ⠙⢿⣿⠂                    ⢤⣶⢤⣴⢒⣊⣁⣾⠟⠃
+                    ⠉⠻⢷⣤⣀  ⢠⠒⠒⠒⠒⣶⣯⡅                   ⢀⡤⠞⠉     ⠉⠉⠓⠚⠉⠉⠒⠱⣿⣄  ⠐⢶⣤⣤⣄⣀⡀⣀⡀      ⡀       ⣀⣨⡗⠈⠉⠛⠉⠁
+      ⠈⠉⠛               ⠈⠓⠲⠬⠶⢾⣽⣭⡍⠙⠛⣛⣓⡒⠂               ⣽                 ⠻⢵⣆⣠⣤⠤⠒⠋  ⠈⠉⢧⡀⢠⠖⠊⠉⠉⠦⢆⣀⡀⢫⡟⠉⠁⢰⣷⣀
+                               ⠉⠙⣻⠏ ⠁⠉⠉⠉⠓⠒⠢⣄⡀          ⠙⠒⠤⠶⠴⠒⠲⠤⡄          ⣉⡥⠊        ⠙⠙⠂   ⠰⢾⣷⣏⠉⣠⠤⢾⣿⣛⣛⣂⢀
+                                ⠐⠫⡀        ⠈⠈⠉⠉⣒⡆             ⠈⠑⣆       ⠐⡏  ⡀          ☼    Brisbane 4-5pm ·2⣶⡛⠲⢤⣤
+⠂                                 ⠈⠑⢲       ⢀⣀⡴⠃               ⠐⢅   ● Johannesburg 8-9am ·2      ⢀⡤⠤⠔⠋⠉◇⠈⠓⠚⠉⠳⢤●   ⢤⡗  ⠐⠒
+                                   ⢀⡎   ⢀⣀⣠⠜⠁                   ⠈⠳⣄⣀⣀⡤⠞⠉  ⠈⠉               Melbourne 5-6pm⡀⌂ ⢀⡽      ⣀
+                                  ⢀⡾ ⢀⡶⠓⠉⠁                                                                ⠉⠉⠿⠏     ⣠⣴⠾⠛⠃
+                                  ⠈⠲⠶⠯⠅⠐⠒                                         ⠈⠁
+Mon 26 Oct AEDT         12a ·   ·   3a  ·   ·   6a  ·   ·   9a  ·   ·   12p ·   ·   3p  ·   ·   6p  ·   ·   9p  ·   ·
+▸ 5-6pm AEDT 1h        ◂────────────────────────────────────────────────────────────────────┣══┫────────────────────────
+ who   1 team  2 au  3 regions  4 deploy  0 all  +  ⋯  ──────────── ▒ day  ▚ morning/evening  ▓ working  ░ night  ╌ off
+⌂ Paul       5-6pm AEDT Mon░░░░░░░░░░░░░░░░░░░░░░░▚▚▚▚▚▚▚▚▚▚▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▚▚▚▚▚▚▚▚░░░░░░░░░░░░░░░░
+● Priya      4-5pm AEST ░░░░Mon░░░░░░░░░░░░░░░░░░▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▚▚▚▚▚░░░░░░░░░░░░░░░░░░░
+● Sam        4-5pm AEST ░░░░Mon░░░░░░░░░░░░░░░░░░▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▚▚▚▚▚░░░░░░░░░░░░░░░░░░░
+● Thandi     8-9am SAST ╌╌╌╌╌╌╌╌╌╌╌╌╌╌░░░░░░░░░░░░░░░░░░░░░░Mon░░░░░░░░░░░░░░░░░░░▚▚▚▚▚▚▚▚▚▚▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+● Johan      8-9am SAST ╌╌╌╌╌╌╌╌╌╌╌╌╌╌░░░░░░░░░░░░░░░░░░░░░░Mon░░░░░░░░░░░░░░░░░░░▚▚▚▚▚▚▚▚▚▚▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+≡ in hours          5/5 ····································⡀⡀⡀⡀⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇━━━━⡆⡆⡆⡆⡆⡆⡆⡆⡆⡆⡆⡆⡆⡆⡆⡆⡆⡆⡆⡆⡆⡆⡆⡆
+○ Ellie       6-7am GMT ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒░░░░░░░░░░░░░░░░░░░░░░░░░░░░Mon░░░░░░░░░░░░░░░░░░░░░░░░▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
+○ Marcus      1-2am CDT ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒░░░░░░░░░░░░░░░░░░░░Mon░░░░░░░░░░░░░░░░░░░░░░░░░░░░▒
+ where  not asked ───────────────────────────────────────────────────────────────────────── ▁ quiet  ▄ off-peak  █ peak
+≡ where              --  not asked: team has no places (space on a place adds one)
+◇ AU               peak Mon▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄██████████▄▄▄▄▄▄▄▄▄▄▄▄▄▄██████████████▄▄▄▄▄▄▄▄▁▁▁▁
+◇ UK              quiet ████▄▄▄▄▄▄▄▄▄▄▄▄▄▄██████████████▄▄▄▄▄▄▄▄▁▁▁▁Mon▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄██████
+◇ US              quiet ▄▄▄▄▄▄▄▄▄▄▄▄▄▄██████████▄▄▄▄▄▄▄▄▄▄▄▄▄▄██████████████▄▄▄▄▄▄▄▄▁▁▁▁Mon▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▄▄▄▄
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+╭ say team ──────────────────────────────────────────────────────────────────────────────────────── y copies this line ╮
+│ 5-6pm AEDT / 4-5pm AEST / 8-9am SAST   3 zones for 5 people                                                          │
+│ ▶ Priya  Brisbane  AEST UTC+10  hours 9am-5pm Mon-Fri  groups team, au, deploy  Mon 26 Oct 4-5pm in hours            │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+h/l time  v range  n next fit  space mark  1-9 group  w save  tab groups  y copy  c copy as  m map  ? help  q quit
+```
+
+120x36, a real ratatui `TestBackend` render. Now is Sat 24 Oct 9:04am AEDT; the view is scrubbed to Mon 26 Oct, 5-6pm AEDT (London is on GMT by then). The team group is active and focus is on Priya. Team lists no places, so the where block is all `◇`, its answer row says "not asked", and the clipboard is the v2 line unchanged: `5-6pm AEDT / 4-5pm AEST / 8-9am SAST`.
+
+* **Header**: the app name in bold accent, then `now <day date time zone>` (dim) and `viewing <day date> +Nd` when the view is not today. `⌂ City ZONE` (or `✈ City ZONE`) is right-aligned. Pieces drop whole from the right when there is no room.
+* **Columns**: label width `L` plus track width `T`. The minutes per cell `m` is the smallest of 15, 30 or 60 for which `1440/m ≤ cols - 20`. Then `T = 1440/m` and `L = cols - T`. That gives 120 cols: m=15, T=96, L=24, and 80 cols: m=30, T=48, L=32. The track always shows the viewed axis-zone day from 12am to 12am, and column i is the same instant in every row.
+* **Ruler**: the label reads `Mon 26 Oct AEDT`. The ruler shows hour labels (`12a`, `3a` … `9p`) every 3 hours at 15 minutes per cell and every 6 hours at 30 or 60, with `·` on each other hour.
+* **Track**:
+  + The label reads `▸ 5-6pm AEDT 1h`, or `▸ 9:04am AEDT now` when the cursor is at now.
+  + Cells draw `─`, or `═` in ok colour when every slot in the cell fits, or `╌` when only some do.
+  + The cursor with no range draws `┃`, and a range draws `┣` … `┫` over its cells.
+  + When now is outside the viewed day, a `◂` sits in the last column of the track label, and clicking it returns to now.
+  + The fit marks (`═`, `╌`) are drawn first, then the cursor or range glyphs over them.
+* **Who block**:
+  + The top border holds  `who` , then the lens strip `1 team  2 au  3 regions  4 deploy  0 all  +  ⋯`. The active group is accent, bold and underlined, followed by any drift in warn colour, such as `+@UK` or `-Sam`.
+  + The people legend is right-aligned in the border and lists only the bands on screen.
+  + Rows go home first, then counted people, then the `≡` answer row, then the uncounted people dimmed.
+  + Rows within each section are ordered by descending UTC offset, then config order.
+* **Row label**: the mark (`⌂ ● ○`), the name, and the person's local time for the range, right-aligned (`4-5pm AEST`). A weekday prefix is added when the date differs from the axis date. When `L ≥ 32`, a city column sits after the name. City names longer than 9 characters are cut to 8 plus `.`, so the 80-column mockup's `Jo'burg` is illustrative and the build shows `Johannes.`. When the label is short of room, drop the zone first, then the minutes.
+* **Person lane**: `░` night, `▒` day, `▚` morning or evening, `▓` working, `╌` off. A 3-letter weekday tag (`Mon`) is overwritten into the lane at local midnight.
+* **Where block**:
+  + The top border holds  `where`  and `asks off-peak`, `asks quiet`, `context` or `not asked`, plus the load legend `▁ quiet  ▄ off-peak  █ peak`.
+  + Rows go counted places (`◆`), the answer row, then the other places (`◇`) dimmed.
+  + A place label is its range state word, worst over the range, with `peak` in warn bold. At 80 columns the label also shows the place's local clock.
+  + Lanes draw `▁` quiet (night colour), `▄` off-peak (dim), `█` peak (warn), with day tags as for people.
+* **Answer row**:
+  + The label reads `≡ <rule>` with the count right-aligned (`≡ in hours 5/5`).
+  + Each cell shows `·` when no row counts, a braille fill by fraction (`⡀ ⡄ ⡆ ⡇ ⣇ ⣧ ⣷`, nearest seventh), or `━` in ok colour when all count.
+  + When the block is not asked, the row reads `-- not asked: team has no places (space on a place adds one)`, or the people version of that text.
+* **Say panel**: a rounded block titled `say <expression>`, with `y copies this line` right-aligned in the title.
+  + Line 1 is the say line followed by a dim summary (`3 zones for 5 people, 2 places`).
+  + Line 2 is `▶` plus the focused row's detail. For a person: city, zone, offset, hours, groups and state. For a place: state, what comes next, zone, profile and groups. Pieces drop whole from the right when there is no room.
+* **Notice row**: blank unless there is something to say. A notice starts with its key, two spaces, then the text, plus a clickable `u undo` where it applies. It clears on the next key or after 10 s, whichever comes first. Clearing a notice does not cancel undo: `u` stays live for 10 s after the action. The texts are:
+  + `n  next fit for deploy: Mon 5-5:30pm AEDT, range shortened from 1h to 30m (AU peak from 5:30pm)`
+  + `3  dropped team +@UK  u undo`
+  + `w  team: +@UK saved  u undo`
+  + `x  closed deploy: its people and places stay  u undo`
+  + `d  deleted Ellie from config and 2 groups  u undo`
+  + `r  config reloaded`, or `r  config error line 12: unknown key "hour", kept the last good config`
+  + `y  copied`, or `y  clipboard unavailable: 5-6pm AEDT / …`
+* **Footer**: ASCII only, generated from the binding table as a priority ladder. Hints keep their display order, and when space runs out they drop from the lowest priority up. Highest priority first: `y`, `space`, `1-9`, `h/l`, `m` (raised to just below `h/l` while the map is auto-hidden, and otherwise last), `tab`, `v`, `n`, `w`, `c`. `? help` and `q quit` are pinned and never drop. The display order is `h/l v n space 1-9 w tab y c m ? q`.
+* **Map** (M4):
+  + ratatui `Canvas` with `Map { resolution: High }` and Braille markers, cropped to latitudes -58 to 80.
+  + After the canvas renders, paint the night side onto the buffer: dim the foreground and add the night background tint. Draw `☼` at the subsolar point.
+  + Markers: `⌂` home, `●` counted people, `◆` counted places. Uncounted people are dim `●` and uncounted places dim `◇`. Uncounted markers are drawn first, so a counted marker wins a shared cell.
+  + Labels are drawn only for home and counted rows: `City 4-5pm` for a person (with `·N` after it when N counted people share the city, as in `Brisbane 4-5pm ·2`), and `UK quiet 3-5am` for a place. Try the right of the marker on its row first, then the row above, then the left. Drop the label whole if all three overlap another label or leave the map.
+  + The night side and `☼` use the range midpoint, or the cursor when there is no range.
+* **Map hiding**:
+  + The map shows only if there are at least 100 columns and at least 12 rows are left after the fixed rows.
+  + Recompute on resize only, never on a group switch. `m` flips the automatic choice.
+  + When the map is hidden and there is no room, `m` opens it as an overlay (a centred `Clear` box) until `esc`.
+* **Folding** (M6), used when the fixed rows exceed the terminal even without the map:
+  + Block heights are recomputed per resize, never per group switch. The where block shrinks first, to its borders, the answer row and `min(places, 3)` rows. Then the who block shrinks to whatever is left, with at least home, the answer row and one more row.
+  + Inside a block, rows fill in their usual order. The last row becomes `○ +N more` or `◇ +N more` when rows remain, listing how many of them are counted (`○ +3 more, 1 counted`). `enter` on it opens an overlay listing the folded rows.
+  + Answer rows and the say panel never fold.
+  + Below 60 columns the screen is a plain list: the label and state per row, without lanes.
+  + Below 40 columns or 10 rows it shows `terminal too small`, and `q` still quits. The plain list is one line per row: mark, name, then the time or state label.
+
+```
+teamzones   now Sat 24 Oct 9:04am AEDT   viewing Mon 26 Oct +2d                                         ⌂ Melbourne AEDT
+⣀⡀   ⢀⣀⣀⣀⣀⡀⣀⣀   ⣀⣀⣠⣲⣶⣶⣾⣿⡾⣿⣾⣿⣿⣷⣶⣿⡶⣶⣿⡙⡛⡒⠓⠐⠠⣤⣀⡀       ⣀⣴⠿         ⠉⠚⠓⡛⣛⣊⣀⣀      ⣤⣤⡆⡆⠒⣰⢄⣤⣀⣠⡄⠤⠔⠘⠘⠓⠛⠙⠒⠴⠴⠄⠤⠠⠠⢤⣀⣀⢔⡶⠤⠤⢤⢄ ⣀⡀  ⢀⢀⡀⣀
+⠓⠛⠻⠶⣾⣿⣶⣀⢀⣀⣄⣀⣀⣉⣉⡉  ⠉⠁⠉⠉⠉⠉⠉⠉⠉⠉⢉⡭⠛⠿⠾⢷⡿⠿⢤⣿⣿⡃ ⠈⠻⢥⢀⣠⠖⠒⠐⠉⠈⠘⠒⠶⠖⠂  ⣀⡀UK quiet 3-5am⠛⠋ ⠈⠁⠉⠁⠉⠉⠐⠋                      ⡀⡀⣀⣀⡀⢤⣩⣥⡉⣉⠤⠰⠿
+     ⠚⠋⠉⠉⠁     ⠘⠓⠶⣤⡀         ⠉⠉⠉⠙⠴⠉ ⣀⣠⣤⣭⣵⣶⣄             ⠰⠟◆●⠶⠔⠚⠛⠛⠓⠚⠉⠁ ⣀⢀⣀   ⣀⣀                          ⠐⢒⡳⣶⡀  ⠸⠵⠚⠁
+                  ⠸⢄       ◆ US off-peak 10pm-12am      ⠰⣏⣉⣩⡖⣊⣻⣗⢿⡷⠦⣴⣶⣛⣛⣛⡛⠓ ⠙⢿⣿⠂                    ⢤⣶⢤⣴⢒⣊⣁⣾⠟⠃
+                    ⠉⠻⢷⣤⣀  ⢠⠒⠒⠒⠒⣶⣯⡅                   ⢀⡤⠞⠉     ⠉⠉⠓⠚⠉⠉⠒⠱⣿⣄  ⠐⢶⣤⣤⣄⣀⡀⣀⡀      ⡀       ⣀⣨⡗⠈⠉⠛⠉⠁
+      ⠈⠉⠛               ⠈⠓⠲⠬⠶⢾⣽⣭⡍⠙⠛⣛⣓⡒⠂               ⣽                 ⠻⢵⣆⣠⣤⠤⠒⠋  ⠈⠉⢧⡀⢠⠖⠊⠉⠉⠦⢆⣀⡀⢫⡟⠉⠁⢰⣷⣀
+                               ⠉⠙⣻⠏ ⠁⠉⠉⠉⠓⠒⠢⣄⡀          ⠙⠒⠤⠶⠴⠒⠲⠤⡄          ⣉⡥⠊        ⠙⠙⠂   ⠰⢾⣷⣏⠉⣠⠤⢾⣿⣛⣛⣂⢀
+                                ⠐⠫⡀        ⠈⠈⠉⠉⣒⡆             ⠈⠑⣆       ⠐⡏  ⡀                ⠉⠺⠷⠿⠭⠾⣽⣿⡬☼⢋⣻⡻⠭⣵⠦⣶⡛⠲⢤⣤
+⠂                                 ⠈⠑⢲       ⢀⣀⡴⠃               ⠐⢅   ●  ⢠⠖⠋⣰⢊⠟        AU off-peak 2-4pm⠉◆⠈⠓⠚⠉⠳⢤●   ⢤⡗  ⠐⠒
+                                   ⢀⡎   ⢀⣀⣠⠜⠁                   ⠈⠳⣄⣀⣀⡤⠞⠉  ⠈⠉               Melbourne 2-4pm⡀⌂ ⢀⡽      ⣀
+                                  ⢀⡾ ⢀⡶⠓⠉⠁                                                                ⠉⠉⠿⠏     ⣠⣴⠾⠛⠃
+                                  ⠈⠲⠶⠯⠅⠐⠒                                         ⠈⠁
+Mon 26 Oct AEDT         12a ·   ·   3a  ·   ·   6a  ·   ·   9a  ·   ·   12p ·   ·   3p  ·   ·   6p  ·   ·   9p  ·   ·
+▸ 2-4pm AEDT 2h        ◂────══════════──────────────────══════──────────────────┣══════┫══════──────────────══════──────
+ who   1 team  2 au  3 regions  4 deploy  0 all  +  ⋯  ──────────── ▒ day  ▚ morning/evening  ▓ working  ░ night  ╌ off
+⌂ Paul       2-4pm AEDT Mon░░░░░░░░░░░░░░░░░░░░░░░▚▚▚▚▚▚▚▚▚▚▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▚▚▚▚▚▚▚▚░░░░░░░░░░░░░░░░
+≡ who                --  not asked: regions has no people, so home is the axis only (space on a person adds one)
+○ Priya      1-3pm AEST ░░░░Mon░░░░░░░░░░░░░░░░░░▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▚▚▚▚▚░░░░░░░░░░░░░░░░░░░
+○ Sam        1-3pm AEST ░░░░Mon░░░░░░░░░░░░░░░░░░▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▚▚▚▚▚░░░░░░░░░░░░░░░░░░░
+○ Thandi     5-7am SAST ╌╌╌╌╌╌╌╌╌╌╌╌╌╌░░░░░░░░░░░░░░░░░░░░░░Mon░░░░░░░░░░░░░░░░░░░▚▚▚▚▚▚▚▚▚▚▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+○ Johan      5-7am SAST ╌╌╌╌╌╌╌╌╌╌╌╌╌╌░░░░░░░░░░░░░░░░░░░░░░Mon░░░░░░░░░░░░░░░░░░░▚▚▚▚▚▚▚▚▚▚▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+○ Ellie       3-5am GMT ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒░░░░░░░░░░░░░░░░░░░░░░░░░░░░Mon░░░░░░░░░░░░░░░░░░░░░░░░▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
+○ Marcus  Sun 10pm-12am ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒░░░░░░░░░░░░░░░░░░░░Mon░░░░░░░░░░░░░░░░░░░░░░░░░░░░▒
+ where  asks off-peak ───────────────────────────────────────────────────────────────────── ▁ quiet  ▄ off-peak  █ peak
+◆ AU           off-peak Mon▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄██████████▄▄▄▄▄▄▄▄▄▄▄▄▄▄██████████████▄▄▄▄▄▄▄▄▁▁▁▁
+◆ UK              quiet ████▄▄▄▄▄▄▄▄▄▄▄▄▄▄██████████████▄▄▄▄▄▄▄▄▁▁▁▁Mon▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄██████
+◆ US           off-peak ▄▄▄▄▄▄▄▄▄▄▄▄▄▄██████████▄▄▄▄▄▄▄▄▄▄▄▄▄▄██████████████▄▄▄▄▄▄▄▄▁▁▁▁Mon▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▄▄▄▄
+≡ off-peak          3/3 ⣇⣇⣇⣇━━━━━━━━━━⣇⣇⣇⣇⡄⡄⡄⡄⡄⡄⣇⣇⣇⣇⣇⣇⣇⣇━━━━━━⣇⣇⣇⣇⣇⣇⣇⣇⡄⡄⡄⡄⡄⡄⣇⣇⣇⣇━━━━━━━━━━━━━━⣇⣇⣇⣇⣇⣇⣇⣇⣇⣇⣇⣇⣇⣇━━━━━━⣇⣇⣇⣇⣇⣇
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+╭ say regions ───────────────────────────────────────────────────────────────────────────────────── y copies this line ╮
+│ 2-4pm AEDT, off-peak in AU, UK and US   home zone, 3 places                                                          │
+│ ▶ UK  Mon 3-5am quiet  opens 7am  next peak 11:30am-2pm  GMT UTC+0  Europe/London  venue profile                     │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+h/l time  v range  n next fit  space mark  1-9 group  w save  tab groups  y copy  c copy as  m map  ? help  q quit
+```
+
+120x36, regions (alias `apps`), Mon 26 Oct with a 2-4pm AEDT range and focus on UK. All-off-peak windows on Monday (AEDT): 1-3:30am, 8-9:30am, 2-5:30pm and 9-10:30pm, shown both on the `≡ off-peak` row and as `═` on the track. At 2-4pm AU is in its afternoon lull, UK is closed (3-5am GMT) and US is winding down on Sunday night (10pm-12am CDT, open until 11pm). `y` copies `2-4pm AEDT, off-peak in AU, UK and US`.
+
+```
+Mon 26 Oct AEDT         12a ·   ·   3a  ·   ·   6a  ·   ·   9a  ·   ·   12p ·   ·   3p  ·   ·   6p  ·   ·   9p  ·   ·
+▸ 5-5:30pm AEDT 30m    ◂────────────────────────────────────────────────────────────────────┣┫──────────────────────────
+ who   1 team  2 au  3 regions  4 deploy  0 all  +  ⋯  ──────────── ▒ day  ▚ morning/evening  ▓ working  ░ night  ╌ off
+⌂ Paul    5-5:30pm AEDT Mon░░░░░░░░░░░░░░░░░░░░░░░▚▚▚▚▚▚▚▚▚▚▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▚▚▚▚▚▚▚▚░░░░░░░░░░░░░░░░
+● Priya   4-4:30pm AEST ░░░░Mon░░░░░░░░░░░░░░░░░░▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▚▚▚▚▚░░░░░░░░░░░░░░░░░░░
+● Thandi  8-8:30am SAST ╌╌╌╌╌╌╌╌╌╌╌╌╌╌░░░░░░░░░░░░░░░░░░░░░░Mon░░░░░░░░░░░░░░░░░░░▚▚▚▚▚▚▚▚▚▚▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+≡ in hours          3/3 ····································⡄⡄⡄⡄⣇⣇⣇⣇⣇⣇⣇⣇⣇⣇⣇⣇⣇⣇⣇⣇⣇⣇⣇⣇⣇⣇⣇⣇⣇⣇⣇⣇━━━━⡄⡄⡄⡄⡄⡄⡄⡄⡄⡄⡄⡄⡄⡄⡄⡄⡄⡄⡄⡄⡄⡄⡄⡄
+○ Sam     4-4:30pm AEST ░░░░Mon░░░░░░░░░░░░░░░░░░▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▚▚▚▚▚░░░░░░░░░░░░░░░░░░░
+○ Johan   8-8:30am SAST ╌╌╌╌╌╌╌╌╌╌╌╌╌╌░░░░░░░░░░░░░░░░░░░░░░Mon░░░░░░░░░░░░░░░░░░░▚▚▚▚▚▚▚▚▚▚▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+○ Ellie    6-6:30am GMT ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒░░░░░░░░░░░░░░░░░░░░░░░░░░░░Mon░░░░░░░░░░░░░░░░░░░░░░░░▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
+○ Marcus   1-1:30am CDT ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒░░░░░░░░░░░░░░░░░░░░Mon░░░░░░░░░░░░░░░░░░░░░░░░░░░░▒
+ where  asks off-peak ───────────────────────────────────────────────────────────────────── ▁ quiet  ▄ off-peak  █ peak
+◆ AU           off-peak Mon▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄██████████▄▄▄▄▄▄▄▄▄▄▄▄▄▄██████████████▄▄▄▄▄▄▄▄▁▁▁▁
+◆ UK              quiet ████▄▄▄▄▄▄▄▄▄▄▄▄▄▄██████████████▄▄▄▄▄▄▄▄▁▁▁▁Mon▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄██████
+≡ off-peak          2/2 ⡇⡇⡇⡇━━━━━━━━━━━━━━⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇━━━━━━━━━━━━━━⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇━━━━━━━━━━━━━━⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇━━━━━━⡇⡇⡇⡇⡇⡇
+◇ US              quiet ▄▄▄▄▄▄▄▄▄▄▄▄▄▄██████████▄▄▄▄▄▄▄▄▄▄▄▄▄▄██████████████▄▄▄▄▄▄▄▄▁▁▁▁Mon▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▄▄▄▄
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+╭ say deploy ────────────────────────────────────────────────────────────────────────────────────── y copies this line ╮
+│ 5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST, off-peak in AU and UK   3 zones for 3 people, 2 places                │
+│ ▶ AU  Mon 5-5:30pm off-peak  peak 5:30-9pm  AEDT UTC+11  Australia/Melbourne  venue profile  groups regions, deploy  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ n  next fit for deploy: Mon 5-5:30pm AEDT, range shortened from 1h to 30m (AU peak from 5:30pm)
+h/l time  v range  n next fit  space mark  1-9 group  w save  tab groups  y copy  c copy as  m map  ? help  q quit
+```
+
+Crop of a 120x36 render, deploy, after `n` from Saturday. Nobody is in hours over the weekend, and on Monday the who row is full only from 5pm to 6pm AEDT (Thandi starts at 8am SAST, Priya stops at 5pm AEST). The where row is full then until AU's dinner peak starts at 5:30pm AEDT, so the track shows `═` for 5-5:30pm only. `n` lands there and shortens the 1h range to fit, saying why in the notice row while the footer stays put. US is not in deploy, so it sits below the line as `◇`. `y` copies `5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST, off-peak in AU and UK`.
+
+```
+teamzones   now Sat 24 Oct 9:04am AEDT                          ⌂ Melbourne AEDT
+Sat 24 Oct AEDT                 12a · · · · 6a· · · · · 12p · · · · 6p· · · · ·
+▸ 9:04am AEDT now               ─══════─────────══┃═─────────═══════────────────
+ who   1 team  2 au  3 regions  4 deploy  0 all  +  ⋯  ─────────────────────────
+⌂ Paul   Melbourne  9:04am AEDT Sat░░░░░░░░░░╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌░░░░░░░░
+≡ who                        --  not asked: regions has no people
+○ Priya  Brisbane   8:04am AEST ░░Sat░░░░░░░░╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌░░░░░░░░░░
+○ Sam    Brisbane   8:04am AEST ░░Sat░░░░░░░░╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌░░░░░░░░░░
+○ Thandi Jo'burg   12:04am SAST ▓▓▚▚▚▚▚░░░░░░░░░░░Sat░░░░░░░░╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+○ Johan  Jo'burg   12:04am SAST ▓▓▚▚▚▚▚░░░░░░░░░░░Sat░░░░░░░░╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+○ Ellie  London     Fri 11:04pm ▒▒▒▒▒▒▒▒░░░░░░░░░░░░Sat░░░░░░░░░░░░░▒▒▒▒▒▒▒▒▒▒▒▒
+○ Marcus Austin      Fri 5:04pm ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒░░░░░░░░░░Sat░░░░░░░░░░░░░
+ where  asks off-peak ──────────────────────────────────────────────────────────
+◆ AU  9:04am AEDT      off-peak Sat▁▁▁▁▁▁▁▁▁▁▁▄▄▄▄▄▄▄▄▄██████▄▄▄▄▄▄▄████████▄▄▁▁
+◆ UK  Fri 11:04pm BST     quiet █▄▄▄▄▄▄▄████████▄▄▁▁Sat▁▁▁▁▁▁▁▁▁▁▁▄▄▄▄▄▄▄▄▄█████
+◆ US  Fri 5:04pm CDT   off-peak ▄▄▄▄▄▄▄██████▄▄▄▄▄▄▄████████▄▄▁▁Sat▁▁▁▁▁▁▁▁▁▁▁▄▄
+≡ off-peak                  3/3 ⣇━━━━━━⣇⡄⡄⡄⡄⡄⣇⣇⣇━━━━⣇⣇⣇⡄⡄⡄⡄⡄⣇━━━━━━━⣇⣇⣇⣇⣇⣇⣇⡄⣇⣇⣇⣇
+────────────────────────────────────────────────────────────────────────────────
+╭ say regions ───────────────────────────────────────────── y copies this line ╮
+│ 9:04am AEDT, off-peak in AU, UK and US   home zone, 3 places                 │
+│ ▶ UK  Fri 11:04pm quiet  opens Sat 7am  next peak Sat 11:30am-2:30pm         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+h/l time  space mark  1-9 group  tab groups  y copy  m map  ? help  q quit
+```
+
+80x24, regions at now (Sat 24 Oct 9:04am AEDT, the cursor on `┃`), so this is the "is it peak right now?" glance. The map is hidden and the grid is 48 cells at 30 minutes. The wider label gives place rows their local clock as well as their state: UK closed at 11pm BST on Friday, so it reads quiet; US is under an hour from Friday's 6pm peak. Person labels keep the weekday (`Fri 11:04pm`) and drop the zone first. The track's `═` runs show the next all-off-peak windows; at 30 minutes a cell, `═` means the whole cell fits and `╌` would mark one that fits for only part of it (none today, since every Saturday window starts and ends on the half hour). The blank row above the footer is the notice row. The footer drops `v`, `n`, `w` and `c` but keeps `m map`.
