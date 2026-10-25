@@ -1531,6 +1531,7 @@ fn footer_row(buf: &mut Buffer, area: Rect, app: &App, look: Look, map: footer::
         range: main && app.range.is_some(),
         away: main && !app.at_now(),
         map,
+        config: !app.first_run,
     };
     let flash = app
         .style_flash

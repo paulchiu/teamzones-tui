@@ -5,13 +5,14 @@ use super::keys::{Context, Hint, PINNED, Shown, hints};
 
 const GAP: usize = 2;
 
-/// What the conditional hints depend on: a committed range, being anywhere but now, and what
-/// `m` does for the map.
+/// What the conditional hints depend on: a committed range, being anywhere but now, what `m`
+/// does for the map, and whether a config file exists.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Situation {
     pub range: bool,
     pub away: bool,
     pub map: MapKey,
+    pub config: bool,
 }
 
 /// What `m` does: nothing (the ascii glyph set forces the map off), open the map the hiding rule
@@ -69,6 +70,7 @@ fn shows(shown: Shown, situation: Situation) -> bool {
             MapKey::Inert => false,
             MapKey::Opens | MapKey::Flips => true,
         },
+        Shown::WithoutConfig => !situation.config,
     }
 }
 
@@ -131,16 +133,19 @@ mod tests {
         range: false,
         away: false,
         map: MapKey::Flips,
+        config: true,
     };
     const AWAY: Situation = Situation {
         range: false,
         away: true,
         map: MapKey::Flips,
+        config: true,
     };
     const RANGED: Situation = Situation {
         range: true,
         away: true,
         map: MapKey::Flips,
+        config: true,
     };
 
     #[test]

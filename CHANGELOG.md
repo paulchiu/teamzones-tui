@@ -6,13 +6,17 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ## [Unreleased]
 
-### Fixed
+### Added
 
-- On Linux, copying also writes the line to the terminal's clipboard (OSC 52), so it is not lost when the system clipboard empties as `teamzones say` exits.
+- With no config file, the footer offers `E config` next to the `no config: E creates one` notice.
 
 ### Changed
 
 - The times box now sits at the bottom with the notice row and the footer, and spare rows collect above it, so there is a blank row between the grid and the box whenever the terminal has room. With the map shown, the map gives up one row for it.
+
+### Fixed
+
+- On Linux, copying also writes the line to the terminal's clipboard (OSC 52), so it is not lost when the system clipboard empties as `teamzones say` exits.
 
 ## [0.12.0] - 2026-10-25
 

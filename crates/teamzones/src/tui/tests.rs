@@ -1685,3 +1685,14 @@ mod fold;
 mod map;
 mod mouse;
 mod travel;
+
+#[test]
+fn with_no_config_file_the_notice_says_e_creates_one_and_the_footer_offers_e() {
+    let config = Config::load(None, chrono_tz::Australia::Melbourne).unwrap();
+    let app = App::new(config, now()).with_source(None);
+    let buf = render(&app, 120, 24);
+    assert_eq!(row(&buf, 22), "no config: E creates one", "{}", text(&buf));
+    assert!(row(&buf, 23).contains("E config"), "{}", row(&buf, 23));
+    let buf = render(&fixture(), 120, 24);
+    assert!(!row(&buf, 23).contains("E config"), "{}", row(&buf, 23));
+}

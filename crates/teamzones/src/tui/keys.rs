@@ -170,6 +170,8 @@ pub enum Shown {
     AwayFromNow,
     /// Only while `m` can draw the map.
     WithMap,
+    /// Only while there is no config file, so `E` would create one.
+    WithoutConfig,
 }
 
 /// One row of the binding table; the main and global rows mirror `docs/spec/keys.md` row for row.
@@ -524,6 +526,8 @@ pub const BINDINGS: &[Binding] = &[
         )
     },
     Binding {
+        hints: &[hint_when("E", "config", Shown::WithoutConfig)],
+        priority: 20,
         chords: &[
             (Key::Char('E'), Action::OpenEditor),
             (Key::Char('r'), Action::Reload),
@@ -977,7 +981,7 @@ mod tests {
         assert_eq!(
             hinted,
             [
-                "h/l", ".", "v", "n", "space", "w", "tab", "y", "c", "m", "esc", "?", "q"
+                "h/l", ".", "v", "n", "space", "w", "tab", "y", "c", "m", "E", "esc", "?", "q"
             ]
         );
     }

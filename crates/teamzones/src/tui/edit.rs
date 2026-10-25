@@ -237,6 +237,7 @@ pub fn reloaded(app: App, key: &str, result: Result<Box<Loaded>, String>) -> App
             let Loaded { config, text } = *loaded;
             let next = adopt(app, config, text.clone());
             App {
+                first_run: text.is_none(),
                 disk: text,
                 flush_at: None,
                 undo: None,
