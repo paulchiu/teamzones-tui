@@ -68,7 +68,7 @@ Decision: The TUI captures the mouse at start, and `M` releases it for text sele
 
 Why: The slider is a mouse surface. This is the deliberate opposite of repon ADR 0024 ([GitHub](https://github.com/paulchiu/repon/blob/a4b26cc543af925c8529157ca24b0855c01210d5/docs/adr/0024-repon-releases-what-it-enables-and-holds-mouse-capture-off.md)).
 
-Held by: nothing yet
+Held by: `tui::tests::mouse::capital_m_releases_the_mouse_and_says_so_until_m_again_recaptures_it` and `quitting_releases_mouse_capture_and_then_leaves_the_alternate_screen` in `crates/teamzones/tests/terminal_restoration.rs` in `teamzones`
 
 ## D9: Clipboard falls back from arboard to OSC 52 to the notice row (2026-10-24)
 
@@ -241,3 +241,19 @@ Decision: From 80 columns the label is never wider than the track, and from 120 
 Why: A fixed 96-column track handed every extra column to the label, which outgrew the track on wide terminals, and the side-by-side split left too little room below 80 columns. Paul asked for a label to track ratio of about 1:2 and a stacked layout when narrow. Whole columns per hour keep hours evenly spaced on the ruler. Stacking doubles the grid's rows and folding (M6) is not built yet, so a short narrow terminal keeps its lanes beside the labels, as it did before, rather than losing them to the list.
 
 Held by: `tui::layout::tests::from_80_columns_the_label_never_outgrows_the_track_and_from_120_stays_within_half` and `the_split_matches_every_example_in_the_screen_spec`, and `tui::tests::at_250_columns_every_grid_row_marks_the_range_on_the_same_columns`, `at_250_columns_the_cursor_and_fit_marks_sit_on_their_instants`, `ruler_labels_space_out_with_the_cell_size`, `below_80_columns_each_row_stacks_its_label_over_a_full_width_lane`, `from_60_to_79_columns_without_the_height_to_stack_lanes_sit_beside_the_labels` and `below_60_columns_without_the_height_to_stack_the_screen_is_a_plain_list` in `teamzones`
+
+## D30: m flips the map until the next resize, and the overlay is not a modal (2026-10-25)
+
+Decision: `m` flips the map's automatic choice only until the terminal is resized, when the choice is worked out afresh. The overlay `m` opens without room is drawn over the grid while every main key still works under it, so scrubbing moves the night side; `esc` closes it before unwinding anything else. A configured `[map] show = "always"` takes any spare rows, and `never` makes `m` show the map where the hiding rule finds room. See Map hiding in [screen](spec/screen.md).
+
+Why: Keeping a flip across a resize would turn a map hidden at 120x36 into an overlay at 120x24, which nobody asked for. A modal overlay would add a context whose only key is `esc`, and scrubbing under the map is the point of opening it.
+
+Held by: `tui::layout::tests::m_flips_each_configured_choice_to_the_other_or_to_an_overlay_without_room`, the `tui::tests::map` hide, overlay and resize tests, `tui::tests::map::main_keys_still_work_under_the_map_overlay` and `tui::tests::mouse::the_wheel_scrubs_under_the_map_overlay_and_a_click_inside_it_does_nothing` in `teamzones`
+
+## D31: Every built mouse equivalent sends its key's messages (2026-10-25)
+
+Decision: A pointer event is translated into the messages its keymap row's key sends (a wheel notch is `l`, a click on a strip name is its number), hit-tested against the areas the view draws at the terminal's last size. Drags become repeated edge or move keys, and drawing a range is `v`, moves and `enter`. Only clicking a row label, putting the cursor down for a drawn range and clicking a fitting run have no key, so they get their own messages. A press on the grid that never moves does nothing, except on a fitting cell of the track.
+
+Why: The mouse then cannot drift from the keys: whatever a key does, its mouse equivalent does by sending it. A test reads the keymap's mouse column, so a new mouse row fails until it is covered.
+
+Held by: `tui::tests::mouse::every_built_mouse_equivalent_in_the_keymap_sends_what_its_key_does` in `teamzones`

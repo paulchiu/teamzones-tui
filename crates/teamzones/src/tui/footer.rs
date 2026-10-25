@@ -5,11 +5,22 @@ use super::keys::{Context, Hint, PINNED, Shown, hints};
 
 const GAP: usize = 2;
 
-/// What the conditional hints depend on: a committed range, and being anywhere but now.
+/// What the conditional hints depend on: a committed range, being anywhere but now, and what
+/// `m` does for the map.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Situation {
     pub range: bool,
     pub away: bool,
+    pub map: MapKey,
+}
+
+/// What `m` does: nothing (the ascii glyph set forces the map off), open the map the hiding rule
+/// found no room for, or flip the map's choice where there is room.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MapKey {
+    Inert,
+    Opens,
+    Flips,
 }
 
 /// One footer: the mode badge, if any, then the hints that fit, in display order.
@@ -50,6 +61,10 @@ fn shows(shown: Shown, situation: Situation) -> bool {
         Shown::Always => true,
         Shown::WithRange => situation.range,
         Shown::AwayFromNow => situation.away,
+        Shown::WithMap => match situation.map {
+            MapKey::Inert => false,
+            MapKey::Opens | MapKey::Flips => true,
+        },
     }
 }
 
@@ -62,6 +77,10 @@ pub fn line(context: Context, situation: Situation, columns: u16) -> Footer {
     let candidates: Vec<(Hint, u8)> = hints(context)
         .into_iter()
         .filter(|(hint, _)| shows(hint.shown, situation))
+        .map(|(hint, priority)| {
+            let raised = hint.raised.filter(|_| situation.map == MapKey::Opens);
+            (hint, raised.unwrap_or(priority))
+        })
         .collect();
     Footer {
         badge,
@@ -107,15 +126,43 @@ mod tests {
     const AT_NOW: Situation = Situation {
         range: false,
         away: false,
+        map: MapKey::Flips,
     };
     const AWAY: Situation = Situation {
         range: false,
         away: true,
+        map: MapKey::Flips,
     };
     const RANGED: Situation = Situation {
         range: true,
         away: true,
+        map: MapKey::Flips,
     };
+
+    #[test]
+    fn m_drops_first_while_the_map_shows_and_ranks_below_h_l_while_it_is_hidden() {
+        let hidden = Situation {
+            map: MapKey::Opens,
+            ..AWAY
+        };
+        assert_eq!(
+            at(Context::Main, AWAY, 60),
+            "h/l time  . now  v range  space mark  y copy  ? help  q quit"
+        );
+        assert_eq!(
+            at(Context::Main, hidden, 60),
+            "h/l time  . now  space mark  y copy  m map  ? help  q quit"
+        );
+    }
+
+    #[test]
+    fn m_is_never_offered_while_it_does_nothing() {
+        let inert = Situation {
+            map: MapKey::Inert,
+            ..RANGED
+        };
+        assert!(!at(Context::Main, inert, 200).contains("m map"));
+    }
 
     fn at(context: Context, situation: Situation, columns: u16) -> String {
         line(context, situation, columns).text()
@@ -125,7 +172,7 @@ mod tests {
     fn at_now_the_main_footer_has_no_mode_hints_and_no_group_hint() {
         assert_eq!(
             at(Context::Main, AT_NOW, 120),
-            "h/l time  v range  n next fit  space mark  y copy  c copy as  ? help  q quit"
+            "h/l time  v range  n next fit  space mark  y copy  c copy as  m map  ? help  q quit"
         );
         assert_eq!(
             at(Context::Main, AT_NOW, 80),
@@ -137,11 +184,11 @@ mod tests {
     fn away_from_now_the_footer_offers_dot_now() {
         assert_eq!(
             at(Context::Main, AWAY, 120),
-            "h/l time  . now  v range  n next fit  space mark  y copy  c copy as  ? help  q quit"
+            "h/l time  . now  v range  n next fit  space mark  y copy  c copy as  m map  ? help  q quit"
         );
         assert_eq!(
             at(Context::Main, AWAY, 80),
-            "h/l time  . now  v range  n next fit  space mark  y copy  ? help  q quit"
+            "h/l time  . now  v range  n next fit  space mark  y copy  m map  ? help  q quit"
         );
     }
 
@@ -149,7 +196,7 @@ mod tests {
     fn with_a_committed_range_the_footer_offers_esc_and_keeps_it_last_to_drop() {
         assert_eq!(
             at(Context::Main, RANGED, 120),
-            "h/l time  . now  v range  n next fit  space mark  y copy  c copy as  esc clear range  ? help  q quit"
+            "h/l time  . now  v range  n next fit  space mark  y copy  c copy as  m map  esc clear range  ? help  q quit"
         );
         assert_eq!(
             at(Context::Main, RANGED, 80),

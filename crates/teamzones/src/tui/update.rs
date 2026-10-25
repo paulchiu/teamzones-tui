@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use teamzones_core::clock::{Range, Slot, When};
 use teamzones_core::config::{Config, PersonId};
 use teamzones_core::copy::{clock_text, span_text};
-use teamzones_core::fit::{NoFit, blocker, next_run, previous_run};
+use teamzones_core::fit::{NoFit, blocker, next_run, previous_run, slot_fits};
 use teamzones_core::question::{Marks, Row, person_band, place_level};
 use teamzones_core::time::Moment;
 
@@ -12,6 +12,8 @@ use super::app::{
     App, Cursor, Lanes, Lens, Mode, Undo, Visual, base_marks, next_style, style_name,
 };
 use super::keys::{Action, Context, Key, action_for};
+use super::layout::MapView;
+use super::mouse::{self, Drag, Pointer};
 use super::notice::{Notice, TIMEOUT};
 use super::prompt;
 use super::say::duration_text;
@@ -35,12 +37,34 @@ pub enum Msg {
         expect(dead_code, reason = "the r key that sends it lands with write-back")
     )]
     Reload(Box<Config>),
+    /// The terminal is now this many columns and rows.
+    Resize(u16, u16),
+    /// Whether switching mouse capture to `on` worked.
+    Captured {
+        on: bool,
+        result: Result<(), String>,
+    },
+    /// A pointer event, which stands for the messages its keymap row's key would send.
+    Mouse(Pointer),
+    /// Focus this row.
+    Focus(Row),
+    /// Put the cursor on this slot, dropping any range.
+    Cursor(Slot),
+    /// Move the range to the start of the fitting run holding this slot.
+    Run(Slot),
+    /// The drag in progress, or none once the button is released.
+    Drag(Option<Drag>),
 }
 
 /// Work the effects layer does on the update's behalf.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Effect {
-    Copy { key: String, text: String },
+    Copy {
+        key: String,
+        text: String,
+    },
+    /// Turn mouse capture on or off.
+    CaptureMouse(bool),
 }
 
 /// The context whose bindings read the next key: a modal, range mode while drawing, or main.
@@ -68,6 +92,46 @@ pub fn update(app: App, msg: Msg) -> (App, Vec<Effect>) {
             };
             let now = app.now;
             (with_notice(app, &key, &words, now), Vec::new())
+        }
+        Msg::Resize(cols, rows) => (
+            App {
+                size: (cols, rows),
+                map_flipped: false,
+                ..app
+            },
+            Vec::new(),
+        ),
+        Msg::Mouse(pointer) => {
+            let msgs = mouse::msgs(&app, pointer);
+            msgs.into_iter()
+                .fold((app, Vec::new()), |(app, mut effects), msg| {
+                    let (next, more) = update(app, msg);
+                    effects.extend(more);
+                    (next, effects)
+                })
+        }
+        Msg::Focus(row) => (App { focus: row, ..app }, Vec::new()),
+        Msg::Cursor(slot) => (
+            App {
+                cursor: Cursor::At(slot),
+                range: None,
+                visual: None,
+                ..app
+            },
+            Vec::new(),
+        ),
+        Msg::Run(slot) => (run_at(app, slot), Vec::new()),
+        Msg::Drag(drag) => (App { drag, ..app }, Vec::new()),
+        Msg::Captured { on, result } => {
+            let now = app.now;
+            match result {
+                Ok(()) => (app, Vec::new()),
+                Err(error) => {
+                    let kept = App { mouse: !on, ..app };
+                    let text = format!("mouse capture failed: {error}");
+                    (with_notice(kept, "M", &text, now), Vec::new())
+                }
+            }
         }
         Msg::Reload(config) => (
             App {
@@ -246,6 +310,14 @@ fn act(app: App, action: Action, key: Key) -> (App, Vec<Effect>) {
                 ..app
             })
         }
+        Action::ToggleMouse => {
+            let mouse = !app.mouse;
+            (App { mouse, ..app }, vec![Effect::CaptureMouse(mouse)])
+        }
+        Action::FlipMap => only(App {
+            map_flipped: !app.map_flipped,
+            ..app
+        }),
     }
 }
 
@@ -329,6 +401,12 @@ fn edge(app: App, start: i64, end: i64) -> App {
 }
 
 fn unwind(app: App) -> App {
+    if app.mode == Mode::Normal && app.map_view() == MapView::Overlay {
+        return App {
+            map_flipped: false,
+            ..app
+        };
+    }
     match (&app.mode, app.visual, app.range) {
         (Mode::Prompt(_) | Mode::CopyMenu | Mode::SortMenu | Mode::Help(_), _, _) => normal(app),
         (Mode::Normal, Some(v), _) => App {
@@ -535,6 +613,36 @@ fn landed(app: App, step: Step, run: Range, length: i64, now: DateTime<Utc>) -> 
         ..app
     };
     with_notice(next, key, &text, now)
+}
+
+/// The fitting run holding `slot`, found by walking out from it a day either way.
+fn run_around(app: &App, slot: Slot) -> Option<Range> {
+    let fits = |slot: Slot| slot_fits(app.roster(), &app.marks, slot);
+    if !fits(slot) {
+        return None;
+    }
+    let start = (1..=DAY)
+        .map(|step| slot.offset(-step))
+        .take_while(|slot| fits(*slot))
+        .last()
+        .unwrap_or(slot);
+    let end = (1..=DAY)
+        .map(|step| slot.offset(step))
+        .find(|slot| !fits(*slot))
+        .unwrap_or(slot.offset(DAY));
+    Range::new(start, end)
+}
+
+/// A click on a fitting run: the range moves to the run's start, shortened to the run if needed.
+fn run_at(app: App, slot: Slot) -> App {
+    let length = app
+        .shown_range()
+        .map_or(HOUR, |range| range.end().since(range.start()));
+    let now = app.now;
+    match run_around(&app, slot) {
+        Some(run) => landed(app, Step::Next, run, length, now),
+        None => app,
+    }
 }
 
 fn missed(app: App, step: Step, no_fit: NoFit, now: DateTime<Utc>) -> App {

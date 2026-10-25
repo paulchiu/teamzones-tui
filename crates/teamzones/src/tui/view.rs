@@ -9,14 +9,14 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Widget};
 use teamzones_core::clock::{Range, Slot, When};
-use teamzones_core::config::{MapShow, PersonId, Rule};
+use teamzones_core::config::{PersonId, Rule};
 use teamzones_core::fit::{day_start, slot_fits};
 use teamzones_core::question::{Row, evaluate, person_band};
 use teamzones_core::schedule::{Band, Level, band, is_day};
 
 use super::app::{App, Cursor, Lanes, Mode, without_colour};
 use super::glyphs::Glyphs;
-use super::layout::{Areas, MapChoice, layout};
+use super::layout::{Areas, MapChoice, MapView, layout};
 use super::say::{detail, duration_text, local_text, summary};
 use super::theme::{Role, Theme};
 use super::update::context;
@@ -32,8 +32,14 @@ pub struct Look<'a> {
     pub glyphs: &'static Glyphs,
 }
 
+/// The where block's title, which a click hit-tests as the sort key.
+pub const WHERE_TITLE: &str = " where ";
+
+/// The say panel's copy hint, key then label, which a click hit-tests as `y`.
+pub const COPY_HINT: (&str, &str) = (" y", " copy ");
+
 /// The display width of `text`, in terminal columns.
-fn width_of(text: &str) -> usize {
+pub fn width_of(text: &str) -> usize {
     Span::raw(text).width()
 }
 
@@ -82,13 +88,13 @@ fn set_char(buf: &mut Buffer, area: Rect, x: u16, y: u16, c: char, style: Style)
 /// The track's geometry: where it starts, how many cells, and the instant each cell covers.
 ///
 /// The cells split the viewed day evenly, so cell `index` is the same instant in every row.
-struct Track {
-    x: u16,
-    cells: u16,
+pub struct Track {
+    pub x: u16,
+    pub cells: u16,
     /// The label's width: the columns before the track, or the whole line when stacked.
-    label: u16,
+    pub label: u16,
     /// How far below a row's label line its lane sits: 0 side by side, 1 stacked.
-    dy: u16,
+    pub dy: u16,
     start: DateTime<Utc>,
     when: When,
     /// How the range is marked, already fallen back for a theme without colour.
@@ -165,8 +171,13 @@ impl Track {
         self.start + TimeDelta::seconds(seconds)
     }
 
+    /// The grid slot cell `index` starts in, which decides its state.
+    pub fn first_slot(&self, index: u16) -> Slot {
+        Slot::containing(self.cell_start(index))
+    }
+
     /// The grid slots cell `index` overlaps, first to last.
-    fn slots(&self, index: u16) -> impl Iterator<Item = Slot> {
+    pub fn slots(&self, index: u16) -> impl Iterator<Item = Slot> {
         let first = Slot::containing(self.cell_start(index));
         let last = Slot::containing(self.cell_start(index + 1) - TimeDelta::seconds(1));
         (0..=last.since(first).max(0)).map(move |step| first.offset(step))
@@ -184,7 +195,7 @@ impl Track {
     }
 
     /// Whether cell `index` overlaps the range, or holds the cursor's instant.
-    fn selected(&self, index: u16) -> bool {
+    pub fn selected(&self, index: u16) -> bool {
         let (from, to) = (self.cell_start(index), self.cell_start(index + 1));
         match self.when {
             When::At(instant) => from <= instant && instant < to,
@@ -205,31 +216,60 @@ impl Track {
     }
 }
 
-fn map_choice(app: &App, glyphs: &Glyphs) -> MapChoice {
-    match (glyphs.ascii, app.config.map) {
-        (true, _) | (false, MapShow::Never) => MapChoice::Hidden,
-        (false, MapShow::Auto | MapShow::Always) => MapChoice::Auto,
-    }
-}
-
 /// The screen's areas for this frame size and roster.
-pub fn areas(app: &App, glyphs: &Glyphs, size: Rect) -> Areas {
+pub fn areas(app: &App, size: Rect) -> Areas {
     let count = |n: usize| u16::try_from(n).unwrap_or(u16::MAX);
+    let choice = match app.map_view_at(size.width, size.height) {
+        MapView::InPlace => MapChoice::Always,
+        MapView::Hidden | MapView::Overlay => MapChoice::Hidden,
+    };
     layout(
         size.width,
         size.height,
         count(app.roster().people().count()),
         count(app.roster().places().count()),
-        map_choice(app, glyphs),
+        choice,
     )
 }
 
-/// Draws the whole screen.
-pub fn draw(frame: &mut Frame, app: &App, look: Look) {
-    let size = frame.area();
-    let areas = areas(app, look.glyphs, size);
-    let clip = |area: Rect| size.intersection(area);
-    let track = Track {
+/// The map overlay's box: centred, up to twelve map rows inside its border.
+pub fn map_overlay_area(size: Rect) -> Rect {
+    let width = size.width.saturating_sub(4).min(120);
+    let height = size.height.saturating_sub(4).min(14);
+    Rect::new(
+        size.x + (size.width - width) / 2,
+        size.y + (size.height - height) / 2,
+        width,
+        height,
+    )
+}
+
+fn map_overlay(buf: &mut Buffer, size: Rect, app: &App, look: Look) {
+    let theme = look.theme;
+    let area = map_overlay_area(size);
+    Clear.render(area, buf);
+    let block = Block::bordered()
+        .border_set(look.glyphs.rounded)
+        .border_style(theme.fg(Role::Accent))
+        .title(Span::styled(
+            " map ",
+            theme.fg(Role::Text).add_modifier(Modifier::BOLD),
+        ))
+        .title_bottom(
+            Line::from(vec![
+                Span::styled(" esc", theme.fg(Role::Accent)),
+                Span::styled(" close ", theme.fg(Role::Dim)),
+            ])
+            .right_aligned(),
+        );
+    let inner = block.inner(area);
+    block.render(area, buf);
+    super::map::draw(buf, inner, app, look);
+}
+
+/// The track for `areas`: where its cells sit and the instant each covers.
+pub fn track_for(app: &App, areas: &Areas, look: Look) -> Track {
+    Track {
         x: areas.columns.track_x(),
         cells: areas.columns.track(),
         label: areas.columns.label(),
@@ -237,15 +277,30 @@ pub fn draw(frame: &mut Frame, app: &App, look: Look) {
         start: day_start(app.day(), app.roster().axis()),
         when: app.when(),
         marking: without_colour(app.range_style, look.theme.is_mono()),
-    };
+    }
+}
+
+/// Draws the whole screen.
+pub fn draw(frame: &mut Frame, app: &App, look: Look) {
+    let size = frame.area();
+    let areas = areas(app, size);
+    let clip = |area: Rect| size.intersection(area);
+    let track = track_for(app, &areas, look);
     let buf = frame.buffer_mut();
     header(buf, clip(areas.header), app, look);
+    if let Some(area) = areas.map {
+        super::map::draw(buf, clip(area), app, look);
+    }
     slider(buf, clip(areas.slider), app, look, &track);
     who(buf, clip(areas.who), app, look, &track);
     places(buf, clip(areas.place), app, look, &track);
     say_panel(buf, clip(areas.say), app, look);
     notice(buf, clip(areas.notice), app, look);
-    footer_row(buf, clip(areas.footer), app, look);
+    let map_key = app.map_key_at(size.width, size.height);
+    footer_row(buf, clip(areas.footer), app, look, map_key);
+    if app.map_view_at(size.width, size.height) == MapView::Overlay {
+        map_overlay(buf, size, app, look);
+    }
     match app.mode {
         Mode::Help(from) => help_overlay(buf, size, from, look),
         Mode::CopyMenu => copy_dialog(buf, size, app, look),
@@ -253,10 +308,27 @@ pub fn draw(frame: &mut Frame, app: &App, look: Look) {
     }
 }
 
+/// The header's now, as in `Sat 24 Oct 9:04am AEDT`.
+fn now_text(app: &App) -> String {
+    let now = app.now.with_timezone(&app.roster().axis());
+    format!(
+        "{} {} {}",
+        now.format("%a %-d %b"),
+        teamzones_core::copy::clock_text(&now),
+        now.format("%Z")
+    )
+}
+
+/// The header columns the now piece's text covers, after the app name and its gap.
+pub fn header_now_columns(app: &App) -> std::ops::Range<u16> {
+    let start = u16::try_from(width_of("teamzones   now ")).unwrap_or(0);
+    let width = u16::try_from(width_of(&now_text(app))).unwrap_or(0);
+    start..start + width
+}
+
 fn header(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
     let (theme, glyphs) = (look.theme, look.glyphs);
     let axis = app.roster().axis();
-    let now = app.now.with_timezone(&axis);
     let days = (app.day() - app.today()).num_days();
     let mut pieces: Vec<Vec<Span>> = vec![
         vec![Span::styled(
@@ -265,15 +337,7 @@ fn header(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
         )],
         vec![
             Span::styled("   now ", theme.fg(Role::Dim)),
-            Span::styled(
-                format!(
-                    "{} {}",
-                    now.format("%a %-d %b"),
-                    teamzones_core::copy::clock_text(&now)
-                ),
-                theme.fg(Role::Dim),
-            ),
-            Span::styled(format!(" {}", now.format("%Z")), theme.fg(Role::Dim)),
+            Span::styled(now_text(app), theme.fg(Role::Dim)),
         ],
     ];
     if days != 0 {
@@ -733,7 +797,7 @@ fn legend(items: &[(char, Role, &str)], look: Look) -> Line<'static> {
 }
 
 /// The who strip: `who`, then each numbered group with the active one marked and its drift.
-fn strip(app: &App, look: Look) -> Line<'static> {
+pub fn strip(app: &App, look: Look) -> Line<'static> {
     let theme = look.theme;
     let mut spans = vec![Span::styled(
         " who ",
@@ -776,6 +840,11 @@ fn strip(app: &App, look: Look) -> Line<'static> {
     Line::from(spans)
 }
 
+/// Whether a block's legend fits beside its title in `width` columns.
+pub fn legend_fits(title: &Line, legend: &Line, width: u16) -> bool {
+    title.width() + legend.width() + 2 <= usize::from(width)
+}
+
 /// A block's top border: its title, then the legend right-aligned when both fit.
 fn block_with_legend(
     borders: Borders,
@@ -784,7 +853,7 @@ fn block_with_legend(
     width: u16,
     look: Look,
 ) -> Block<'static> {
-    let fits = title.width() + legend.width() + 2 <= usize::from(width);
+    let fits = legend_fits(&title, &legend, width);
     let block = Block::new()
         .borders(borders)
         .border_set(look.glyphs.line)
@@ -797,17 +866,23 @@ fn block_with_legend(
     }
 }
 
-fn who(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
-    let (theme, glyphs) = (look.theme, look.glyphs);
-    let roster = app.roster();
-    let rows = app.who_rows();
-    let lanes: Vec<(PersonId, Vec<(char, Role)>)> = rows
+/// The who border's legend: the bands drawn in the people lanes, in the spec's order.
+pub fn who_legend(app: &App, look: Look, track: &Track) -> Line<'static> {
+    who_legend_of(&who_lanes(app, look, track), look)
+}
+
+fn who_lanes(app: &App, look: Look, track: &Track) -> Vec<(PersonId, Vec<(char, Role)>)> {
+    app.who_rows()
         .iter()
         .filter_map(|row| match row {
             Row::Person(id) => Some((id, person_cells(app, track, look, id))),
             Row::Place(_) => None,
         })
-        .collect();
+        .collect()
+}
+
+fn who_legend_of(lanes: &[(PersonId, Vec<(char, Role)>)], look: Look) -> Line<'static> {
+    let glyphs = look.glyphs;
     let on_screen = |glyph: char| {
         lanes
             .iter()
@@ -823,10 +898,18 @@ fn who(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
     .into_iter()
     .filter(|(glyph, _, _)| on_screen(*glyph))
     .collect();
+    legend(&items, look)
+}
+
+fn who(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
+    let (theme, glyphs) = (look.theme, look.glyphs);
+    let roster = app.roster();
+    let rows = app.who_rows();
+    let lanes = who_lanes(app, look, track);
     block_with_legend(
         Borders::TOP,
         strip(app, look),
-        legend(&items, look),
+        who_legend_of(&lanes, look),
         area.width,
         look,
     )
@@ -921,7 +1004,7 @@ fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
     let roster = app.roster();
     let marks = &app.marks;
     let mut title = vec![Span::styled(
-        " where ",
+        WHERE_TITLE,
         theme.fg(Role::Text).add_modifier(Modifier::BOLD),
     )];
     match (marks.asks_where(), marks.rule, marks.places.is_empty()) {
@@ -1080,8 +1163,8 @@ fn say_panel(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
         .title(Line::from(title))
         .title_top(
             Line::from(vec![
-                Span::styled(" y", theme.fg(Role::Accent)),
-                Span::styled(" copy ", theme.fg(Role::Dim)),
+                Span::styled(COPY_HINT.0, theme.fg(Role::Accent)),
+                Span::styled(COPY_HINT.1, theme.fg(Role::Dim)),
             ])
             .right_aligned(),
         )
@@ -1144,27 +1227,33 @@ fn notice(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
     }
 }
 
-fn footer_row(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
+fn footer_row(buf: &mut Buffer, area: Rect, app: &App, look: Look, map: footer::MapKey) {
     let theme = look.theme;
     let context = context(app);
     let main = context == keys::Context::Main;
     let situation = footer::Situation {
         range: main && app.range.is_some(),
         away: main && !app.at_now(),
+        map,
     };
     let flash = app
         .style_flash
         .as_ref()
         .filter(|flash| flash.visible(app.now))
         .map(|flash| flash.text.as_str());
-    let room = flash.map_or(area.width, |label| {
+    let notes: Vec<&str> = flash
+        .into_iter()
+        .chain((!app.mouse).then_some("mouse off"))
+        .collect();
+    let right = (!notes.is_empty()).then(|| notes.join("  "));
+    let room = right.as_ref().map_or(area.width, |label| {
         area.width
-            .saturating_sub(u16::try_from(label.len() + 2).unwrap_or(u16::MAX))
+            .saturating_sub(u16::try_from(width_of(label) + 2).unwrap_or(u16::MAX))
     });
-    if let Some(label) = flash {
+    if let Some(label) = &right {
         let x = area
             .right()
-            .saturating_sub(u16::try_from(label.len()).unwrap_or(0));
+            .saturating_sub(u16::try_from(width_of(label)).unwrap_or(0));
         put(buf, area, x, area.y, label, theme.fg(Role::Warn));
     }
     let footer::Footer { badge, hints } = footer::line(context, situation, room);
@@ -1197,23 +1286,29 @@ fn footer_row(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
     );
 }
 
-/// The copy-as dialog: each format's key and the line it copies, with a dim description under it,
-/// or one row per format with no descriptions when two rows each would not fit.
-fn copy_dialog(buf: &mut Buffer, size: Rect, app: &App, look: Look) {
-    let theme = look.theme;
-    let rows = app.copy_menu();
+/// The copy-as dialog's box for `rows` formats, and the screen lines each format takes.
+pub fn copy_dialog_area(size: Rect, rows: usize) -> (Rect, u16) {
     let width = size.width.min(110);
-    let tall = u16::try_from(rows.len() * 2 + 2).unwrap_or(u16::MAX);
+    let tall = u16::try_from(rows * 2 + 2).unwrap_or(u16::MAX);
     let step = if tall <= size.height { 2 } else { 1 };
     let height = size
         .height
-        .min(u16::try_from(rows.len() * step + 2).unwrap_or(u16::MAX));
+        .min(u16::try_from(rows * usize::from(step) + 2).unwrap_or(u16::MAX));
     let area = Rect::new(
         size.x + (size.width - width) / 2,
         size.y + (size.height - height) / 2,
         width,
         height,
     );
+    (area, step)
+}
+
+/// The copy-as dialog: each format's key and the line it copies, with a dim description under it,
+/// or one row per format with no descriptions when two rows each would not fit.
+fn copy_dialog(buf: &mut Buffer, size: Rect, app: &App, look: Look) {
+    let theme = look.theme;
+    let rows = app.copy_menu();
+    let (area, step) = copy_dialog_area(size, rows.len());
     Clear.render(area, buf);
     let block = Block::bordered()
         .border_set(look.glyphs.line)
@@ -1234,7 +1329,10 @@ fn copy_dialog(buf: &mut Buffer, size: Rect, app: &App, look: Look) {
     let x = inner.x + 1;
     let room = usize::from(inner.width.saturating_sub(5));
     let mark = look.glyphs.text("…");
-    for ((key, line, about), y) in rows.iter().zip((inner.top()..inner.bottom()).step_by(step)) {
+    for ((key, line, about), y) in rows
+        .iter()
+        .zip((inner.top()..inner.bottom()).step_by(usize::from(step)))
+    {
         let key = look.glyphs.text(&key.to_string());
         put(buf, inner, x, y, &key, theme.fg(Role::Accent));
         let preview = truncate_with_mark(&look.glyphs.text(line), room, &mark);
@@ -1246,19 +1344,25 @@ fn copy_dialog(buf: &mut Buffer, size: Rect, app: &App, look: Look) {
     }
 }
 
-fn help_overlay(buf: &mut Buffer, size: Rect, from: keys::Context, look: Look) {
-    let theme = look.theme;
-    let lines = help::lines(from, look.glyphs);
+/// The help overlay's box for help opened from `from`.
+pub fn help_area(size: Rect, from: keys::Context, look: Look) -> Rect {
+    let lines = help::lines(from, look.glyphs).len();
     let width = size.width.min(96);
     let height = size
         .height
-        .min(u16::try_from(lines.len() + 2).unwrap_or(u16::MAX));
-    let area = Rect::new(
+        .min(u16::try_from(lines + 2).unwrap_or(u16::MAX));
+    Rect::new(
         size.x + (size.width - width) / 2,
         size.y + (size.height - height) / 2,
         width,
         height,
-    );
+    )
+}
+
+fn help_overlay(buf: &mut Buffer, size: Rect, from: keys::Context, look: Look) {
+    let theme = look.theme;
+    let lines = help::lines(from, look.glyphs);
+    let area = help_area(size, from, look);
     Clear.render(area, buf);
     let block = Block::bordered()
         .border_set(look.glyphs.rounded)
