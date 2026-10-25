@@ -1,6 +1,6 @@
 //! Runs the real binary on a real pseudo-terminal and reads back what it wrote, proving it
-//! releases mouse capture, raw mode and the alternate screen on quit and around the editor
-//! handoff. A `TestBackend` never sees these escape sequences, and `rustix` opens the pty
+//! releases mouse capture, raw mode and the alternate screen on quit, around the editor handoff
+//! and on a panic. A `TestBackend` never sees these escape sequences, and `rustix` opens the pty
 //! without any unsafe code.
 
 use std::fs::{File, OpenOptions};
@@ -147,9 +147,9 @@ struct Session {
 }
 
 impl Session {
-    /// Starts teamzones on the fixture at the golden instant, with `env` set and `VISUAL` unset,
-    /// once it has captured the mouse and drawn.
-    fn start(config: &str, env: &[(&str, &str)]) -> Self {
+    /// Starts teamzones on the fixture at the golden instant, with `env` set, `VISUAL` unset and
+    /// the state file in `state_home`, once it has captured the mouse and drawn.
+    fn start(config: &str, state_home: &std::path::Path, env: &[(&str, &str)]) -> Self {
         let (master, slave_path) = open_pty();
         let held = open_slave(&slave_path);
         tcsetwinsize(
@@ -168,6 +168,7 @@ impl Session {
             .args(["--now", "2026-10-23T22:04:00Z"])
             .env("TEAMZONES_CONFIG", config)
             .env("NO_COLOR", "1")
+            .env("XDG_STATE_HOME", state_home)
             .env_remove("VISUAL")
             .envs(env.iter().copied())
             .stdin(Stdio::from(open_slave(&slave_path)))
@@ -200,12 +201,22 @@ impl Session {
     /// Sends `q`, waits for the child to exit and reads to the end; returns all of the output.
     fn quit(mut self) -> String {
         self.send(b"q");
+        self.finish().0
+    }
+
+    /// Waits for the child to exit and reads to the end; returns all of the output and whether
+    /// the terminal was left in canonical (cooked) mode.
+    fn finish(mut self) -> (String, bool) {
         wait_for_exit(&mut self.child);
+        let cooked = rustix::termios::tcgetattr(&self.held)
+            .expect("read the pty's modes")
+            .local_modes
+            .contains(rustix::termios::LocalModes::ICANON);
         drop(self.held);
-        read_until(&self.rx, &mut self.output, "quit", |_, end| {
+        read_until(&self.rx, &mut self.output, "exit", |_, end| {
             matches!(end, Some(End::Eof | End::EofViaEio))
         });
-        String::from_utf8_lossy(&self.output).into_owned()
+        (String::from_utf8_lossy(&self.output).into_owned(), cooked)
     }
 }
 
@@ -213,6 +224,14 @@ const FIXTURE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../teamzones-core/tests/fixtures/sample.toml"
 );
+
+/// A fresh scratch directory for one test.
+fn scratch(name: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("teamzones-pty-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("make a scratch dir");
+    dir
+}
 
 /// Mouse capture off and then the alternate screen left, as crossterm encodes them.
 fn release() -> String {
@@ -225,7 +244,8 @@ fn release() -> String {
 
 #[test]
 fn quitting_releases_mouse_capture_and_then_leaves_the_alternate_screen() {
-    let output = Session::start(FIXTURE, &[]).quit();
+    let dir = scratch("quit");
+    let output = Session::start(FIXTURE, &dir, &[]).quit();
     assert!(
         output.ends_with(&release()),
         "the output ends {:?}",
@@ -252,14 +272,13 @@ fn reporting_editor(dir: &std::path::Path) -> PathBuf {
 
 #[test]
 fn the_editor_gets_a_released_terminal_and_the_tui_takes_it_back_after() {
-    let dir = std::env::temp_dir().join(format!("teamzones-pty-editor-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("make a scratch dir");
+    let dir = scratch("editor");
     let config = dir.join("config.toml");
     std::fs::copy(FIXTURE, &config).expect("copy the fixture");
     let editor = reporting_editor(&dir);
     let mut session = Session::start(
         &config.display().to_string(),
+        &dir,
         &[("EDITOR", &editor.display().to_string())],
     );
     let (enter, capture) = (
@@ -303,4 +322,43 @@ fn a_closed_slave_reads_as_the_end_on_either_platform() {
     let eio = std::io::Error::from_raw_os_error(rustix::io::Errno::IO.raw_os_error());
     assert!(matches!(classify_pty_read(Err(eio)), Err(End::EofViaEio)));
     assert!(matches!(classify_pty_read(Ok(3)), Ok(3)));
+}
+
+#[test]
+fn the_tui_opens_on_the_group_the_state_file_names_and_saves_the_one_it_quits_on() {
+    let dir = scratch("state");
+    let state = dir.join("teamzones").join("state.toml");
+    std::fs::create_dir_all(state.parent().expect("a state dir")).expect("make the state dir");
+    std::fs::write(&state, "# kept\nlast_group = \"deploy\"\n").expect("write the state");
+    let mut session = Session::start(FIXTURE, &dir, &[]);
+    // Deploy's summary in the times box's border, which carries no styling inside it.
+    session.read_until("deploy", |out| {
+        contains(out, "3 zones for 3 people, 2 places")
+    });
+    session.send(b"3");
+    session.quit();
+    assert_eq!(
+        std::fs::read_to_string(&state).expect("read the state back"),
+        "# kept\nlast_group = \"regions\"\n"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_panic_releases_mouse_capture_raw_mode_and_the_alternate_screen() {
+    let dir = scratch("panic");
+    let session = Session::start(FIXTURE, &dir, &[("TEAMZONES_TEST_PANIC", "1")]);
+    let (output, cooked) = session.finish();
+    let (_, after) = output
+        .rsplit_once(&ansi(crossterm::terminal::EnterAlternateScreen))
+        .expect("the alternate screen was entered");
+    let released = after
+        .find(&release())
+        .unwrap_or_else(|| panic!("never released after the panic: {after:?}"));
+    let message = after
+        .find("TEAMZONES_TEST_PANIC")
+        .unwrap_or_else(|| panic!("no panic message: {after:?}"));
+    assert!(released < message, "{after:?}");
+    assert!(cooked, "raw mode was left on");
+    let _ = std::fs::remove_dir_all(&dir);
 }

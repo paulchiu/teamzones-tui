@@ -381,3 +381,19 @@ Decision: On Linux, `y` and `teamzones say` give the line to arboard and also wr
 Why: On Linux the X11 and Wayland selection belongs to the process that set it, so arboard can report success and the clipboard empties when `teamzones say` exits unless a clipboard manager takes it over. Writing OSC 52 as well lets a terminal that supports it keep the line. Keeping the selection alive with a detached helper (arboard's `SetExtLinux::wait`) needs a forked process this binary cannot make without `unsafe`, and dropping `copied` would leave the common clipboard-manager case reporting nothing. Paul has no Linux machine, so CI's Linux runner is what proves the choice: no test there shows the line surviving on a real desktop.
 
 Held by: `clipboard::tests::on_linux_the_terminal_gets_the_text_even_when_the_system_clipboard_takes_it`, `the_running_platform_writes_osc_52_as_well_exactly_when_it_is_linux` (which checks the running OS, so the Linux CI job holds the Linux branch) and `both_succeeds_when_either_takes_the_text_and_fails_with_both_reasons` in `teamzones`
+
+## D47: The state file keeps the last group, and the TUI writes it only on a clean quit (2026-10-25)
+
+Decision: `state.toml` lives under the XDG state directory (`$XDG_STATE_HOME`, else `~/.local/state`) on every platform, as config does. The TUI reads `last_group` before it takes the terminal and opens on that group, matched case-insensitively, or on `0 all` for `all`; a name the config no longer has opens the first group. It writes `last_group` through `toml_edit` when the user quits, keeping every other key and comment, atomically. A state file that exists but cannot be read, does not parse or holds a non-string `last_group` is an error naming the path, exit 2, and since the TUI never starts nothing is written over it. The map override and mouse capture setting the spec also lists are not kept yet. A failed write on quit is reported on stderr and does not change the exit code.
+
+Why: The spec names the file and says the TUI opens on the last used group but not when it is saved or what a stale name does. Saving on quit keeps the write out of the event loop, and a stale name falling back to the first group matches what a closed group does in the session. Absent is not unreadable, so a broken file is never treated as empty.
+
+Held by: the `state::tests` and `tui::tests::the_screen_opens_on_the_saved_last_group_and_on_the_first_without_one` in `teamzones`, and `the_tui_opens_on_the_group_the_state_file_names_and_saves_the_one_it_quits_on` in `crates/teamzones/tests/terminal_restoration.rs`
+
+## D48: Debug builds panic on request so the pty test can hold the panic hook (2026-10-25)
+
+Decision: With `TEAMZONES_TEST_PANIC` set, a debug build panics right after its first frame. Release builds compile the check out entirely. The pty test sets it and asserts that the output releases mouse capture and leaves the alternate screen before the panic message, and that the pty is back in canonical mode.
+
+Why: The panic hook restores the terminal only on a panic, and nothing in the app panics on purpose. A debug-only hook is the smallest way to make the real binary exercise it without shipping a way to crash a release build.
+
+Held by: `a_panic_releases_mouse_capture_raw_mode_and_the_alternate_screen` in `crates/teamzones/tests/terminal_restoration.rs`

@@ -242,6 +242,36 @@ impl App {
         }
     }
 
+    /// The app opened on the group named `last` (or `all`), as the state file saved it; a name
+    /// no longer in the config keeps the first group.
+    pub fn on_group(self, last: Option<&str>) -> Self {
+        let groups = &self.roster().groups;
+        let lens = last.and_then(|name| {
+            if name.eq_ignore_ascii_case("all") {
+                Some(Lens::All)
+            } else {
+                groups
+                    .iter()
+                    .position(|group| group.name.eq_ignore_ascii_case(name))
+                    .map(Lens::Group)
+            }
+        });
+        match lens {
+            Some(lens) => {
+                let app = Self {
+                    marks: base_marks(self.roster(), lens),
+                    lens,
+                    ..self
+                };
+                Self {
+                    camera: framing(&app),
+                    ..app
+                }
+            }
+            None => self,
+        }
+    }
+
     /// Where the map goes on a `cols` by `rows` screen; the ascii glyph set never draws it.
     pub fn map_view_at(&self, cols: u16, rows: u16) -> MapView {
         let ascii = self.ascii();

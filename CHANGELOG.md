@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ### Added
 
+- `teamzones` opens on the group you last quit on, kept in `~/.local/state/teamzones/state.toml`.
 - With no config file, the footer offers `E config` next to the `no config: E creates one` notice.
 
 ### Changed

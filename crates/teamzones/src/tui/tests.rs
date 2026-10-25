@@ -1696,3 +1696,21 @@ fn with_no_config_file_the_notice_says_e_creates_one_and_the_footer_offers_e() {
     let buf = render(&fixture(), 120, 24);
     assert!(!row(&buf, 23).contains("E config"), "{}", row(&buf, 23));
 }
+
+#[test]
+fn the_screen_opens_on_the_saved_last_group_and_on_the_first_without_one() {
+    let title = |app: &App| {
+        let buf = render(app, 120, 36);
+        row(&buf, y_of(&buf, " times for "))
+    };
+    assert!(title(&fixture().on_group(Some("deploy"))).starts_with("╭ times for deploy "));
+    assert!(title(&fixture().on_group(Some("ALL"))).starts_with("╭ times for all "));
+    for last in [None, Some("gone")] {
+        assert!(
+            title(&fixture().on_group(last)).starts_with("╭ times for team "),
+            "{last:?}"
+        );
+    }
+    let deploy = fixture().on_group(Some("deploy"));
+    assert_eq!(deploy.marks, press(fixture(), &chars("4")).marks);
+}
