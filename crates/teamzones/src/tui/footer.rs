@@ -5,13 +5,22 @@ use super::keys::{Context, Hint, PINNED, Shown, hints};
 
 const GAP: usize = 2;
 
-/// What the conditional hints depend on: a committed range, being anywhere but now, and the
-/// map being hidden for want of room.
+/// What the conditional hints depend on: a committed range, being anywhere but now, and what
+/// `m` does for the map.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Situation {
     pub range: bool,
     pub away: bool,
-    pub map_hidden: bool,
+    pub map: MapKey,
+}
+
+/// What `m` does: nothing (the ascii glyph set forces the map off), open the map the hiding rule
+/// found no room for, or flip the map's choice where there is room.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MapKey {
+    Inert,
+    Opens,
+    Flips,
 }
 
 /// One footer: the mode badge, if any, then the hints that fit, in display order.
@@ -52,6 +61,10 @@ fn shows(shown: Shown, situation: Situation) -> bool {
         Shown::Always => true,
         Shown::WithRange => situation.range,
         Shown::AwayFromNow => situation.away,
+        Shown::WithMap => match situation.map {
+            MapKey::Inert => false,
+            MapKey::Opens | MapKey::Flips => true,
+        },
     }
 }
 
@@ -65,7 +78,7 @@ pub fn line(context: Context, situation: Situation, columns: u16) -> Footer {
         .into_iter()
         .filter(|(hint, _)| shows(hint.shown, situation))
         .map(|(hint, priority)| {
-            let raised = hint.raised.filter(|_| situation.map_hidden);
+            let raised = hint.raised.filter(|_| situation.map == MapKey::Opens);
             (hint, raised.unwrap_or(priority))
         })
         .collect();
@@ -113,23 +126,23 @@ mod tests {
     const AT_NOW: Situation = Situation {
         range: false,
         away: false,
-        map_hidden: false,
+        map: MapKey::Flips,
     };
     const AWAY: Situation = Situation {
         range: false,
         away: true,
-        map_hidden: false,
+        map: MapKey::Flips,
     };
     const RANGED: Situation = Situation {
         range: true,
         away: true,
-        map_hidden: false,
+        map: MapKey::Flips,
     };
 
     #[test]
     fn m_drops_first_while_the_map_shows_and_ranks_below_h_l_while_it_is_hidden() {
         let hidden = Situation {
-            map_hidden: true,
+            map: MapKey::Opens,
             ..AWAY
         };
         assert_eq!(
@@ -140,6 +153,15 @@ mod tests {
             at(Context::Main, hidden, 60),
             "h/l time  . now  space mark  y copy  m map  ? help  q quit"
         );
+    }
+
+    #[test]
+    fn m_is_never_offered_while_it_does_nothing() {
+        let inert = Situation {
+            map: MapKey::Inert,
+            ..RANGED
+        };
+        assert!(!at(Context::Main, inert, 200).contains("m map"));
     }
 
     fn at(context: Context, situation: Situation, columns: u16) -> String {

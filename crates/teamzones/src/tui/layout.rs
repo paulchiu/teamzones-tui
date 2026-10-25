@@ -27,13 +27,20 @@ pub fn map_view(
     base: MapChoice,
     flipped: bool,
 ) -> MapView {
-    let shown = |choice| layout(cols, rows, people, places, choice).map.is_some();
-    match (shown(base), flipped) {
+    let shown = layout(cols, rows, people, places, base).map.is_some();
+    match (shown, flipped) {
         (true, false) => MapView::InPlace,
         (true, true) | (false, false) => MapView::Hidden,
-        (false, true) if shown(MapChoice::Auto) => MapView::InPlace,
+        (false, true) if room_for_map(cols, rows, (people, places)) => MapView::InPlace,
         (false, true) => MapView::Overlay,
     }
+}
+
+/// Whether the hiding rule finds room for the map on a `cols` by `rows` screen.
+pub fn room_for_map(cols: u16, rows: u16, (people, places): (u16, u16)) -> bool {
+    layout(cols, rows, people, places, MapChoice::Auto)
+        .map
+        .is_some()
 }
 
 /// How each grid row splits into its label and its track; the track's columns split the viewed

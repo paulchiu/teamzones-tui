@@ -122,3 +122,50 @@ fn a_resize_recomputes_the_choice_and_a_group_switch_never_does() {
         "a resize drops the flip"
     );
 }
+
+/// The footer row of `app`'s frame at the size it last reported.
+fn footer_of(app: &App) -> String {
+    row(&frame(app), app.size.1 - 1)
+}
+
+#[test]
+fn under_ascii_glyphs_the_footer_never_offers_m_which_does_nothing() {
+    let ascii = go_to(
+        App::new(config("glyphs = \"ascii\"\n"), now()),
+        "26 oct 5-6pm",
+    );
+    for (cols, rows) in [(120, 36), (120, 24)] {
+        let app = sized(ascii.clone(), cols, rows);
+        assert!(!footer_of(&app).contains("m map"), "{}", footer_of(&app));
+        assert_eq!(frame(&press(app.clone(), &chars("m"))), frame(&app));
+    }
+}
+
+#[test]
+fn m_ranks_below_h_l_only_while_the_hiding_rule_finds_no_room() {
+    let shown = sized(team_monday(), 100, 36);
+    let hidden = press(shown.clone(), &chars("m"));
+    assert_eq!(footer_of(&hidden), footer_of(&shown));
+    let cramped = sized(team_monday(), 100, 24);
+    assert!(
+        footer_of(&cramped).contains("m map"),
+        "{}",
+        footer_of(&cramped)
+    );
+    assert!(
+        !footer_of(&shown).contains("m map"),
+        "{}",
+        footer_of(&shown)
+    );
+}
+
+#[test]
+fn main_keys_still_work_under_the_map_overlay() {
+    let open = press(sized(team_monday(), 120, 24), &chars("m"));
+    let scrubbed = press(open, &chars("l"));
+    assert_eq!(
+        scrubbed.say_line(),
+        press(team_monday(), &chars("l")).say_line()
+    );
+    assert!(shows_map(&frame(&scrubbed)), "{}", text(&frame(&scrubbed)));
+}

@@ -58,6 +58,7 @@ fn capital_m_releases_the_mouse_and_says_so_until_m_again_recaptures_it() {
 use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use teamzones_core::question::Row;
 
+use crate::tui::keys::BUILT;
 use crate::tui::mouse::{self, Pointer};
 
 /// The app as a 120 by 36 terminal reports itself.
@@ -163,19 +164,22 @@ fn dot() {
 }
 
 fn v_o() {
-    // 2pm is cell 56, column 80; dragging along Paul's lane to column 83 draws 2-3pm.
+    // 2pm is cell 56, column 80; dragging along a lane or the ruler to column 83 draws 2-3pm.
     let lane = y_of(&render(&team(), 120, 36), "⌂ Paul");
-    let held = send(team(), &[left(MouseEventKind::Down, (80, lane))]);
-    let started = msgs(&held, left(MouseEventKind::Drag, (83, lane)));
-    assert_eq!(keys_of(started)[0], key('v'));
-    let drawn = send(
-        held,
-        &[
-            left(MouseEventKind::Drag, (83, lane)),
-            left(MouseEventKind::Up, (83, lane)),
-        ],
-    );
-    assert_eq!(drawn.say_line(), "2-3pm AEDT / 1-2pm AEST / 5-6am SAST");
+    let ruler = y_of(&render(&team(), 120, 36), "Mon 26 Oct AEDT");
+    for y in [lane, ruler] {
+        let held = send(team(), &[left(MouseEventKind::Down, (80, y))]);
+        let started = msgs(&held, left(MouseEventKind::Drag, (83, y)));
+        assert_eq!(keys_of(started)[0], key('v'));
+        let drawn = send(
+            held,
+            &[
+                left(MouseEventKind::Drag, (83, y)),
+                left(MouseEventKind::Up, (83, y)),
+            ],
+        );
+        assert_eq!(drawn.say_line(), "2-3pm AEDT / 1-2pm AEST / 5-6am SAST");
+    }
 }
 
 fn edges() {
@@ -203,11 +207,13 @@ fn n_n() {
 }
 
 fn esc() {
+    let corner = left(MouseEventKind::Down, (0, 0));
     let dialog = press(team(), &chars("c"));
-    assert_eq!(
-        msgs(&dialog, left(MouseEventKind::Down, (0, 0))),
-        [Msg::Key(Key::Esc)]
-    );
+    assert_eq!(msgs(&dialog, corner), [Msg::Key(Key::Esc)]);
+    let help = press(team(), &chars("?"));
+    assert_eq!(msgs(&help, corner), [Msg::Key(Key::Esc)]);
+    let map = press(update(team_monday(), Msg::Resize(120, 24)).0, &chars("m"));
+    assert_eq!(msgs(&map, corner), [Msg::Key(Key::Esc)]);
 }
 
 fn focus_rows() {
@@ -236,6 +242,53 @@ fn groups() {
     );
     let all = find(&team(), "all");
     assert_eq!(msgs(&team(), left(MouseEventKind::Down, all)), [key('0')]);
+}
+
+#[test]
+fn the_drift_tag_and_the_gap_after_the_last_name_are_inert_until_write_back() {
+    let drifted = press(focus_on(team(), "UK"), &chars(" "));
+    let tag = find(&drifted, "+@UK");
+    assert_eq!(msgs(&drifted, left(MouseEventKind::Down, tag)), []);
+    let (x, y) = find(&team(), "0 all");
+    let gap = (x + 5, y);
+    assert_eq!(msgs(&team(), left(MouseEventKind::Down, gap)), []);
+}
+
+#[test]
+fn the_wheel_scrubs_under_the_map_overlay_and_a_click_inside_it_does_nothing() {
+    let open = press(update(team_monday(), Msg::Resize(120, 24)).0, &chars("m"));
+    let inside = (60, 12);
+    assert_eq!(
+        msgs(
+            &open,
+            event(MouseEventKind::ScrollDown, inside, KeyModifiers::NONE)
+        ),
+        [key('l')]
+    );
+    assert_eq!(msgs(&open, left(MouseEventKind::Down, inside)), []);
+}
+
+/// A terminal whose every mouse capture switch fails.
+struct Broken;
+
+impl Modes for Broken {
+    fn capture_mouse(&mut self, _on: bool) -> std::io::Result<()> {
+        Err(std::io::Error::other("no tty"))
+    }
+}
+
+#[test]
+fn a_failed_capture_switch_keeps_the_footer_true_to_the_terminal() {
+    let (pressed, effects) = press_all(fixture(), &chars("M"));
+    let failed = effects.into_iter().fold(pressed, |app, effect| {
+        update(app, run_effect(effect, &mut NoClipboard, &mut Broken)).0
+    });
+    assert!(failed.mouse, "the terminal still captures the mouse");
+    assert!(
+        !footer(&failed).contains("mouse off"),
+        "{}",
+        footer(&failed)
+    );
 }
 
 fn undo() {
@@ -299,7 +352,7 @@ fn built_mouse_rows() -> Vec<String> {
         .skip(2)
         .filter_map(|line| {
             let cells: Vec<&str> = line.trim_matches('|').split(" | ").map(str::trim).collect();
-            let built = ["M3", "M4", "FB2"].iter().any(|m| cells[3].contains(m));
+            let built = BUILT.iter().any(|m| cells[3].contains(m));
             (built && cells[2] != "none").then(|| cells[0].to_owned())
         })
         .collect()

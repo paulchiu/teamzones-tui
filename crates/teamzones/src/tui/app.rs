@@ -6,9 +6,10 @@ use teamzones_core::config::{Config, MapShow, PersonId, RangeStyle, Roster};
 use teamzones_core::copy::{Format, Who, format_line};
 use teamzones_core::question::{Marks, Row};
 
+use super::footer::MapKey;
 use super::glyphs::Glyphs;
 use super::keys::{Context, Sort};
-use super::layout::{MapChoice, MapView, map_view};
+use super::layout::{MapChoice, MapView, map_view, room_for_map};
 use super::mouse::Drag;
 use super::notice::Notice;
 
@@ -186,18 +187,44 @@ impl App {
 
     /// Where the map goes on a `cols` by `rows` screen; the ascii glyph set never draws it.
     pub fn map_view_at(&self, cols: u16, rows: u16) -> MapView {
-        let count = |n: usize| u16::try_from(n).unwrap_or(u16::MAX);
-        let base = match (Glyphs::of(self.config.theme.glyphs).ascii, self.config.map) {
+        let ascii = self.ascii();
+        let base = match (ascii, self.config.map) {
             (true, _) | (false, MapShow::Never) => MapChoice::Hidden,
             (false, MapShow::Auto) => MapChoice::Auto,
             (false, MapShow::Always) => MapChoice::Always,
         };
-        let ascii = Glyphs::of(self.config.theme.glyphs).ascii;
-        let roster = (
+        map_view(
+            cols,
+            rows,
+            self.roster_size(),
+            base,
+            self.map_flipped && !ascii,
+        )
+    }
+
+    /// What `m` does on a `cols` by `rows` screen, which decides the footer's `m` hint.
+    pub fn map_key_at(&self, cols: u16, rows: u16) -> MapKey {
+        let room = room_for_map(cols, rows, self.roster_size());
+        match (self.ascii(), self.map_view_at(cols, rows), room) {
+            (true, _, _) => MapKey::Inert,
+            (false, MapView::InPlace, _) | (false, MapView::Hidden | MapView::Overlay, true) => {
+                MapKey::Flips
+            }
+            (false, MapView::Hidden | MapView::Overlay, false) => MapKey::Opens,
+        }
+    }
+
+    fn ascii(&self) -> bool {
+        Glyphs::of(self.config.theme.glyphs).ascii
+    }
+
+    /// The whole roster's people and places, which size the blocks.
+    fn roster_size(&self) -> (u16, u16) {
+        let count = |n: usize| u16::try_from(n).unwrap_or(u16::MAX);
+        (
             count(self.roster().people().count()),
             count(self.roster().places().count()),
-        );
-        map_view(cols, rows, roster, base, self.map_flipped && !ascii)
+        )
     }
 
     /// Where the map goes at the size the terminal last reported.

@@ -32,6 +32,12 @@ pub struct Look<'a> {
     pub glyphs: &'static Glyphs,
 }
 
+/// The where block's title, which a click hit-tests as the sort key.
+pub const WHERE_TITLE: &str = " where ";
+
+/// The say panel's copy hint, key then label, which a click hit-tests as `y`.
+pub const COPY_HINT: (&str, &str) = (" y", " copy ");
+
 /// The display width of `text`, in terminal columns.
 pub fn width_of(text: &str) -> usize {
     Span::raw(text).width()
@@ -290,7 +296,8 @@ pub fn draw(frame: &mut Frame, app: &App, look: Look) {
     places(buf, clip(areas.place), app, look, &track);
     say_panel(buf, clip(areas.say), app, look);
     notice(buf, clip(areas.notice), app, look);
-    footer_row(buf, clip(areas.footer), app, look, areas.map.is_none());
+    let map_key = app.map_key_at(size.width, size.height);
+    footer_row(buf, clip(areas.footer), app, look, map_key);
     if app.map_view_at(size.width, size.height) == MapView::Overlay {
         map_overlay(buf, size, app, look);
     }
@@ -997,7 +1004,7 @@ fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
     let roster = app.roster();
     let marks = &app.marks;
     let mut title = vec![Span::styled(
-        " where ",
+        WHERE_TITLE,
         theme.fg(Role::Text).add_modifier(Modifier::BOLD),
     )];
     match (marks.asks_where(), marks.rule, marks.places.is_empty()) {
@@ -1156,8 +1163,8 @@ fn say_panel(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
         .title(Line::from(title))
         .title_top(
             Line::from(vec![
-                Span::styled(" y", theme.fg(Role::Accent)),
-                Span::styled(" copy ", theme.fg(Role::Dim)),
+                Span::styled(COPY_HINT.0, theme.fg(Role::Accent)),
+                Span::styled(COPY_HINT.1, theme.fg(Role::Dim)),
             ])
             .right_aligned(),
         )
@@ -1220,14 +1227,14 @@ fn notice(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
     }
 }
 
-fn footer_row(buf: &mut Buffer, area: Rect, app: &App, look: Look, map_hidden: bool) {
+fn footer_row(buf: &mut Buffer, area: Rect, app: &App, look: Look, map: footer::MapKey) {
     let theme = look.theme;
     let context = context(app);
     let main = context == keys::Context::Main;
     let situation = footer::Situation {
         range: main && app.range.is_some(),
         away: main && !app.at_now(),
-        map_hidden,
+        map,
     };
     let flash = app
         .style_flash
@@ -1241,12 +1248,12 @@ fn footer_row(buf: &mut Buffer, area: Rect, app: &App, look: Look, map_hidden: b
     let right = (!notes.is_empty()).then(|| notes.join("  "));
     let room = right.as_ref().map_or(area.width, |label| {
         area.width
-            .saturating_sub(u16::try_from(label.len() + 2).unwrap_or(u16::MAX))
+            .saturating_sub(u16::try_from(width_of(label) + 2).unwrap_or(u16::MAX))
     });
     if let Some(label) = &right {
         let x = area
             .right()
-            .saturating_sub(u16::try_from(label.len()).unwrap_or(0));
+            .saturating_sub(u16::try_from(width_of(label)).unwrap_or(0));
         put(buf, area, x, area.y, label, theme.fg(Role::Warn));
     }
     let footer::Footer { badge, hints } = footer::line(context, situation, room);
@@ -1279,8 +1286,6 @@ fn footer_row(buf: &mut Buffer, area: Rect, app: &App, look: Look, map_hidden: b
     );
 }
 
-/// The copy-as dialog: each format's key and the line it copies, with a dim description under it,
-/// or one row per format with no descriptions when two rows each would not fit.
 /// The copy-as dialog's box for `rows` formats, and the screen lines each format takes.
 pub fn copy_dialog_area(size: Rect, rows: usize) -> (Rect, u16) {
     let width = size.width.min(110);
@@ -1298,6 +1303,8 @@ pub fn copy_dialog_area(size: Rect, rows: usize) -> (Rect, u16) {
     (area, step)
 }
 
+/// The copy-as dialog: each format's key and the line it copies, with a dim description under it,
+/// or one row per format with no descriptions when two rows each would not fit.
 fn copy_dialog(buf: &mut Buffer, size: Rect, app: &App, look: Look) {
     let theme = look.theme;
     let rows = app.copy_menu();

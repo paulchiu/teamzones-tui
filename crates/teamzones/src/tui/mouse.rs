@@ -120,10 +120,17 @@ pub fn msgs(app: &App, pointer: Pointer) -> Vec<Msg> {
             vec![Msg::Key(Key::Esc)]
         }
         Mode::Normal if app.map_view() == MapView::Overlay => {
-            if outside(view::map_overlay_area(size)) {
-                vec![Msg::Key(Key::Esc)]
-            } else {
-                Vec::new()
+            let area = view::map_overlay_area(size);
+            match pointer.kind {
+                Kind::Down if area.contains(at) => Vec::new(),
+                Kind::Down => vec![Msg::Key(Key::Esc)],
+                Kind::Drag
+                | Kind::Up
+                | Kind::ScrollUp
+                | Kind::ScrollDown
+                | Kind::ScrollLeft
+                | Kind::ScrollRight
+                | Kind::Other => main(app, look, size, pointer),
             }
         }
         Mode::Normal => main(app, look, size, pointer),
@@ -211,7 +218,7 @@ fn main(app: &App, look: Look, size: Rect, pointer: Pointer) -> Vec<Msg> {
 }
 
 /// The key a click on the who strip stands for: `s` on its title, a group's number on its name
-/// or number, and `b` on the legend.
+/// or number, and `b` on the legend; the drift tag and the trailing gap send nothing.
 fn strip_click(app: &App, look: Look, areas: &Areas, track: &Track, x: u16) -> Option<Msg> {
     let strip = view::strip(app, look);
     let legend = view::who_legend(app, look, track);
@@ -222,11 +229,12 @@ fn strip_click(app: &App, look: Look, areas: &Areas, track: &Track, x: u16) -> O
         return Some(key('b'));
     }
     let mut left = areas.who.x;
-    let mut number = None;
+    let mut after_digit = None;
     for (index, span) in strip.spans.iter().enumerate() {
         let width = u16::try_from(span.width()).unwrap_or(u16::MAX);
         let digit = span.content.trim().parse::<u8>().ok();
-        number = digit.or(number);
+        let number = digit.or(after_digit);
+        after_digit = digit;
         if (left..left + width).contains(&x) {
             return match (index, number) {
                 (0, _) => Some(key('s')),
@@ -270,10 +278,13 @@ fn down(app: &App, look: Look, areas: &Areas, track: &Track, pointer: Pointer) -
             .into_iter()
             .collect();
     }
-    if y == areas.place.y && x < areas.place.x + 7 {
+    let where_width = u16::try_from(view::width_of(view::WHERE_TITLE)).unwrap_or(0);
+    if y == areas.place.y && x < areas.place.x + where_width {
         return vec![key('s')];
     }
-    let copy_hint = 8;
+    let (copy_key, copy_label) = view::COPY_HINT;
+    let copy_hint =
+        u16::try_from(view::width_of(copy_key) + view::width_of(copy_label)).unwrap_or(0);
     let say_title = areas.say.y + 1;
     let copy_right = areas.say.right().saturating_sub(1);
     if y == say_title && (copy_right.saturating_sub(copy_hint)..copy_right).contains(&x) {

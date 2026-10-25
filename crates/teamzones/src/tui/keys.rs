@@ -110,7 +110,7 @@ pub struct Hint {
     pub keys: &'static str,
     pub label: &'static str,
     pub shown: Shown,
-    /// The priority it takes instead while the map is hidden for want of room.
+    /// The priority it takes instead while `m` opens a map the hiding rule found no room for.
     pub raised: Option<u8>,
 }
 
@@ -122,6 +122,8 @@ pub enum Shown {
     WithRange,
     /// Only while the cursor or range is anywhere other than now.
     AwayFromNow,
+    /// Only while `m` can draw the map.
+    WithMap,
 }
 
 /// One row of the binding table; the main and global rows mirror `docs/spec/keys.md` row for row.
@@ -145,6 +147,10 @@ pub struct Binding {
     pub chords: &'static [(Key, Action)],
 }
 
+/// The milestones built so far: M3, M4 and the hands-on feedback rounds after M3.
+#[cfg(test)]
+pub const BUILT: [&str; 3] = ["M3", "M4", "FB2"];
+
 /// A footer priority that never drops.
 pub const PINNED: u8 = u8::MAX;
 
@@ -165,6 +171,9 @@ const fn hint_when(keys: &'static str, label: &'static str, shown: Shown) -> Hin
         raised: None,
     }
 }
+
+/// The footer priority of `h/l`, which `m` ranks just below while the map has no room.
+const TIME: u8 = 7;
 
 /// The footer priority of a mode hint: below the pinned ones, above everything else.
 const MODE: u8 = 200;
@@ -203,7 +212,7 @@ const GROUP_CHORDS: [(Key, Action); 10] = [
 pub const BINDINGS: &[Binding] = &[
     Binding {
         hints: &[hint("h/l", "time")],
-        priority: 7,
+        priority: TIME,
         chords: &[
             (Key::Char('h'), Action::Earlier(1)),
             (Key::Char('l'), Action::Later(1)),
@@ -414,8 +423,8 @@ pub const BINDINGS: &[Binding] = &[
     },
     Binding {
         hints: &[Hint {
-            raised: Some(6),
-            ..hint("m", "map")
+            raised: Some(TIME - 1),
+            ..hint_when("m", "map", Shown::WithMap)
         }],
         chords: &[(Key::Char('m'), Action::FlipMap)],
         ..row(
@@ -667,9 +676,6 @@ mod tests {
             .collect();
         assert_eq!(compiled, spec_rows());
     }
-
-    /// The milestones built so far: M3, M4 and the hands-on feedback rounds after M3.
-    const BUILT: [&str; 3] = ["M3", "M4", "FB2"];
 
     #[test]
     fn a_row_dispatches_only_when_its_milestone_is_built() {

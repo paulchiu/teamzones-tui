@@ -39,8 +39,11 @@ pub enum Msg {
     Reload(Box<Config>),
     /// The terminal is now this many columns and rows.
     Resize(u16, u16),
-    /// Whether switching mouse capture worked.
-    Captured(Result<(), String>),
+    /// Whether switching mouse capture to `on` worked.
+    Captured {
+        on: bool,
+        result: Result<(), String>,
+    },
     /// A pointer event, which stands for the messages its keymap row's key would send.
     Mouse(Pointer),
     /// Focus this row.
@@ -119,14 +122,15 @@ pub fn update(app: App, msg: Msg) -> (App, Vec<Effect>) {
         ),
         Msg::Run(slot) => (run_at(app, slot), Vec::new()),
         Msg::Drag(drag) => (App { drag, ..app }, Vec::new()),
-        Msg::Captured(result) => {
+        Msg::Captured { on, result } => {
             let now = app.now;
             match result {
                 Ok(()) => (app, Vec::new()),
-                Err(error) => (
-                    with_notice(app, "M", &format!("mouse capture failed: {error}"), now),
-                    Vec::new(),
-                ),
+                Err(error) => {
+                    let kept = App { mouse: !on, ..app };
+                    let text = format!("mouse capture failed: {error}");
+                    (with_notice(kept, "M", &text, now), Vec::new())
+                }
             }
         }
         Msg::Reload(config) => (

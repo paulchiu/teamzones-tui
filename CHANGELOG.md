@@ -15,7 +15,7 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ### Changed
 
-- The footer offers `m map`, and keeps it ahead of other hints while the map is hidden for want of room.
+- The footer offers `m map`, and keeps it ahead of other hints while the map is hidden for want of room. With `glyphs = "ascii"`, which forces the map off, it leaves `m map` out.
 
 ## [0.7.0] - 2026-10-25
 

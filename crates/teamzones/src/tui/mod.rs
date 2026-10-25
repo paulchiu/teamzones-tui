@@ -49,9 +49,10 @@ pub trait Modes {
 /// Runs one effect and returns the message carrying its result.
 fn run_effect(effect: Effect, clipboard: &mut dyn Clipboard, modes: &mut dyn Modes) -> Msg {
     match effect {
-        Effect::CaptureMouse(on) => {
-            Msg::Captured(modes.capture_mouse(on).map_err(|error| error.to_string()))
-        }
+        Effect::CaptureMouse(on) => Msg::Captured {
+            on,
+            result: modes.capture_mouse(on).map_err(|error| error.to_string()),
+        },
         Effect::Copy { key, text } => Msg::Copied {
             result: clipboard.copy(&text),
             key,

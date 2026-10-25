@@ -248,7 +248,7 @@ Decision: `m` flips the map's automatic choice only until the terminal is resize
 
 Why: Keeping a flip across a resize would turn a map hidden at 120x36 into an overlay at 120x24, which nobody asked for. A modal overlay would add a context whose only key is `esc`, and scrubbing under the map is the point of opening it.
 
-Held by: `tui::layout::tests::m_flips_each_configured_choice_to_the_other_or_to_an_overlay_without_room` and the `tui::tests::map` hide, overlay and resize tests in `teamzones`
+Held by: `tui::layout::tests::m_flips_each_configured_choice_to_the_other_or_to_an_overlay_without_room`, the `tui::tests::map` hide, overlay and resize tests, `tui::tests::map::main_keys_still_work_under_the_map_overlay` and `tui::tests::mouse::the_wheel_scrubs_under_the_map_overlay_and_a_click_inside_it_does_nothing` in `teamzones`
 
 ## D31: Every built mouse equivalent sends its key's messages (2026-10-25)
 
