@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-25
+
 ### Added
 
 - A world map above the timeline shows the night side and the sun for the time you are viewing, with a marker for everyone and every place, labelled with each counted city's local time and each counted place's state, as in `UK closed 3-5am`.

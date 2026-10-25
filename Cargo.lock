@@ -1916,7 +1916,7 @@ dependencies = [
 
 [[package]]
 name = "teamzones"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "arboard",
  "assert_cmd",
@@ -1936,7 +1936,7 @@ dependencies = [
 
 [[package]]
 name = "teamzones-core"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "chrono",
  "chrono-tz",
