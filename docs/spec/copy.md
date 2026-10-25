@@ -15,12 +15,29 @@ Seeded from the shared contract of the teamzones build spec (2026-10-24). Where 
 * **Variants**:
   + `c d` prefixes the axis zone's date, as in `"Mon 26 Oct, "` (the date, a comma and a space).
   + `c w` adds names after each zone entry, as in `(Paul)` or `(Priya, Sam)`, with home's name included.
-  + `c t` is only the focused row's entry, followed by the axis entry in parentheses, with no clause.
+  + `c t` is only the focused row's entry, followed by the axis entry in parentheses, with no clause. When both render the same time (the focused row is in the axis zone), the entry appears once, with no parentheses.
   + `c z` replaces the clause with the counted places' zone entries.
   + `c s` drops the clause.
   + `c a` is the line for `0 all`.
+* **No repeats**: entries that render identically are always merged, so no line names the same time twice.
 
-The `c` menu applies one variant at a time, and previews each variant's line before you pick it (`y` in the menu is the plain line). CLI flags can combine, applied in the order date prefix, names, then clause handling.
+The `c` menu applies one format at a time, and previews each format's line before you pick it. CLI flags can combine, applied in the order date prefix, names, then clause handling.
+
+## Formats
+
+Each copy-as format is data: a dialog `key`, a `label` (the dialog's description), `who` (`marked`, `all` for the `0 all` line, or `focused-first` for the focused row's entry before the axis entry in parentheses), `date`, `names` and `places` (`states` for the clause, `zones` for the places' zone entries, `none` for neither). The built-ins, in dialog order:
+
+| Key | Label | who | date | names | places |
+| --- | --- | --- | --- | --- | --- |
+| `y` | the times | marked | no | no | states |
+| `d` | with the date | marked | yes | no | states |
+| `w` | with names | marked | no | yes | states |
+| `t` | the focused row's time first | focused-first | no | no | none |
+| `z` | with each place's time instead of its state | marked | no | no | zones |
+| `s` | times only | marked | no | no | none |
+| `a` | for everyone | all | no | no | states |
+
+`[[copy]]` tables in config add, replace or hide formats ([config](config.md)). One format is the default (`y` unless config says otherwise): its line is the `times for <group>` box line, what `y` copies, and what `teamzones say` prints, with say's flags adding to it. A `focused-first` format cannot be the default, because `say` has no focused row. Labels are plain words, never internal terms such as `ttz` or `clause`.
 
 ## Copy golden table
 

@@ -176,8 +176,42 @@ Held by: `tui::tests::each_copy_as_key_copies_its_preview_and_closes_the_dialog`
 
 ## D22: The range's columns may carry the selection background, provisionally (2026-10-25)
 
+Superseded by D26, which makes the range style a user setting and keeps `columns` as the default.
+
 Decision: The selection background covers the focused row and the range's columns (every lane, the ruler and the answer rows), as the mockups always drew it. This is provisional: the shading is hard to read, so with `TEAMZONES_DEBUG=1`, `F2` cycles five range-marking styles (columns, edges, lines, underline, dim) and the footer names the current one. Under `NO_COLOR` the styles that need colour (columns, edges and dim) fall back to lines. The choice is local and never saved. Once Paul picks a style, a follow-up removes the others and the debug key. See [theme](spec/theme.md).
 
 Why: The theme text said the selected row was the only background, while the screen mockups shaded the range's columns too. Paul kept the shading at the hands-on round after M3, pending a side-by-side comparison.
 
 Held by: `tui::tests::each_range_style_marks_the_range_its_own_way`, `under_no_color_the_styles_that_need_colour_fall_back_to_edge_lines` and `f2_cycles_the_range_styles_only_in_debug_and_the_footer_names_the_style` in `teamzones`
+
+## D23: Copy-as formats are data, and the default one is the times box, y and say (2026-10-25)
+
+Decision: Every copy-as format is a value (key, label, who, date, names, places), the built-ins `y d w t z s a` included, and `[[copy]]` tables add, replace or hide them. Exactly one format is the default, and its line is the `times for <group>` box, what `y` copies and what `teamzones say` prints, with say's flags adding to it. A `focused-first` format cannot be the default, because `say` has no focused row. The keys `?` and `q` are kept for the dialog. Labels are plain words. See [copy](spec/copy.md#formats) and [config](spec/config.md#data-model-and-config).
+
+Why: Paul asked to define and override formats at the second hands-on round. The issue's proposed names were kept (`who = "focused-first"`, `places = "states" | "zones" | "none"`). A focused-first default was rejected rather than given a CLI meaning, since any meaning for it in `say` would be a guess. An override of `y` that leaves `default` unset keeps `y` the default, so relabelling it is not an error, while `default = false` on it, or hiding it, with no other default is rejected.
+
+Held by: the `[[copy]]` tests in `config::tests` in `teamzones-core`, `write::tests::the_uncommented_copy_tables_are_exactly_the_built_in_formats`, `tui::keys::tests::the_keys_copy_formats_may_not_use_are_the_global_keys_the_dialog_keeps`, `tui::tests::the_default_format_is_the_times_box_line_and_what_y_copies` and the copy-table dialog tests in `teamzones`, and `say_prints_the_default_copy_format_and_its_flags_add_to_it` in `crates/teamzones/tests/cli.rs`
+
+## D24: No copy line names the same time twice, and the dialog never repeats a line (2026-10-25)
+
+Decision: Zone entries that render identically are merged in every format, so `t` with a row in the axis zone copies its time once. The copy-as dialog leaves out a format whose line equals an earlier row's, and that format's key still copies the line.
+
+Why: On a group with no places, `y`, `z` and `s` showed three identical rows, and `t` on home copied `10:30-11:15am AEDT (10:30-11:15am AEDT)`.
+
+Held by: `copy::tests::the_focus_line_for_a_row_in_the_axis_zone_names_the_time_once` in `teamzones-core`, and `tui::tests::a_hidden_duplicate_row_s_key_still_copies_the_same_line` and `t_with_home_focused_copies_the_time_once` in `teamzones`
+
+## D25: llms.txt names every config field (2026-10-25)
+
+Decision: `llms.txt` at the repo root teaches a coding agent to write a config, gathering colleagues' cities, zones and hours from real sources, and it names every field the config parser accepts.
+
+Why: An agent writing a config for its user needs one page, and a page that lags the parser teaches fields that no longer exist or misses new ones.
+
+Held by: `config::tests::llms_txt_names_every_field_the_config_accepts` in `teamzones-core`, which reads the field lists from the parser's own tables
+
+## D26: The range style is a user setting, and columns stays the default (2026-10-25)
+
+Decision: `[theme] range` picks how the range is marked (`columns`, `edges`, `lines`, `underline` or `focus`), defaulting to `columns`. `R` cycles it for the session without writing config, and the footer names the new style briefly. `TEAMZONES_DEBUG` and `F2` are gone. The `NO_COLOR` fallbacks from D22 still hold. The style D22 called `dim` is `focus`, the name Paul used. See [theme](spec/theme.md).
+
+Why: `F2` behind a debug variable was awkward to reach, and Paul wanted the styles as a real choice rather than a pending pick.
+
+Held by: `config::tests::theme_range_picks_the_range_style_and_defaults_to_columns` in `teamzones-core`, and `tui::tests::capital_r_cycles_the_range_style_for_the_session_and_the_footer_names_it_briefly`, `each_range_style_marks_the_range_its_own_way` and `under_no_color_the_styles_that_need_colour_fall_back_to_edge_lines` in `teamzones`
