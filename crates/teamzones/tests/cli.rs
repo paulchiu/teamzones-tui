@@ -496,3 +496,48 @@ fn say_and_status_use_a_profile_s_labels() {
         "{stdout}"
     );
 }
+
+/// A copy of the fixture with `tables` appended.
+fn fixture_with(name: &str, tables: &str) -> std::path::PathBuf {
+    let (path, original) = fixture_copy(name);
+    std::fs::write(&path, format!("{original}{tables}")).unwrap();
+    path
+}
+
+#[test]
+fn say_prints_the_default_copy_format_and_its_flags_add_to_it() {
+    let path = fixture_with(
+        "say-default-format",
+        "\n[[copy]]\nkey = \"n\"\nlabel = \"named\"\nnames = true\ndefault = true\n",
+    );
+    teamzones_on(&path)
+        .args(["say", "au", "3pm", "--no-copy"])
+        .assert()
+        .success()
+        .stdout("3pm AEDT (Paul) / 2pm AEST (Priya, Sam)\n");
+    teamzones_on(&path)
+        .args(["say", "au", "3pm", "--date", "--no-copy"])
+        .assert()
+        .success()
+        .stdout("Sat 24 Oct, 3pm AEDT (Paul) / 2pm AEST (Priya, Sam)\n");
+}
+
+#[test]
+fn config_check_rejects_a_second_default_copy_format() {
+    let path = fixture_with(
+        "check-two-defaults",
+        "\n[[copy]]\nkey = \"d\"\nlabel = \"dated\"\ndefault = true\n\n[[copy]]\nkey = \"n\"\nlabel = \"named\"\ndefault = true\n",
+    );
+    let text = std::fs::read_to_string(&path).unwrap();
+    let line = |needle: &str| text.lines().position(|l| l == needle).unwrap() + 1;
+    teamzones_on(&path)
+        .args(["config", "check"])
+        .assert()
+        .code(2)
+        .stderr(format!(
+            "{}: line {}: a second default copy format; \"d\" on line {} is already the default\n",
+            path.display(),
+            line("key = \"n\""),
+            line("key = \"d\""),
+        ));
+}

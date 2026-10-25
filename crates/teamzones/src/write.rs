@@ -169,6 +169,12 @@ mod tests {
     }
 
     #[test]
+    fn the_uncommented_copy_tables_are_exactly_the_built_in_formats() {
+        let config = Config::parse(&uncommented()).unwrap();
+        assert_eq!(config.copy, teamzones_core::copy::Formats::builtin());
+    }
+
+    #[test]
     fn the_uncommented_home_days_and_group_where_are_the_defaults_they_name() {
         let full = uncommented();
         let without_days = full.replacen("days = \"Mon-Fri\"\n", "", 1);
