@@ -1698,6 +1698,27 @@ fn with_no_config_file_the_notice_says_e_creates_one_and_the_footer_offers_e() {
 }
 
 #[test]
+fn a_reload_that_finds_a_config_file_takes_e_config_out_of_the_footer() {
+    let config = Config::load(None, chrono_tz::Australia::Melbourne).unwrap();
+    let app = App::new(config, now()).with_source(None);
+    assert!(row(&render(&app, 120, 24), 23).contains("E config"));
+    let loaded = super::editor::Loaded {
+        config: Config::parse(FIXTURE).unwrap(),
+        text: Some(FIXTURE.to_owned()),
+    };
+    let reloaded = update(
+        app,
+        Msg::Reloaded {
+            key: "r".to_owned(),
+            result: Ok(Box::new(loaded)),
+        },
+    )
+    .0;
+    let footer = row(&render(&reloaded, 120, 24), 23);
+    assert!(!footer.contains("E config"), "{footer}");
+}
+
+#[test]
 fn the_screen_opens_on_the_saved_last_group_and_on_the_first_without_one() {
     let title = |app: &App| {
         let buf = render(app, 120, 36);

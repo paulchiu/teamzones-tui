@@ -345,6 +345,10 @@ fn the_tui_opens_on_the_group_the_state_file_names_and_saves_the_one_it_quits_on
 }
 
 #[test]
+#[cfg_attr(
+    not(debug_assertions),
+    ignore = "the panic hook trigger is debug-only (D48)"
+)]
 fn a_panic_releases_mouse_capture_raw_mode_and_the_alternate_screen() {
     let dir = scratch("panic");
     let session = Session::start(FIXTURE, &dir, &[("TEAMZONES_TEST_PANIC", "1")]);

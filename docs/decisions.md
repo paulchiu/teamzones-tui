@@ -154,6 +154,8 @@ Held by: `tui::tests::the_city_column_shows_the_whole_city_when_the_label_has_ro
 
 ## D19: The copy box holds only what y copies (2026-10-25)
 
+Superseded in part by D45: the detail line sits directly above the box only when there are no spare rows.
+
 Decision: The box at the bottom is titled `times for <group>` and contains only the say line. The focused row's detail sits on its own dim line directly above it, and the summary sits in the box's bottom border, so nothing inside the box is left out of the copy. See the say panel in [screen](spec/screen.md).
 
 Why: With the detail inside a border that said `y copies this line`, the box read as if all of it was copied.
@@ -246,6 +248,8 @@ Held by: `tui::layout::tests::from_80_columns_the_label_never_outgrows_the_track
 
 ## D30: m flips the map until the next resize, and the overlay is not a modal (2026-10-25)
 
+Superseded in part by D45: `[map] show = "always"` needs two spare rows, since one always sits over the times box.
+
 Decision: `m` flips the map's automatic choice only until the terminal is resized, when the choice is worked out afresh. The overlay `m` opens without room is drawn over the grid while every main key still works under it, so scrubbing moves the night side; `esc` closes it before unwinding anything else. A configured `[map] show = "always"` takes any spare rows, and `never` makes `m` show the map where the hiding rule finds room. See Map hiding in [screen](spec/screen.md).
 
 Why: Keeping a flip across a resize would turn a map hidden at 120x36 into an overlay at 120x24, which nobody asked for. A modal overlay would add a context whose only key is `esc`, and scrubbing under the map is the point of opening it.
@@ -322,7 +326,7 @@ Decision: A Braille dot spans the same degrees of longitude and latitude, so the
 
 Why: On wide terminals the stretched map flattened the continents, and Paul asked for the macOS Clock app's zoom-to-fill. The issue also asked for the band to be centred on the counted markers and for a group switch never to move the map (D2); a band recomputed every frame would satisfy the first and break the second, so the band is framed on the markers counted when the view is set and then held. This supersedes M4's check that the UK, US, AU and Melbourne labels all show at 120x36: that band now crops the UK and Melbourne, so the four-label check runs at 120x48, where the whole map fits.
 
-Held by: `tui::map::tests::a_degree_of_longitude_and_of_latitude_take_the_same_distance_at_every_size`, `the_band_never_shows_beyond_the_map_s_latitudes` and `an_area_taller_than_the_map_centres_it_with_blank_rows_above_and_below`, and `tui::tests::map::the_band_is_centred_on_home_and_the_counted_markers_within_the_map_s_bounds`, `a_group_switch_never_moves_the_map`, `the_map_labels_home_and_each_counted_place_with_its_state_over_the_range` (at 120x48) and the `regions_map_120x36` snapshot in `teamzones`
+Held by: `tui::map::tests::a_degree_of_longitude_and_of_latitude_take_the_same_distance_at_every_size`, `the_band_never_shows_beyond_the_map_s_latitudes` and `an_area_taller_than_the_map_centres_it_with_blank_rows_above_and_below`, and `tui::tests::map::the_band_is_centred_on_home_and_the_counted_markers_within_the_map_s_bounds`, `a_group_switch_never_moves_the_map`, `the_map_labels_home_and_each_counted_place_with_its_state_over_the_range` (at 120x48) and the `regions_map_120x37` snapshot in `teamzones`
 
 ## D40: Map mode is a modal with its own keys, entered with `z` (2026-10-25)
 
@@ -372,7 +376,7 @@ Decision: The times box, the notice row and the footer keep to the bottom of the
 
 Why: Paul found the times box jammed against the grid with the free rows under it, between the box and the footer, and asked for room to breathe. Anchoring the box to the bottom puts the space where it reads as a margin. Group switches still never move a block (D2), since the layout depends only on the size, the roster and the map's place.
 
-Held by: `tui::layout::tests::wherever_the_blocks_fit_whole_the_times_box_keeps_to_the_bottom_under_a_blank_row`, `a_hidden_map_moves_the_blocks_up_and_leaves_its_rows_above_the_times_box` and `at_120_by_36_the_map_takes_eleven_of_the_twelve_spare_rows_and_one_sits_over_the_times_box`, and `tui::tests::map::with_the_map_off_the_blocks_sit_under_the_header_and_the_spare_rows_above_the_times_box`, `at_145_by_30_the_spare_rows_collect_over_the_times_box_and_the_footer_takes_the_last_row` and `with_the_map_off_a_group_switch_never_moves_the_ruler_the_borders_or_the_times_box` in `teamzones`
+Held by: `tui::layout::tests::wherever_the_blocks_fit_whole_the_times_box_keeps_to_the_bottom_under_a_blank_row`, `a_hidden_map_moves_the_blocks_up_and_leaves_its_rows_above_the_times_box`, `always_shows_no_map_with_one_spare_row_and_leaves_it_blank_over_the_times_box` and `at_120_by_36_the_map_takes_eleven_of_the_twelve_spare_rows_and_one_sits_over_the_times_box`, and `tui::tests::map::with_the_map_off_the_blocks_sit_under_the_header_and_the_spare_rows_above_the_times_box`, `at_145_by_30_the_spare_rows_collect_over_the_times_box_and_the_footer_takes_the_last_row` and `with_the_map_off_a_group_switch_never_moves_the_ruler_the_borders_or_the_times_box` in `teamzones`
 
 ## D46: On Linux a copy goes to arboard and to OSC 52 both (2026-10-25)
 
@@ -380,7 +384,7 @@ Decision: On Linux, `y` and `teamzones say` give the line to arboard and also wr
 
 Why: On Linux the X11 and Wayland selection belongs to the process that set it, so arboard can report success and the clipboard empties when `teamzones say` exits unless a clipboard manager takes it over. Writing OSC 52 as well lets a terminal that supports it keep the line. Keeping the selection alive with a detached helper (arboard's `SetExtLinux::wait`) needs a forked process this binary cannot make without `unsafe`, and dropping `copied` would leave the common clipboard-manager case reporting nothing. Paul has no Linux machine, so CI's Linux runner is what proves the choice: no test there shows the line surviving on a real desktop.
 
-Held by: `clipboard::tests::on_linux_the_terminal_gets_the_text_even_when_the_system_clipboard_takes_it`, `the_running_platform_writes_osc_52_as_well_exactly_when_it_is_linux` (which checks the running OS, so the Linux CI job holds the Linux branch) and `both_succeeds_when_either_takes_the_text_and_fails_with_both_reasons` in `teamzones`
+Held by: `clipboard::tests::on_linux_the_terminal_gets_the_text_even_when_the_system_clipboard_takes_it`, `the_chain_the_binary_copies_through_writes_both_exactly_when_built_for_linux` (which checks the chain `main` builds, so the Linux CI job holds the Linux wiring) and `both_succeeds_when_either_takes_the_text_and_fails_with_both_reasons` in `teamzones`
 
 ## D47: The state file keeps the last group, and the TUI writes it only on a clean quit (2026-10-25)
 

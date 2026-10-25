@@ -88,6 +88,12 @@ pub fn for_os<A, B>(os: &str, system: A, terminal: B) -> Chain<A, B> {
     }
 }
 
+/// The chain the binary copies through: the system clipboard and the terminal, combined for the
+/// operating system it runs on.
+pub fn system_chain() -> Chain<System, Terminal> {
+    for_os(std::env::consts::OS, System, Terminal)
+}
+
 /// The OSC 52 sequence that sets the terminal's clipboard to `text`.
 pub fn osc52(text: &str) -> String {
     format!("\x1b]52;c;{}\x07", base64(text.as_bytes()))
@@ -168,8 +174,9 @@ mod tests {
     }
 
     #[test]
-    fn the_running_platform_writes_osc_52_as_well_exactly_when_it_is_linux() {
-        assert_eq!(writes_both(std::env::consts::OS), cfg!(target_os = "linux"));
+    fn the_chain_the_binary_copies_through_writes_both_exactly_when_built_for_linux() {
+        let both = matches!(system_chain(), Chain::Both(_));
+        assert_eq!(both, cfg!(target_os = "linux"));
     }
 
     #[test]

@@ -107,8 +107,8 @@ pub struct Areas {
     pub columns: Columns,
 }
 
-/// The header, the block borders, the say panel, the notice and the footer: the rows that never
-/// stack.
+/// The header, the block borders, the detail line, the times box, the notice and the footer: the
+/// rows that never stack.
 const FLAT_ROWS: u16 = 1 + 1 + 2 + 4 + 1 + 1;
 /// Below this width rows stack when the height allows.
 const STACK_BELOW: u16 = 80;
@@ -401,10 +401,18 @@ mod tests {
         assert_eq!(view(120, 36, MapChoice::Auto, true), MapView::Hidden);
         assert_eq!(view(120, 24, MapChoice::Auto, true), MapView::Overlay);
         assert_eq!(view(120, 36, MapChoice::Hidden, true), MapView::InPlace);
-        // `always` takes any spare rows, so 30 rows leave it 6 even under the 12 auto needs.
+        // `always` needs only two spare rows, so 30 rows leave it 6 even under the 12 auto needs.
         assert_eq!(view(120, 30, MapChoice::Auto, false), MapView::Hidden);
         assert_eq!(view(120, 30, MapChoice::Always, false), MapView::InPlace);
         assert_eq!(view(120, 30, MapChoice::Always, true), MapView::Hidden);
+    }
+
+    #[test]
+    fn always_shows_no_map_with_one_spare_row_and_leaves_it_blank_over_the_times_box() {
+        let areas = layout(120, 25, 7, 3, MapChoice::Always);
+        assert_eq!(areas.map, None);
+        assert_eq!(areas.say.y - areas.detail.bottom(), 1);
+        assert!(layout(120, 26, 7, 3, MapChoice::Always).map.is_some());
     }
 
     #[test]

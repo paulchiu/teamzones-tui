@@ -17,7 +17,7 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ### Fixed
 
-- On Linux, copying also writes the line to the terminal's clipboard (OSC 52), so it is not lost when the system clipboard empties as `teamzones say` exits.
+- On Linux, copying also writes the line to the terminal's clipboard (OSC 52), so terminals that support OSC 52 keep it when the system clipboard empties as `teamzones say` exits.
 
 ## [0.12.0] - 2026-10-25
 
