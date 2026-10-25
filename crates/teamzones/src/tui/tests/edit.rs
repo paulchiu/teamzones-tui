@@ -310,9 +310,26 @@ fn the_matrix_draws_people_then_places_against_every_group_with_its_question() {
     assert_eq!(cells("Priya   Brisbane"), "●●·●");
     assert_eq!(cells("Paul    Melbourne"), "⌂⌂⌂⌂");
     assert_eq!(cells("US      venue profile"), "··◆·");
-    assert!(line("cursor").contains("space adds the place US to deploy (its state, not its zone)"));
+    assert!(line("cursor").contains("space adds the place US to deploy (its clock and its state)"));
     assert!(line("cli ").contains("teamzones say deploy now"));
     insta::assert_snapshot!("matrix_120x36", text(&buf));
+}
+
+#[test]
+fn the_matrix_cursor_says_a_place_without_trading_adds_only_its_clock() {
+    let clock_only = FIXTURE.replacen(
+        "tz      = \"America/Chicago\"\ntrading = \"venue\"\n",
+        "tz      = \"America/Chicago\"\n",
+        1,
+    );
+    let open = press(
+        focus_on(editable(&clock_only), "US"),
+        &[Key::Char('4'), Key::Tab],
+    );
+    assert_eq!(
+        super::super::matrix::cursor_text(&open, matrix_of(&open)),
+        "space adds the place US to deploy (its clock)"
+    );
 }
 
 #[test]

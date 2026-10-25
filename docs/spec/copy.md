@@ -14,7 +14,7 @@ Seeded from the shared contract of the teamzones build spec (2026-10-24). Where 
   + The state is the range state.
 * **Variants**:
   + `c d` prefixes the axis zone's date, as in `"Mon 26 Oct, "` (the date, a comma and a space).
-  + `c w` adds names after each zone entry, as in `(Paul)` or `(Priya, Sam)`, with home's name included.
+  + `c w` adds names after each zone entry, people then places, as in `(Paul)`, `(Priya, Sam)`, `(Paul, AU)` or `(UK)`, with home's name included.
   + `c t` is only the focused row's entry, followed by the axis entry in parentheses, with no clause. When both render the same time (the focused row is in the axis zone), the entry appears once, with no parentheses.
   + `c z` keeps the counted places' zone entries and drops the clause.
   + `c s` drops the places altogether, zones and clause, leaving the people's times.

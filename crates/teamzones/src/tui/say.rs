@@ -28,20 +28,36 @@ fn plural(count: usize, one: &str, many: &str) -> String {
 }
 
 /// The dim summary after the say line, such as `4 zones for 5 people, 1 place`: the zones the
-/// default format names, without its clause, for the counted people and places.
+/// default format names, without its clause, for the counted people and places. A line naming
+/// neither people nor place clocks reads `home zone`, as in `home zone, 3 places`.
 pub fn summary(app: &App) -> String {
     let roster = app.roster();
     let marks = &app.marks;
-    let clause = match app.config.copy.default_format().variant.clause {
-        Clause::Both | Clause::Zones => Clause::Zones,
-        Clause::States | Clause::Drop => Clause::Drop,
+    let place_clocks = match app.config.copy.default_format().variant.clause {
+        Clause::Both | Clause::Zones => true,
+        Clause::States | Clause::Drop => false,
     };
+    let places = match marks.counted_places().len() {
+        0 => None,
+        count => Some(plural(count, "place", "places")),
+    };
+    if !marks.asks_who() && !place_clocks {
+        return ["home zone".to_owned()]
+            .into_iter()
+            .chain(places)
+            .collect::<Vec<_>>()
+            .join(", ");
+    }
     let zones = say_line(
         roster,
         marks,
         app.when(),
         Variant {
-            clause,
+            clause: if place_clocks {
+                Clause::Zones
+            } else {
+                Clause::Drop
+            },
             ..Variant::default()
         },
     )
@@ -50,10 +66,6 @@ pub fn summary(app: &App) -> String {
     let people = marks
         .asks_who()
         .then(|| plural(marks.counted_people().len(), "person", "people"));
-    let places = match marks.counted_places().len() {
-        0 => None,
-        count => Some(plural(count, "place", "places")),
-    };
     let counted: Vec<String> = people.into_iter().chain(places).collect();
     if counted.is_empty() {
         "home zone".to_owned()

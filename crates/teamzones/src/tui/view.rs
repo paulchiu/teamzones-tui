@@ -1472,12 +1472,17 @@ fn say_panel(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
         inner.width.saturating_sub(2),
         inner.height,
     );
+    let line = truncate_with_mark(
+        &look.glyphs.text(&line),
+        usize::from(inner.width),
+        &look.glyphs.text("…"),
+    );
     put(
         buf,
         inner,
         inner.x,
         inner.y,
-        &look.glyphs.text(&line),
+        &line,
         theme.fg(Role::Text).add_modifier(Modifier::BOLD),
     );
 }

@@ -22,7 +22,7 @@ The line starts with home's zone, then every other counted person's and place's 
 | Flag | Does |
 | --- | --- |
 | `--zones` | Keeps each counted place's clock and drops its state, the old `ttz` shape. |
-| `--names` | Adds who is in each zone after it, home included. |
+| `--names` | Adds who and which places are in each zone after it, home included, as in `(Paul, AU)` or `(UK)`. |
 | `--date` | Starts the line with home's date, as in `Mon 26 Oct, `. |
 | `--no-clause` | Drops the places altogether, clocks and states, leaving the people's times. |
 | `--no-copy` | Prints without copying. |

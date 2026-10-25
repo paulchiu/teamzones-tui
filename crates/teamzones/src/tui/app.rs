@@ -650,14 +650,17 @@ impl App {
     }
 }
 
-/// The marks `entry` names, by name in `roster`, over `base`'s rule; names the roster no
-/// longer has are dropped.
+/// The marks `entry` names, by name in `roster`, over `base`'s rule and home; names the roster
+/// no longer has are dropped.
 fn resolve(roster: &Roster, entry: &LensMarks, base: Marks) -> Marks {
     let named = |names: &[String], name: &str| names.iter().any(|n| n.eq_ignore_ascii_case(name));
+    let home = base.people.contains(&PersonId::HOME);
     Marks {
         people: roster
             .people()
-            .filter(|(_, person)| named(&entry.people, &person.name))
+            .filter(|(id, person)| {
+                (home && *id == PersonId::HOME) || named(&entry.people, &person.name)
+            })
             .map(|(id, _)| id)
             .collect(),
         places: roster

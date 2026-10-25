@@ -452,10 +452,15 @@ pub fn cursor_text(app: &App, matrix: &Matrix) -> String {
                 roster.place(id).name
             )
         }
-        Row::Place(id) => format!(
-            "space adds the place {} to {name} (its state, not its zone)",
-            roster.place(id).name
-        ),
+        Row::Place(id) => {
+            let place = roster.place(id);
+            let adds = if place.trading.is_some() {
+                "its clock and its state"
+            } else {
+                "its clock"
+            };
+            format!("space adds the place {} to {name} ({adds})", place.name)
+        }
     }
 }
 

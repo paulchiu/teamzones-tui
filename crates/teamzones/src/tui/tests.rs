@@ -763,6 +763,19 @@ fn the_frames_at_120_by_24_and_80_by_24_sit_on_the_row_budget() {
     }
 }
 
+#[test]
+fn a_times_line_wider_than_its_box_ends_in_a_mark() {
+    let regions = press(fixture(), &chars("3"));
+    let line = regions.say_line();
+    let buf = render(&regions, 80, 24);
+    let shown = say_line(&buf);
+    let shown = shown.trim_end_matches(['│', ' ']);
+    assert!(shown.ends_with('…'), "{shown:?}");
+    assert!(line.starts_with(shown.trim_end_matches('…')), "{line:?}");
+    let wide = render(&regions, 120, 24);
+    assert_eq!(say_line(&wide), line);
+}
+
 /// Every key the main footer or binding table names, as probes for the modal tests.
 fn main_keys() -> Vec<Key> {
     super::keys::BINDINGS
@@ -1771,6 +1784,18 @@ fn a_places_only_summary_counts_the_zones_its_places_add() {
     assert!(bottom.contains(" 3 zones for 3 places "), "{bottom}");
 }
 
+#[test]
+fn a_places_only_summary_under_a_states_line_counts_no_zones() {
+    let states = App::new(
+        config("\n[[copy]]\nkey    = \"y\"\nlabel  = \"states\"\nplaces = \"states\"\n"),
+        now(),
+    );
+    let regions = go_to(press(states, &chars("3")), "26 oct 2-4pm");
+    let buf = render(&regions, 120, 36);
+    let bottom = row(&buf, y_of(&buf, " times for ") + 2);
+    assert!(bottom.contains(" home zone, 3 places "), "{bottom}");
+}
+
 const CLI_SPEC: &str = include_str!("../../../../docs/spec/cli.md");
 
 #[test]
@@ -1845,6 +1870,17 @@ fn marks_a_person_and_a_place_on_all_and_keeps_them_for_the_next_run() {
     let buf = render(&reopened, 120, 36);
     assert!(row(&buf, y_of(&buf, " times for ")).contains("times for all "));
     assert_eq!(say_line(&buf), "5-6pm AEDT / 6-7am GMT, closed in UK");
+}
+
+#[test]
+fn kept_marks_without_home_s_name_still_count_home() {
+    let app = fixture().on_group(Some("all"), &[kept("all", &["Ellie"], &[])]);
+    assert!(
+        app.marks
+            .people
+            .contains(&teamzones_core::config::PersonId::HOME)
+    );
+    assert_eq!(app.remembered(), [kept("all", &["Paul", "Ellie"], &[])]);
 }
 
 #[test]
