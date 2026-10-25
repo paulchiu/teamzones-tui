@@ -72,6 +72,186 @@ fn render_with(app: &App, cols: u16, rows: u16, env: TerminalEnv) -> Buffer {
     terminal.backend().buffer().clone()
 }
 
+/// A terminal that records every mode switch the effects layer asks for, failing each one when
+/// `broken`.
+#[derive(Default)]
+struct Recorder {
+    capture: Vec<bool>,
+    suspended: usize,
+    resumed: Vec<bool>,
+    broken: bool,
+}
+
+impl super::Modes for Recorder {
+    fn capture_mouse(&mut self, on: bool) -> std::io::Result<()> {
+        self.capture.push(on);
+        self.result()
+    }
+
+    fn suspend(&mut self) -> std::io::Result<()> {
+        self.suspended += 1;
+        self.result()
+    }
+
+    fn resume(&mut self, mouse: bool) -> std::io::Result<()> {
+        self.resumed.push(mouse);
+        self.result()
+    }
+}
+
+impl Recorder {
+    fn result(&self) -> std::io::Result<()> {
+        if self.broken {
+            Err(std::io::Error::other("no tty"))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+struct NoClipboard;
+
+impl crate::clipboard::Clipboard for NoClipboard {
+    fn copy(&mut self, _text: &str) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+/// Terminal events on a virtual clock: each arrives at its time, and polling advances the clock.
+#[derive(Default)]
+struct Feed {
+    now: std::time::Duration,
+    queue: std::collections::VecDeque<(std::time::Duration, crossterm::event::Event)>,
+}
+
+impl Feed {
+    /// Queues `key` to arrive `after` the feed's current time.
+    fn key_after(&mut self, after: std::time::Duration, key: char) {
+        let event = crossterm::event::Event::Key(crossterm::event::KeyEvent::from(
+            crossterm::event::KeyCode::Char(key),
+        ));
+        self.queue.push_back((self.now + after, event));
+    }
+}
+
+/// A feed shared with a fake editor, which types into it while it runs.
+#[derive(Clone, Default)]
+struct Shared(std::rc::Rc<std::cell::RefCell<Feed>>);
+
+impl super::Events for Shared {
+    fn poll(&mut self, timeout: std::time::Duration) -> std::io::Result<bool> {
+        let mut feed = self.0.borrow_mut();
+        let deadline = feed.now + timeout;
+        match feed.queue.front() {
+            Some((at, _)) if *at <= deadline => {
+                feed.now = feed.now.max(*at);
+                Ok(true)
+            }
+            Some(_) => {
+                feed.now = deadline;
+                Ok(false)
+            }
+            None if feed.now > std::time::Duration::from_secs(3600) => {
+                Err(std::io::Error::other("the feed ran dry"))
+            }
+            None => {
+                feed.now = deadline;
+                Ok(false)
+            }
+        }
+    }
+
+    fn read(&mut self) -> std::io::Result<crossterm::event::Event> {
+        let mut feed = self.0.borrow_mut();
+        let (at, event) = feed
+            .queue
+            .pop_front()
+            .ok_or_else(|| std::io::Error::other("the feed ran dry"))?;
+        feed.now = feed.now.max(at);
+        Ok(event)
+    }
+}
+
+/// A fake editor: it records each run, types `typed` into the feed while it runs (taking 100 ms),
+/// queues `after` to arrive that long after it exits, writes `writes` into the config when
+/// given, and exits with `succeeds`.
+struct Editor {
+    feed: Shared,
+    typed: Vec<char>,
+    after: Vec<(std::time::Duration, char)>,
+    writes: Option<(std::path::PathBuf, String)>,
+    succeeds: std::io::Result<bool>,
+    runs: Vec<(String, Vec<String>)>,
+}
+
+impl super::Opener for Editor {
+    fn open(&mut self, program: &str, args: &[String]) -> std::io::Result<bool> {
+        self.runs.push((program.to_owned(), args.to_vec()));
+        {
+            let mut feed = self.feed.0.borrow_mut();
+            for (n, key) in (1..).zip(&self.typed) {
+                feed.key_after(std::time::Duration::from_millis(n), *key);
+            }
+            let exit = std::time::Duration::from_millis(100);
+            for (after, key) in &self.after {
+                feed.key_after(exit + *after, *key);
+            }
+            feed.now += exit;
+        }
+        if let Some((path, text)) = &self.writes {
+            std::fs::write(path, text)?;
+        }
+        match &self.succeeds {
+            Ok(succeeds) => Ok(*succeeds),
+            Err(error) => Err(std::io::Error::new(error.kind(), error.to_string())),
+        }
+    }
+}
+
+impl Editor {
+    fn new(feed: &Shared) -> Self {
+        Self {
+            feed: feed.clone(),
+            typed: Vec::new(),
+            after: Vec::new(),
+            writes: None,
+            succeeds: Ok(true),
+            runs: Vec::new(),
+        }
+    }
+}
+
+/// A fresh directory for a test's config file.
+fn scratch_dir(name: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir()
+        .join("teamzones-tui-tests")
+        .join(format!("{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+/// Runs `effects` through the shell's effects layer against the config at `path`.
+fn run_against(
+    app: App,
+    effects: Vec<Effect>,
+    path: &std::path::Path,
+    modes: &mut Recorder,
+) -> App {
+    let feed = Shared::default();
+    let mut io = super::Io {
+        clipboard: &mut NoClipboard,
+        modes,
+        events: &mut feed.clone(),
+        opener: &mut Editor::new(&feed),
+        config: path,
+        system_zone: chrono_tz::Australia::Melbourne,
+        editors: (None, None),
+        repaint: false,
+    };
+    super::run_effects(app, effects, &mut io)
+}
+
 fn render(app: &App, cols: u16, rows: u16) -> Buffer {
     render_with(app, cols, rows, TerminalEnv::default())
 }
@@ -302,7 +482,10 @@ fn copied(effects: &[Effect]) -> Vec<String> {
         .iter()
         .filter_map(|effect| match effect {
             Effect::Copy { text, .. } => Some(text.clone()),
-            Effect::CaptureMouse(_) => None,
+            Effect::CaptureMouse(_)
+            | Effect::Write { .. }
+            | Effect::Reload
+            | Effect::Edit { .. } => None,
         })
         .collect()
 }
@@ -501,7 +684,7 @@ fn the_footer_at_now_leaves_out_the_group_hint_and_the_mode_hints() {
     let buf = render(&fixture(), 80, 24);
     assert_eq!(
         row(&buf, 23),
-        "h/l time  v range  n next fit  space mark  y copy  m map  ? help  q quit",
+        "h/l time  v range  space mark  w save  tab groups  y copy  m map  ? help  q quit",
         "with the map hidden for want of room, m outranks c"
     );
 }
@@ -610,8 +793,16 @@ fn the_prompt_acts_on_the_keys_its_footer_advertises() {
 
 #[test]
 fn each_modal_context_swallows_the_keys_it_does_not_advertise() {
-    for opener in ["c", "s", "?"] {
-        let open = press(fixture(), &chars(opener));
+    let drift_menu = update(fixture(), Msg::DriftMenu).0;
+    let opened = [
+        press(fixture(), &chars("c")),
+        press(fixture(), &chars("s")),
+        press(fixture(), &chars("?")),
+        press(fixture(), &[Key::Tab]),
+        press(fixture(), &chars("a")),
+        drift_menu,
+    ];
+    for open in opened {
         let context = super::update::context(&open);
         let formats = open
             .config
@@ -627,8 +818,32 @@ fn each_modal_context_swallows_the_keys_it_does_not_advertise() {
             .collect();
         for key in main_keys().into_iter().filter(|key| !own.contains(key)) {
             let (after, effects) = press_all(open.clone(), &[key]);
-            assert_eq!(after, open, "{opener} then {key:?}");
-            assert!(effects.is_empty(), "{opener} then {key:?}");
+            assert_eq!(after, open, "{context:?} then {key:?}");
+            assert!(effects.is_empty(), "{context:?} then {key:?}");
+        }
+    }
+}
+
+#[test]
+fn the_name_prompt_and_the_picker_type_every_advertised_key() {
+    let openers: [&[Key]; 3] = [
+        &[Key::Char('+')],
+        &[Key::Char('a'), Key::Char('p')],
+        &[Key::Tab, Key::Char('R')],
+    ];
+    for opener in openers {
+        let open = press(fixture().with_source(Some(FIXTURE.to_owned())), opener);
+        assert_eq!(
+            super::update::context(&open),
+            super::keys::Context::Prompt,
+            "{opener:?}"
+        );
+        for key in main_keys() {
+            let Key::Char(c) = key else { continue };
+            let (after, effects) = press_all(open.clone(), &[key]);
+            assert!(effects.is_empty(), "{opener:?} then {key:?}");
+            assert_ne!(after.mode, open.mode, "{opener:?} then {c:?} is typed");
+            assert_eq!(after.config, open.config, "{opener:?} then {key:?}");
         }
     }
 }
@@ -659,9 +874,16 @@ fn a_reload_that_drops_the_focused_row_lands_on_the_row_now_in_its_place() {
         "",
     );
     assert_ne!(without_marcus, FIXTURE);
+    let loaded = super::editor::Loaded {
+        config: Config::parse(&without_marcus).unwrap(),
+        text: Some(without_marcus.clone()),
+    };
     let reloaded = update(
         app,
-        Msg::Reload(Box::new(Config::parse(&without_marcus).unwrap())),
+        Msg::Reloaded {
+            key: "r".to_owned(),
+            result: Ok(Box::new(loaded)),
+        },
     )
     .0;
     assert!(reloaded.focus_rows().contains(&reloaded.focus));
@@ -1451,5 +1673,6 @@ fn below_60_columns_without_the_height_to_stack_the_screen_is_a_plain_list() {
     assert_eq!(say_line(&buf), "5-6pm AEDT / 4-5pm AEST / 8-9am SAST");
 }
 
+mod edit;
 mod map;
 mod mouse;

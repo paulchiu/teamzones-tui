@@ -14,6 +14,7 @@ pub enum Key {
     Enter,
     Esc,
     Backspace,
+    Tab,
     Other,
 }
 
@@ -34,6 +35,7 @@ impl Key {
             KeyCode::Enter => Self::Enter,
             KeyCode::Esc => Self::Esc,
             KeyCode::Backspace => Self::Backspace,
+            KeyCode::Tab => Self::Tab,
             _ => Self::Other,
         }
     }
@@ -50,6 +52,12 @@ pub enum Context {
     CopyMenu,
     SortMenu,
     Help,
+    /// The membership matrix overlay.
+    Matrix,
+    /// `a`'s choice of what to add.
+    AddMenu,
+    /// The drift tag's menu.
+    DriftMenu,
 }
 
 /// How rows are ordered within each block.
@@ -84,6 +92,11 @@ pub enum Action {
     FocusLast,
     ToggleMark,
     ClearMarks,
+    /// `w`: write the marks into the active group.
+    Save,
+    NewGroup,
+    CloseGroup,
+    CycleWhere,
     Group(usize),
     All,
     Undo,
@@ -102,6 +115,27 @@ pub enum Action {
     CycleRangeStyle,
     FlipMap,
     ToggleMouse,
+    /// `tab`: open the membership matrix.
+    Matrix,
+    /// Move the matrix cursor this many columns and rows.
+    Cell(i8, i8),
+    ToggleCell,
+    UseGroup,
+    CopyGroup,
+    AddGroup,
+    RenameGroup,
+    MoveGroup(i8),
+    CloseColumn,
+    FinishMatrix,
+    AddMenu,
+    /// Open the picker on a new place when true, a new person when false.
+    AddRow(bool),
+    EditRow,
+    DeleteRow,
+    Reload,
+    OpenEditor,
+    /// Drop the drift, back to the active group's saved members.
+    Revert,
 }
 
 /// A footer hint: the keys as the footer writes them, a short label, and when it shows.
@@ -147,9 +181,9 @@ pub struct Binding {
     pub chords: &'static [(Key, Action)],
 }
 
-/// The milestones built so far: M3, M4 and the hands-on feedback rounds after M3.
+/// The milestones built so far: M3 to M5 and the hands-on feedback rounds after M3.
 #[cfg(test)]
-pub const BUILT: [&str; 3] = ["M3", "M4", "FB2"];
+pub const BUILT: [&str; 4] = ["M3", "M4", "M5", "FB2"];
 
 /// A footer priority that never drops.
 pub const PINNED: u8 = u8::MAX;
@@ -361,12 +395,22 @@ pub const BINDINGS: &[Binding] = &[
             Context::Main,
         )
     },
-    row(
-        "w, +, x, =",
-        "Save; new group; close group; cycle where",
-        "M5",
-        Context::Main,
-    ),
+    Binding {
+        hints: &[hint("w", "save")],
+        priority: 2,
+        chords: &[
+            (Key::Char('w'), Action::Save),
+            (Key::Char('+'), Action::NewGroup),
+            (Key::Char('x'), Action::CloseGroup),
+            (Key::Char('='), Action::CycleWhere),
+        ],
+        ..row(
+            "w, +, x, =",
+            "Save; new group; close group; cycle where",
+            "M5",
+            Context::Main,
+        )
+    },
     Binding {
         chords: &[(Key::Char('u'), Action::Undo)],
         ..row(
@@ -376,7 +420,12 @@ pub const BINDINGS: &[Binding] = &[
             Context::Main,
         )
     },
-    row("tab", "Membership matrix", "M5", Context::Main),
+    Binding {
+        hints: &[hint("tab", "groups")],
+        priority: 5,
+        chords: &[(Key::Tab, Action::Matrix)],
+        ..row("tab", "Membership matrix", "M5", Context::Main)
+    },
     Binding {
         hints: &[hint("y", "copy")],
         priority: 10,
@@ -438,18 +487,31 @@ pub const BINDINGS: &[Binding] = &[
         chords: &[(Key::Char('M'), Action::ToggleMouse)],
         ..row("M", "Release or recapture the mouse", "M4", Context::Main)
     },
-    row(
-        "a e d",
-        "Add, edit or delete a person or place",
-        "M5",
-        Context::Main,
-    ),
-    row(
-        "E, r",
-        "Open config in `$EDITOR` (suspending the TUI); reload config",
-        "M5",
-        Context::Main,
-    ),
+    Binding {
+        chords: &[
+            (Key::Char('a'), Action::AddMenu),
+            (Key::Char('e'), Action::EditRow),
+            (Key::Char('d'), Action::DeleteRow),
+        ],
+        ..row(
+            "a e d",
+            "Add, edit or delete a person or place",
+            "M5",
+            Context::Main,
+        )
+    },
+    Binding {
+        chords: &[
+            (Key::Char('E'), Action::OpenEditor),
+            (Key::Char('r'), Action::Reload),
+        ],
+        ..row(
+            "E, r",
+            "Open config in `$EDITOR` (suspending the TUI); reload config",
+            "M5",
+            Context::Main,
+        )
+    },
     Binding {
         hints: &[hint("?", "help"), hint("q", "quit")],
         priority: PINNED,
@@ -542,6 +604,117 @@ pub const BINDINGS: &[Binding] = &[
         )
     },
     Binding {
+        chords: &[
+            (Key::Char('h'), Action::Cell(-1, 0)),
+            (Key::Char('l'), Action::Cell(1, 0)),
+            (Key::Char('k'), Action::Cell(0, -1)),
+            (Key::Char('j'), Action::Cell(0, 1)),
+            (Key::Left, Action::Cell(-1, 0)),
+            (Key::Right, Action::Cell(1, 0)),
+            (Key::Up, Action::Cell(0, -1)),
+            (Key::Down, Action::Cell(0, 1)),
+        ],
+        ..row(
+            "h j k l, arrows",
+            "Move between groups and rows",
+            "",
+            Context::Matrix,
+        )
+    },
+    Binding {
+        hints: &[hint("space", "member")],
+        priority: MODE + 9,
+        chords: &[(Key::Char(' '), Action::ToggleCell)],
+        ..row(
+            "space",
+            "Add the row to the group, or take it out",
+            "",
+            Context::Matrix,
+        )
+    },
+    Binding {
+        hints: &[hint("enter", "use")],
+        priority: MODE + 8,
+        chords: &[(Key::Enter, Action::UseGroup)],
+        ..row("enter", "Use the group and close", "", Context::Matrix)
+    },
+    Binding {
+        hints: &[hint("y", "copy")],
+        priority: MODE + 7,
+        chords: &[(Key::Char('y'), Action::CopyGroup)],
+        ..row("y", "Copy the group's line", "", Context::Matrix)
+    },
+    Binding {
+        hints: &[hint("a", "new")],
+        priority: MODE + 4,
+        chords: &[(Key::Char('a'), Action::AddGroup)],
+        ..row("a", "Add a group", "", Context::Matrix)
+    },
+    Binding {
+        hints: &[hint("R", "rename")],
+        priority: MODE + 3,
+        chords: &[(Key::Char('R'), Action::RenameGroup)],
+        ..row(
+            "R",
+            "Rename the group, keeping the old name as an alias",
+            "",
+            Context::Matrix,
+        )
+    },
+    Binding {
+        hints: &[hint("</>", "move")],
+        priority: MODE + 2,
+        chords: &[
+            (Key::Char('<'), Action::MoveGroup(-1)),
+            (Key::Char('>'), Action::MoveGroup(1)),
+        ],
+        ..row("< >", "Move the group a column", "", Context::Matrix)
+    },
+    Binding {
+        hints: &[hint("x", "close")],
+        priority: MODE + 5,
+        chords: &[(Key::Char('x'), Action::CloseColumn)],
+        ..row("x", "Close the group", "", Context::Matrix)
+    },
+    Binding {
+        hints: &[hint("u", "undo")],
+        priority: MODE + 6,
+        chords: &[(Key::Char('u'), Action::Undo)],
+        ..row("u", "Undo the last change here", "", Context::Matrix)
+    },
+    Binding {
+        hints: &[hint("?", "help"), hint("esc", "done")],
+        priority: PINNED,
+        chords: &[
+            (Key::Char('?'), Action::Help),
+            (Key::Esc, Action::FinishMatrix),
+        ],
+        ..row(
+            "?, esc",
+            "Help; close, writing the changes to config",
+            "",
+            Context::Matrix,
+        )
+    },
+    Binding {
+        hints: &[hint("p", "person"), hint("l", "place")],
+        priority: 5,
+        chords: &[
+            (Key::Char('p'), Action::AddRow(false)),
+            (Key::Char('l'), Action::AddRow(true)),
+        ],
+        ..row("p l", "Add a person; add a place", "", Context::AddMenu)
+    },
+    Binding {
+        hints: &[hint("w", "save"), hint("r", "revert")],
+        priority: 5,
+        chords: &[
+            (Key::Char('w'), Action::Save),
+            (Key::Char('r'), Action::Revert),
+        ],
+        ..row("w r", "Save the drift; revert it", "", Context::DriftMenu)
+    },
+    Binding {
         hints: &[hint("o", "offset"), hint("n", "name")],
         priority: 5,
         chords: &[
@@ -561,9 +734,14 @@ pub const BINDINGS: &[Binding] = &[
 /// text, and range mode keeps every main key.
 fn fallbacks(context: Context) -> &'static [Context] {
     match context {
-        Context::Main | Context::Global | Context::CopyMenu | Context::SortMenu | Context::Help => {
-            &[Context::Global]
-        }
+        Context::Main
+        | Context::Global
+        | Context::CopyMenu
+        | Context::SortMenu
+        | Context::Help
+        | Context::Matrix
+        | Context::AddMenu
+        | Context::DriftMenu => &[Context::Global],
         Context::Range => &[Context::Main, Context::Global],
         Context::Prompt => &[],
     }
@@ -572,10 +750,14 @@ fn fallbacks(context: Context) -> &'static [Context] {
 /// Whether a context's footer adds the global hints; range mode names only its own keys.
 fn hints_global(context: Context) -> bool {
     match context {
-        Context::Main | Context::Global | Context::CopyMenu | Context::SortMenu | Context::Help => {
-            true
-        }
-        Context::Range | Context::Prompt => false,
+        Context::Main
+        | Context::Global
+        | Context::CopyMenu
+        | Context::SortMenu
+        | Context::Help
+        | Context::AddMenu
+        | Context::DriftMenu => true,
+        Context::Range | Context::Prompt | Context::Matrix => false,
     }
 }
 
@@ -617,7 +799,10 @@ fn unbound(context: Context, key: Key) -> Option<Action> {
         | Context::Global
         | Context::CopyMenu
         | Context::SortMenu
-        | Context::Help => None,
+        | Context::Help
+        | Context::Matrix
+        | Context::AddMenu
+        | Context::DriftMenu => None,
     }
 }
 
@@ -709,7 +894,7 @@ mod tests {
         assert_eq!(
             hinted,
             [
-                "h/l", ".", "v", "n", "space", "y", "c", "m", "esc", "?", "q"
+                "h/l", ".", "v", "n", "space", "w", "tab", "y", "c", "m", "esc", "?", "q"
             ]
         );
     }

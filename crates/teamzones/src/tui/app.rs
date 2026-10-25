@@ -10,8 +10,11 @@ use super::footer::MapKey;
 use super::glyphs::Glyphs;
 use super::keys::{Context, Sort};
 use super::layout::{MapChoice, MapView, map_view, room_for_map};
+use super::matrix::Matrix;
 use super::mouse::Drag;
 use super::notice::Notice;
+use super::picker::Picker;
+use super::undo::Undo;
 
 /// Where the cursor sits: on exact now, or on a grid slot once anything moves it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -48,13 +51,24 @@ pub enum Lens {
 }
 
 /// Which modal, if any, owns the keys.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Mode {
     Normal,
     Prompt(String),
+    /// The `+` prompt in the strip: the new group's name as typed so far.
+    NewGroup(String),
     CopyMenu,
     SortMenu,
-    Help(Context),
+    /// Help for the keys of a context, over the mode it opened from, which closing it returns to.
+    Help(Context, Box<Mode>),
+    /// The membership matrix overlay.
+    Matrix(Box<Matrix>),
+    /// `a`'s choice of a person or a place, with the map point a double click gave.
+    AddMenu(Option<(f64, f64)>),
+    /// The picker for a new or edited person or place.
+    Picker(Box<Picker>),
+    /// The drift tag's menu: save the drift, or revert it.
+    DriftMenu,
 }
 
 /// How people lanes are drawn: by band, or plain day and night.
@@ -99,14 +113,6 @@ pub fn without_colour(style: RangeStyle, mono: bool) -> RangeStyle {
     }
 }
 
-/// The one level of undo: the lens and marks a group switch dropped, until it expires.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Undo {
-    pub lens: Lens,
-    pub marks: Marks,
-    pub expires: DateTime<Utc>,
-}
-
 /// The rows of one block in display order: above the answer row, then below it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BlockRows {
@@ -149,6 +155,14 @@ pub struct App {
     pub mouse: bool,
     /// The left-button drag in progress, if any.
     pub drag: Option<Drag>,
+    /// The config file's text the config was parsed from, or `None` when there is no file.
+    pub text: Option<String>,
+    /// What the file on disk holds, as far as the app knows: `text` once every edit is written.
+    pub disk: Option<String>,
+    /// When `text` is due on disk, while a close waits out its undo window unwritten.
+    pub flush_at: Option<DateTime<Utc>>,
+    /// The cell and instant of the last left-button press, for spotting a double click.
+    pub last_click: Option<(u16, u16, DateTime<Utc>)>,
 }
 
 impl App {
@@ -182,6 +196,25 @@ impl App {
             map_flipped: false,
             mouse: true,
             drag: None,
+            text: None,
+            disk: None,
+            flush_at: None,
+            last_click: None,
+        }
+    }
+
+    /// The app reading its config from a file holding `text`, or from no file, which raises the
+    /// first-run notice.
+    pub fn with_source(self, text: Option<String>) -> Self {
+        let notice = text.is_none().then(|| Notice {
+            text: "no config: E creates one".to_owned(),
+            raised_at: self.now,
+        });
+        Self {
+            disk: text.clone(),
+            text,
+            notice,
+            ..self
         }
     }
 
@@ -284,8 +317,16 @@ impl App {
         }
     }
 
-    /// The marks differ from the lens's saved members as `+@UK` or `-Sam`, people first.
+    /// The marks differ from the lens's saved members as `+@UK` or `-Sam`, people first, then a
+    /// changed `where` as `=closed`.
     pub fn drift(&self) -> Vec<String> {
+        let base = base_marks(self.roster(), self.lens);
+        let rule = (base.rule != self.marks.rule).then(|| format!("={}", self.marks.rule.word()));
+        self.member_drift().into_iter().chain(rule).collect()
+    }
+
+    /// The marks' members that differ from the lens's saved ones, as `+@UK` or `-Sam`.
+    fn member_drift(&self) -> Vec<String> {
         let roster = self.roster();
         let base = base_marks(roster, self.lens);
         let people = roster
@@ -311,7 +352,7 @@ impl App {
     /// The who-expression the marks stand for, such as `team +@UK`.
     pub fn expression(&self) -> String {
         std::iter::once(self.lens_name())
-            .chain(self.drift())
+            .chain(self.member_drift())
             .collect::<Vec<_>>()
             .join(" ")
     }

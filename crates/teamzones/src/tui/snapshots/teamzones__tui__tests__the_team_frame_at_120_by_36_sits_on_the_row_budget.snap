@@ -17,7 +17,7 @@ teamzones   now Sat 24 Oct 9:04am AEDT   viewing Mon 26 Oct +2d                 
                                   ⠈⠲⠶⠯⠅⠐⠒                                         ⠈⠁
 Mon 26 Oct AEDT         12a ·   ·   3a  ·   ·   6a  ·   ·   9a  ·   ·   12p ·   ·   3p  ·   ·   6p  ·   ·   9p  ·   ·
 ▸ 5-6pm AEDT 1h        ◂────────────────────────────────────────────────────────────────────┣══┫────────────────────────
- who   1 team  2 au  3 regions  4 deploy  0 all  ────────────────── ▒ day  ▚ morning/evening  ▓ working  ░ night  ╌ off
+ who   1 team  2 au  3 regions  4 deploy  0 all  +  ⋯  ──────────── ▒ day  ▚ morning/evening  ▓ working  ░ night  ╌ off
 ⌂ Paul       5-6pm AEDT Mon░░░░░░░░░░░░░░░░░░░░░░░▚▚▚▚▚▚▚▚▚▚▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▚▚▚▚▚▚▚▚░░░░░░░░░░░░░░░░
 ● Priya      4-5pm AEST ░░░░Mon░░░░░░░░░░░░░░░░░░▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▚▚▚▚▚░░░░░░░░░░░░░░░░░░░
 ● Sam        4-5pm AEST ░░░░Mon░░░░░░░░░░░░░░░░░░▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▚▚▚▚▚░░░░░░░░░░░░░░░░░░░
@@ -37,4 +37,4 @@ Mon 26 Oct AEDT         12a ·   ·   3a  ·   ·   6a  ·   ·   9a  ·   ·   
 │ 5-6pm AEDT / 4-5pm AEST / 8-9am SAST                                                                                 │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────── 3 zones for 5 people ╯
 
-h/l time  . now  v range  n next fit  space mark  y copy  c copy as  m map  esc clear range  ? help  q quit
+h/l time  . now  v range  n next fit  space mark  w save  tab groups  y copy  c copy as  esc clear range  ? help  q quit

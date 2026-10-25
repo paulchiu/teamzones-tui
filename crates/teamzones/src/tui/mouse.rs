@@ -12,7 +12,7 @@ use super::keys::Key;
 use super::layout::{Areas, MapView};
 use super::theme::{TerminalEnv, Theme};
 use super::update::Msg;
-use super::view::{self, Look, Track};
+use super::view::{self, Look, Piece, Track};
 
 /// What the pointer did: the left button's press, drag and release, or a wheel notch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -24,7 +24,10 @@ pub enum Kind {
     ScrollDown,
     ScrollLeft,
     ScrollRight,
-    /// Moves, and the other buttons, which nothing reads.
+    /// A right or middle button press.
+    Right,
+    Middle,
+    /// Moves, the other buttons' drags and releases, which nothing reads.
     Other,
 }
 
@@ -49,10 +52,9 @@ impl Pointer {
             MouseEventKind::ScrollDown => Kind::ScrollDown,
             MouseEventKind::ScrollLeft => Kind::ScrollLeft,
             MouseEventKind::ScrollRight => Kind::ScrollRight,
-            MouseEventKind::Down(_)
-            | MouseEventKind::Up(_)
-            | MouseEventKind::Drag(_)
-            | MouseEventKind::Moved => Kind::Other,
+            MouseEventKind::Down(MouseButton::Right) => Kind::Right,
+            MouseEventKind::Down(MouseButton::Middle) => Kind::Middle,
+            MouseEventKind::Up(_) | MouseEventKind::Drag(_) | MouseEventKind::Moved => Kind::Other,
         };
         Self {
             kind,
@@ -116,16 +118,23 @@ pub fn msgs(app: &App, pointer: Pointer) -> Vec<Msg> {
                 .flatten();
             picked.map(|(c, _, _)| key(*c)).into_iter().collect()
         }
-        Mode::Help(from) if outside(view::help_area(size, *from, look)) => {
+        Mode::Help(from, _) if outside(view::help_area(size, *from, look)) => {
             vec![Msg::Key(Key::Esc)]
         }
         Mode::Normal if app.map_view() == MapView::Overlay => {
             let area = view::map_overlay_area(size);
+            let map = area.inner(ratatui::layout::Margin::new(1, 1));
             match pointer.kind {
-                Kind::Down if area.contains(at) => Vec::new(),
+                Kind::Down if area.contains(at) => map_double(app, map, pointer.x, pointer.y)
+                    .into_iter()
+                    .chain([Msg::Clicked(pointer.x, pointer.y)])
+                    .collect(),
                 Kind::Down => vec![Msg::Key(Key::Esc)],
+                Kind::Right | Kind::Middle if area.contains(at) => Vec::new(),
                 Kind::Drag
                 | Kind::Up
+                | Kind::Right
+                | Kind::Middle
                 | Kind::ScrollUp
                 | Kind::ScrollDown
                 | Kind::ScrollLeft
@@ -134,7 +143,30 @@ pub fn msgs(app: &App, pointer: Pointer) -> Vec<Msg> {
             }
         }
         Mode::Normal => main(app, look, size, pointer),
-        Mode::Help(_) | Mode::Prompt(_) | Mode::SortMenu => Vec::new(),
+        Mode::Matrix(matrix) => super::matrix::pointer(app, matrix, size, pointer),
+        Mode::Picker(picker) if outside(super::picker::area(size, picker)) => {
+            vec![Msg::Key(Key::Esc)]
+        }
+        Mode::DriftMenu => {
+            let area = view::drift_menu_area(app, look, size);
+            if outside(area) {
+                return vec![Msg::Key(Key::Esc)];
+            }
+            let item = (pointer.kind == Kind::Down)
+                .then(|| pointer.y.checked_sub(area.y + 1))
+                .flatten()
+                .and_then(|line| view::DRIFT_MENU.get(usize::from(line)));
+            item.and_then(|(k, _)| k.chars().next())
+                .map(key)
+                .into_iter()
+                .collect()
+        }
+        Mode::Help(..)
+        | Mode::Prompt(_)
+        | Mode::NewGroup(_)
+        | Mode::SortMenu
+        | Mode::AddMenu(_)
+        | Mode::Picker(_) => Vec::new(),
     }
 }
 
@@ -211,40 +243,54 @@ fn main(app: &App, look: Look, size: Rect, pointer: Pointer) -> Vec<Msg> {
             .drag
             .map_or_else(Vec::new, |drag| dragged(&track, drag, pointer)),
         Kind::Up => released(app, &areas, &track, pointer),
-        Kind::ScrollDown | Kind::ScrollUp | Kind::ScrollRight | Kind::ScrollLeft | Kind::Other => {
-            Vec::new()
+        Kind::Middle if pointer.y == areas.who.y => {
+            match strip_piece(app, look, &areas, &track, pointer.x) {
+                Some(Piece::Group(digit)) if digit != '0' => vec![key(digit), key('x')],
+                Some(_) | None => Vec::new(),
+            }
         }
+        Kind::Right
+        | Kind::Middle
+        | Kind::ScrollDown
+        | Kind::ScrollUp
+        | Kind::ScrollRight
+        | Kind::ScrollLeft
+        | Kind::Other => Vec::new(),
     }
 }
 
-/// The key a click on the who strip stands for: `s` on its title, a group's number on its name
-/// or number, and `b` on the legend; the drift tag and the trailing gap send nothing.
-fn strip_click(app: &App, look: Look, areas: &Areas, track: &Track, x: u16) -> Option<Msg> {
-    let strip = view::strip(app, look);
+/// The piece of the who strip, or its legend, at column `x`.
+fn strip_piece(app: &App, look: Look, areas: &Areas, track: &Track, x: u16) -> Option<Piece> {
     let legend = view::who_legend(app, look, track);
     let legend_width = u16::try_from(legend.width()).unwrap_or(u16::MAX);
-    if view::legend_fits(&strip, &legend, areas.who.width)
+    if view::legend_fits(&view::strip(app, look), &legend, areas.who.width)
         && x >= areas.who.right().saturating_sub(legend_width)
     {
-        return Some(key('b'));
+        return Some(Piece::Legend);
     }
     let mut left = areas.who.x;
-    let mut after_digit = None;
-    for (index, span) in strip.spans.iter().enumerate() {
+    for (piece, span) in view::strip_pieces(app, look) {
         let width = u16::try_from(span.width()).unwrap_or(u16::MAX);
-        let digit = span.content.trim().parse::<u8>().ok();
-        let number = digit.or(after_digit);
-        after_digit = digit;
         if (left..left + width).contains(&x) {
-            return match (index, number) {
-                (0, _) => Some(key('s')),
-                (_, Some(n)) => char::from_digit(u32::from(n), 10).map(key),
-                (_, None) => None,
-            };
+            return Some(piece);
         }
         left += width;
     }
     None
+}
+
+/// What a click on the who strip stands for: `s` on its title, a group's number on its name or
+/// number, the drift menu on the drift tag, `+` and `tab` on theirs, and `b` on the legend.
+fn strip_click(app: &App, look: Look, areas: &Areas, track: &Track, x: u16) -> Vec<Msg> {
+    match strip_piece(app, look, areas, track, x) {
+        Some(Piece::Title) => vec![key('s')],
+        Some(Piece::Group(digit)) => vec![key(digit)],
+        Some(Piece::Drift) => vec![Msg::DriftMenu],
+        Some(Piece::NewGroup) => vec![key('+')],
+        Some(Piece::Matrix) => vec![Msg::Key(Key::Tab)],
+        Some(Piece::Legend) => vec![key('b')],
+        Some(Piece::Gap) | None => Vec::new(),
+    }
 }
 
 /// The grab a press on track cell `cell` takes: an edge or the middle of the range it hits, or
@@ -264,9 +310,36 @@ fn grab_at(track: &Track, cell: u16, ranged: bool) -> Grab {
     }
 }
 
+/// How close together two presses on one cell are a double click.
+const DOUBLE: chrono::TimeDelta = chrono::TimeDelta::milliseconds(400);
+
+/// Whether a press at (`x`, `y`) now makes a double click with the last one.
+fn is_double(app: &App, x: u16, y: u16) -> bool {
+    app.last_click
+        .is_some_and(|(cx, cy, at)| (cx, cy) == (x, y) && app.now - at <= DOUBLE)
+}
+
+/// A double click on the map at (`x`, `y`) in `area`: add a person or place at that point.
+fn map_double(app: &App, area: Rect, x: u16, y: u16) -> Option<Msg> {
+    (area.contains(Position::new(x, y)) && is_double(app, x, y)).then(|| {
+        let (lat, lon) = super::map::unproject(area, x, y);
+        Msg::AddAt(lat, lon)
+    })
+}
+
+/// A left-button press, followed by the note of where it was for spotting a double click.
 fn down(app: &App, look: Look, areas: &Areas, track: &Track, pointer: Pointer) -> Vec<Msg> {
+    let mut msgs = pressed(app, look, areas, track, pointer);
+    msgs.push(Msg::Clicked(pointer.x, pointer.y));
+    msgs
+}
+
+fn pressed(app: &App, look: Look, areas: &Areas, track: &Track, pointer: Pointer) -> Vec<Msg> {
     let Pointer { x, y, .. } = pointer;
     let slider = slider(areas, track);
+    if let Some(add) = areas.map.and_then(|map| map_double(app, map, x, y)) {
+        return vec![add];
+    }
     if y == areas.header.y && view::header_now_columns(app).contains(&x) {
         return vec![key('.')];
     }
@@ -274,13 +347,19 @@ fn down(app: &App, look: Look, areas: &Areas, track: &Track, pointer: Pointer) -
         return vec![key('.')];
     }
     if y == areas.who.y {
-        return strip_click(app, look, areas, track, x)
-            .into_iter()
-            .collect();
+        return strip_click(app, look, areas, track, x);
     }
     let where_width = u16::try_from(view::width_of(view::WHERE_TITLE)).unwrap_or(0);
     if y == areas.place.y && x < areas.place.x + where_width {
         return vec![key('s')];
+    }
+    let question: u16 = view::where_question(app, look)
+        .iter()
+        .map(|span| u16::try_from(span.width()).unwrap_or(0))
+        .sum();
+    let asks = areas.place.x + where_width..areas.place.x + where_width + question;
+    if y == areas.place.y && asks.contains(&x) {
+        return vec![key('=')];
     }
     let (copy_key, copy_label) = view::COPY_HINT;
     let copy_hint =
@@ -298,6 +377,8 @@ fn down(app: &App, look: Look, areas: &Areas, track: &Track, pointer: Pointer) -
         let focus = Msg::Focus(row);
         return if x == areas.who.x {
             vec![focus, key(' ')]
+        } else if is_double(app, x, y) {
+            vec![focus, key('e')]
         } else {
             vec![focus]
         };

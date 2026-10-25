@@ -2,21 +2,24 @@
 
 use chrono::{DateTime, Utc};
 use teamzones_core::clock::{Range, Slot, When};
-use teamzones_core::config::{Config, PersonId};
+use teamzones_core::config::PersonId;
 use teamzones_core::copy::{clock_text, span_text};
 use teamzones_core::fit::{NoFit, blocker, next_run, previous_run, slot_fits};
 use teamzones_core::question::{Marks, Row, person_band, place_level};
 use teamzones_core::time::Moment;
 
-use super::app::{
-    App, Cursor, Lanes, Lens, Mode, Undo, Visual, base_marks, next_style, style_name,
-};
+use super::app::{App, Cursor, Lanes, Lens, Mode, Visual, base_marks, next_style, style_name};
+use super::edit;
+use super::editor::Loaded;
 use super::keys::{Action, Context, Key, action_for};
 use super::layout::MapView;
+use super::matrix;
 use super::mouse::{self, Drag, Pointer};
 use super::notice::{Notice, TIMEOUT};
+use super::picker;
 use super::prompt;
 use super::say::duration_text;
+use super::undo::{Snapshot, Undo};
 
 /// Slots in an hour and in a day, for the coarse moves.
 const HOUR: i64 = 4;
@@ -32,11 +35,11 @@ pub enum Msg {
         text: String,
         result: Result<(), String>,
     },
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "the r key that sends it lands with write-back")
-    )]
-    Reload(Box<Config>),
+    /// The config read afresh by `r` or after `E`, or the notice text saying why not.
+    Reloaded {
+        key: String,
+        result: Result<Box<Loaded>, String>,
+    },
     /// The terminal is now this many columns and rows.
     Resize(u16, u16),
     /// Whether switching mouse capture to `on` worked.
@@ -46,6 +49,12 @@ pub enum Msg {
     },
     /// A pointer event, which stands for the messages its keymap row's key would send.
     Mouse(Pointer),
+    /// Whether writing the config over `over` worked.
+    Wrote {
+        key: String,
+        over: String,
+        result: Result<(), String>,
+    },
     /// Focus this row.
     Focus(Row),
     /// Put the cursor on this slot, dropping any range.
@@ -54,6 +63,18 @@ pub enum Msg {
     Run(Slot),
     /// The drag in progress, or none once the button is released.
     Drag(Option<Drag>),
+    /// Put the matrix cursor on this row and column.
+    MatrixCell(usize, usize),
+    /// Hold the left button on this matrix column's name, or let go.
+    MatrixHold(Option<usize>),
+    /// The held matrix column has been dragged.
+    MatrixDragged,
+    /// Add a person or a place at this latitude and longitude, from a double click on the map.
+    AddAt(f64, f64),
+    /// Open the drift tag's menu.
+    DriftMenu,
+    /// The left button went down at this cell, for spotting a double click.
+    Clicked(u16, u16),
 }
 
 /// Work the effects layer does on the update's behalf.
@@ -65,6 +86,20 @@ pub enum Effect {
     },
     /// Turn mouse capture on or off.
     CaptureMouse(bool),
+    /// Read the config file afresh.
+    Reload,
+    /// Suspend the TUI, run the editor on the config file and reload it, recapturing the mouse
+    /// afterwards when `mouse`.
+    Edit {
+        mouse: bool,
+    },
+    /// Replace the config file's text, `over` being what the file should still hold, so an edit
+    /// made outside the app is never written over.
+    Write {
+        key: String,
+        text: String,
+        over: String,
+    },
 }
 
 /// The context whose bindings read the next key: a modal, range mode while drawing, or main.
@@ -72,10 +107,15 @@ pub fn context(app: &App) -> Context {
     match &app.mode {
         Mode::Normal if app.visual.is_some() => Context::Range,
         Mode::Normal => Context::Main,
-        Mode::Prompt(_) => Context::Prompt,
+        Mode::Prompt(_) | Mode::NewGroup(_) => Context::Prompt,
+        Mode::Matrix(matrix) if matrix.naming.is_some() => Context::Prompt,
+        Mode::Matrix(_) => Context::Matrix,
+        Mode::Picker(_) => Context::Prompt,
+        Mode::AddMenu(_) => Context::AddMenu,
+        Mode::DriftMenu => Context::DriftMenu,
         Mode::CopyMenu => Context::CopyMenu,
         Mode::SortMenu => Context::SortMenu,
-        Mode::Help(_) => Context::Help,
+        Mode::Help(..) => Context::Help,
     }
 }
 
@@ -84,7 +124,7 @@ pub fn update(app: App, msg: Msg) -> (App, Vec<Effect>) {
     let rows_before = app.focus_rows();
     let (mut next, effects) = match msg {
         Msg::Key(key) => on_key(app, key),
-        Msg::Tick(now) => (tick(app, now), Vec::new()),
+        Msg::Tick(now) => tick(app, now),
         Msg::Copied { key, text, result } => {
             let words = match result {
                 Ok(()) => "copied".to_owned(),
@@ -122,6 +162,45 @@ pub fn update(app: App, msg: Msg) -> (App, Vec<Effect>) {
         ),
         Msg::Run(slot) => (run_at(app, slot), Vec::new()),
         Msg::Drag(drag) => (App { drag, ..app }, Vec::new()),
+        Msg::MatrixCell(row, column) => (matrix::place_cursor(app, row, column), Vec::new()),
+        Msg::MatrixHold(held) => (matrix::hold(app, held), Vec::new()),
+        Msg::MatrixDragged => (matrix::dragged(app), Vec::new()),
+        Msg::DriftMenu => (
+            App {
+                mode: Mode::DriftMenu,
+                ..app
+            },
+            Vec::new(),
+        ),
+        Msg::AddAt(lat, lon) => (
+            App {
+                mode: Mode::AddMenu(Some((lat, lon))),
+                ..app
+            },
+            Vec::new(),
+        ),
+        Msg::Clicked(x, y) => {
+            let at = app.now;
+            (
+                App {
+                    last_click: Some((x, y, at)),
+                    ..app
+                },
+                Vec::new(),
+            )
+        }
+        Msg::Wrote { key, over, result } => match result {
+            Ok(()) => (app, Vec::new()),
+            Err(error) => {
+                let now = app.now;
+                let kept = App {
+                    disk: Some(over),
+                    ..app
+                };
+                let text = format!("not saved: {error}");
+                (with_notice(kept, &key, &text, now), Vec::new())
+            }
+        },
         Msg::Captured { on, result } => {
             let now = app.now;
             match result {
@@ -133,13 +212,7 @@ pub fn update(app: App, msg: Msg) -> (App, Vec<Effect>) {
                 }
             }
         }
-        Msg::Reload(config) => (
-            App {
-                config: *config,
-                ..app
-            },
-            Vec::new(),
-        ),
+        Msg::Reloaded { key, result } => (edit::reloaded(app, &key, result), Vec::new()),
     };
     next.focus = clamp_focus(&rows_before, &next.focus_rows(), next.focus);
     (next, effects)
@@ -157,14 +230,19 @@ fn clamp_focus(before: &[Row], after: &[Row], focus: Row) -> Row {
         .unwrap_or(Row::Person(PersonId::HOME))
 }
 
-fn tick(app: App, now: DateTime<Utc>) -> App {
+/// Samples `now`, expiring notices and writing a pending close once its window has passed.
+fn tick(app: App, now: DateTime<Utc>) -> (App, Vec<Effect>) {
     let notice = app.notice.filter(|notice| notice.visible(now));
     let style_flash = app.style_flash.filter(|flash| flash.visible(now));
-    App {
+    let app = App {
         now,
         notice,
         style_flash,
         ..app
+    };
+    match app.flush_at {
+        Some(due) if due <= now => edit::flush(app, "x"),
+        Some(_) | None => (app, Vec::new()),
     }
 }
 
@@ -257,7 +335,29 @@ fn act(app: App, action: Action, key: Key) -> (App, Vec<Effect>) {
         }),
         Action::Group(index) => only(switch(app, Lens::Group(index), key)),
         Action::All => only(switch(app, Lens::All, key)),
-        Action::Undo => only(undo(app)),
+        Action::Undo => match app.mode {
+            Mode::Matrix(_) => only(matrix::step_back(app)),
+            Mode::Normal
+            | Mode::Prompt(_)
+            | Mode::NewGroup(_)
+            | Mode::CopyMenu
+            | Mode::SortMenu
+            | Mode::Help(..)
+            | Mode::AddMenu(_)
+            | Mode::Picker(_)
+            | Mode::DriftMenu => undo(app),
+        },
+        Action::Save => match app.lens {
+            Lens::Group(_) => edit::save(normal(app)),
+            Lens::All => only(new_group(app)),
+        },
+        Action::Revert => only(normal(App {
+            marks: base_marks(app.roster(), app.lens),
+            ..app
+        })),
+        Action::NewGroup => only(new_group(app)),
+        Action::CloseGroup => edit::close(app),
+        Action::CycleWhere => only(edit::cycle_where(app)),
         Action::Copy => {
             let text = app.say_line();
             (app, copy("y", text))
@@ -282,22 +382,102 @@ fn act(app: App, action: Action, key: Key) -> (App, Vec<Effect>) {
             ..app
         }),
         Action::SortBy(sort) => only(normal(App { sort, ..app })),
-        Action::Help => only(App {
-            mode: match &app.mode {
-                Mode::Help(_) => Mode::Normal,
-                Mode::Normal | Mode::Prompt(_) | Mode::CopyMenu | Mode::SortMenu => {
-                    Mode::Help(context(&app))
-                }
+        Action::Help => only(match app.mode.clone() {
+            Mode::Help(_, back) => App { mode: *back, ..app },
+            mode @ (Mode::Normal
+            | Mode::Prompt(_)
+            | Mode::NewGroup(_)
+            | Mode::CopyMenu
+            | Mode::SortMenu
+            | Mode::Matrix(_)
+            | Mode::AddMenu(_)
+            | Mode::Picker(_)
+            | Mode::DriftMenu) => App {
+                mode: Mode::Help(context(&app), Box::new(mode)),
+                ..app
             },
-            ..app
         }),
-        Action::Quit => only(App {
-            running: false,
-            ..app
-        }),
+        Action::Quit => {
+            let (app, effects) = edit::flush(app, "q");
+            (
+                App {
+                    running: false,
+                    ..app
+                },
+                effects,
+            )
+        }
         Action::Type(c) => only(edit_prompt(app, Some(c))),
         Action::Erase => only(edit_prompt(app, None)),
-        Action::Submit => only(submit(app)),
+        Action::Submit => match &app.mode {
+            Mode::NewGroup(name) => {
+                let name = name.clone();
+                edit::save_as(normal(app), &name)
+            }
+            Mode::Matrix(_) => only(matrix::submit_name(app)),
+            Mode::Picker(_) => picker::submit(app),
+            Mode::Normal
+            | Mode::Prompt(_)
+            | Mode::CopyMenu
+            | Mode::SortMenu
+            | Mode::Help(..)
+            | Mode::AddMenu(_)
+            | Mode::DriftMenu => only(submit(app)),
+        },
+        Action::AddMenu => only(App {
+            mode: Mode::AddMenu(None),
+            ..app
+        }),
+        Action::AddRow(place) => {
+            let point = match app.mode {
+                Mode::AddMenu(point) => point,
+                Mode::Normal
+                | Mode::Prompt(_)
+                | Mode::NewGroup(_)
+                | Mode::CopyMenu
+                | Mode::SortMenu
+                | Mode::Help(..)
+                | Mode::Matrix(_)
+                | Mode::Picker(_)
+                | Mode::DriftMenu => None,
+            };
+            only(picker::open_new(app, place, point))
+        }
+        Action::EditRow => only(picker::open_edit(app)),
+        Action::DeleteRow => picker::delete(app),
+        Action::Reload => {
+            let (app, mut effects) = edit::flush(app, "x");
+            effects.push(Effect::Reload);
+            (app, effects)
+        }
+        Action::OpenEditor => {
+            let (app, mut effects) = edit::flush(app, "x");
+            effects.push(Effect::Edit { mouse: app.mouse });
+            (app, effects)
+        }
+        Action::Matrix => only(matrix::open(app)),
+        Action::Cell(columns, rows) => {
+            only(matrix::step(app, isize::from(columns), isize::from(rows)))
+        }
+        Action::ToggleCell => only(matrix::toggle(app)),
+        Action::UseGroup => matrix::use_group(app),
+        Action::CopyGroup => {
+            let line = matrix::of(&app)
+                .and_then(|m| app.roster().groups.get(m.column))
+                .map(|group| matrix::group_line(&app, group));
+            match line {
+                Some(text) => (app, copy("y", text)),
+                None => only(app),
+            }
+        }
+        Action::AddGroup => only(matrix::start_naming(app, matrix::Naming::Add)),
+        Action::RenameGroup => {
+            let column = matrix::column(&app);
+            only(matrix::start_naming(app, matrix::Naming::Rename(column)))
+        }
+        Action::MoveGroup(by) => only(matrix::move_column(app, isize::from(by))),
+        Action::CloseColumn => only(matrix::close_column(app)),
+        Action::FinishMatrix => matrix::finish(app, None),
         Action::CycleRangeStyle => {
             let range_style = next_style(app.range_style);
             let text = format!("range style: {}", style_name(range_style));
@@ -407,8 +587,20 @@ fn unwind(app: App) -> App {
             ..app
         };
     }
-    match (&app.mode, app.visual, app.range) {
-        (Mode::Prompt(_) | Mode::CopyMenu | Mode::SortMenu | Mode::Help(_), _, _) => normal(app),
+    match (app.mode.clone(), app.visual, app.range) {
+        (Mode::Help(_, back), _, _) => App { mode: *back, ..app },
+        (Mode::Matrix(_), _, _) => matrix::edit_name(app, |_| None),
+        (
+            Mode::Prompt(_)
+            | Mode::NewGroup(_)
+            | Mode::CopyMenu
+            | Mode::SortMenu
+            | Mode::AddMenu(_)
+            | Mode::Picker(_)
+            | Mode::DriftMenu,
+            _,
+            _,
+        ) => normal(app),
         (Mode::Normal, Some(v), _) => App {
             cursor: v.before.0,
             range: v.before.1,
@@ -467,6 +659,7 @@ fn key_text(key: Key) -> String {
         | Key::Enter
         | Key::Esc
         | Key::Backspace
+        | Key::Tab
         | Key::Other => String::new(),
     }
 }
@@ -484,8 +677,7 @@ fn switch(app: App, lens: Lens, key: Key) -> App {
         (
             app.expression(),
             Undo {
-                lens: app.lens,
-                marks: app.marks.clone(),
+                before: Box::new(Snapshot::of(&app)),
                 expires: app.now + TIMEOUT,
             },
         )
@@ -510,20 +702,21 @@ fn switch(app: App, lens: Lens, key: Key) -> App {
     }
 }
 
-fn undo(app: App) -> App {
+/// Puts back the state before the last drop, write, close or delete, writing the file back
+/// unless the state it returns to still had a close pending.
+fn undo(app: App) -> (App, Vec<Effect>) {
     match app.undo.clone() {
         Some(undo) if app.now < undo.expires => {
-            let restored = App {
-                lens: undo.lens,
-                marks: undo.marks,
-                undo: None,
-                ..app
-            };
+            let restored = undo.before.restore(App { undo: None, ..app });
             let now = restored.now;
             let text = format!("restored {}", restored.expression());
-            with_notice(restored, "u", &text, now)
+            let restored = with_notice(restored, "u", &text, now);
+            match restored.flush_at {
+                Some(_) => (restored, Vec::new()),
+                None => edit::flush(restored, "u"),
+            }
         }
-        Some(_) | None => App { undo: None, ..app },
+        Some(_) | None => (App { undo: None, ..app }, Vec::new()),
     }
 }
 
@@ -656,12 +849,28 @@ fn missed(app: App, step: Step, no_fit: NoFit, now: DateTime<Utc>) -> App {
 }
 
 fn edit_prompt(app: App, typed: Option<char>) -> App {
-    match &app.mode {
-        Mode::Prompt(input) => App {
-            mode: Mode::Prompt(prompt::edit(input, typed)),
-            ..app
-        },
-        Mode::Normal | Mode::CopyMenu | Mode::SortMenu | Mode::Help(_) => app,
+    let mode = match &app.mode {
+        Mode::Prompt(input) => Mode::Prompt(prompt::edit(input, typed)),
+        Mode::NewGroup(input) => Mode::NewGroup(prompt::edit(input, typed)),
+        Mode::Matrix(_) => {
+            return matrix::edit_name(app, |input| Some(prompt::edit(input, typed)));
+        }
+        Mode::Picker(_) => return picker::edit_field(app, |input| prompt::edit(input, typed)),
+        Mode::Normal
+        | Mode::CopyMenu
+        | Mode::SortMenu
+        | Mode::Help(..)
+        | Mode::AddMenu(_)
+        | Mode::DriftMenu => return app,
+    };
+    App { mode, ..app }
+}
+
+/// `+`, or `w` on `0 all`: opens the strip's name prompt, offering a name from the expression.
+fn new_group(app: App) -> App {
+    App {
+        mode: Mode::NewGroup(edit::offered_name(&app)),
+        ..app
     }
 }
 

@@ -60,7 +60,7 @@ pub fn truncate_with_mark(text: &str, max: usize, mark: &str) -> String {
 }
 
 /// Writes `text` at (`x`, `y`) without passing `area`'s right edge; returns the column after it.
-fn put(buf: &mut Buffer, area: Rect, x: u16, y: u16, text: &str, style: Style) -> u16 {
+pub fn put(buf: &mut Buffer, area: Rect, x: u16, y: u16, text: &str, style: Style) -> u16 {
     let area = area.intersection(buf.area);
     if y < area.top() || y >= area.bottom() || x < area.left() || x >= area.right() {
         return x;
@@ -301,10 +301,13 @@ pub fn draw(frame: &mut Frame, app: &App, look: Look) {
     if app.map_view_at(size.width, size.height) == MapView::Overlay {
         map_overlay(buf, size, app, look);
     }
-    match app.mode {
-        Mode::Help(from) => help_overlay(buf, size, from, look),
+    match &app.mode {
+        Mode::Help(from, _) => help_overlay(buf, size, *from, look),
+        Mode::Matrix(matrix) => super::matrix::draw(buf, size, app, matrix, look),
+        Mode::Picker(picker) => super::picker::draw(buf, size, app, picker, look),
         Mode::CopyMenu => copy_dialog(buf, size, app, look),
-        Mode::Normal | Mode::Prompt(_) | Mode::SortMenu => {}
+        Mode::DriftMenu => drift_menu(buf, size, app, look),
+        Mode::Normal | Mode::Prompt(_) | Mode::NewGroup(_) | Mode::SortMenu | Mode::AddMenu(_) => {}
     }
 }
 
@@ -796,12 +799,27 @@ fn legend(items: &[(char, Role, &str)], look: Look) -> Line<'static> {
     Line::from(spans)
 }
 
-/// The who strip: `who`, then each numbered group with the active one marked and its drift.
-pub fn strip(app: &App, look: Look) -> Line<'static> {
+/// What a piece of the who strip is, which a click on it stands for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Piece {
+    Title,
+    /// A group's number and name, by its digit (`0` for all).
+    Group(char),
+    Drift,
+    NewGroup,
+    Matrix,
+    Gap,
+    /// The people legend at the border's right, which a click hit-tests as `b`.
+    Legend,
+}
+
+/// The who strip's pieces: `who`, each numbered group with the active one marked and its drift,
+/// then `+` (or its name prompt) and the matrix's `⋯`.
+pub fn strip_pieces(app: &App, look: Look) -> Vec<(Piece, Span<'static>)> {
     let theme = look.theme;
-    let mut spans = vec![Span::styled(
-        " who ",
-        theme.fg(Role::Text).add_modifier(Modifier::BOLD),
+    let mut pieces = vec![(
+        Piece::Title,
+        Span::styled(" who ", theme.fg(Role::Text).add_modifier(Modifier::BOLD)),
     )];
     let active = |index: Option<usize>| match (app.lens, index) {
         (super::app::Lens::Group(lens), Some(index)) => lens == index,
@@ -814,30 +832,85 @@ pub fn strip(app: &App, look: Look) -> Line<'static> {
         .iter()
         .take(9)
         .enumerate()
-        .map(|(index, group)| ((index + 1).to_string(), group.name.clone(), Some(index)))
-        .chain(std::iter::once(("0".to_owned(), "all".to_owned(), None)));
+        .map(|(index, group)| (index + 1, group.name.clone(), Some(index)))
+        .chain(std::iter::once((0, "all".to_owned(), None)));
     for (number, name, index) in names {
-        spans.push(Span::styled(format!("  {number} "), theme.fg(Role::Dim)));
+        let digit = char::from_digit(u32::try_from(number).unwrap_or(0), 10).unwrap_or('0');
+        let group = Piece::Group(digit);
+        pieces.push((
+            group,
+            Span::styled(format!("  {number} "), theme.fg(Role::Dim)),
+        ));
         if active(index) {
-            spans.push(Span::styled(
-                name,
-                theme
-                    .fg(Role::Accent)
-                    .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
-            ));
+            let style = theme
+                .fg(Role::Accent)
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED);
+            pieces.push((group, Span::styled(name, style)));
             let drift = app.drift();
             if !drift.is_empty() {
-                spans.push(Span::styled(
-                    format!(" {}", drift.join(" ")),
-                    theme.fg(Role::Warn),
-                ));
+                let text = format!(" {}", drift.join(" "));
+                pieces.push((Piece::Drift, Span::styled(text, theme.fg(Role::Warn))));
             }
         } else {
-            spans.push(Span::styled(name, theme.fg(Role::Dim)));
+            pieces.push((group, Span::styled(name, theme.fg(Role::Dim))));
         }
     }
-    spans.push(Span::raw("  "));
-    Line::from(spans)
+    let adding = match &app.mode {
+        Mode::NewGroup(input) => Span::styled(format!("  + {input}_"), theme.fg(Role::Accent)),
+        Mode::Normal
+        | Mode::Prompt(_)
+        | Mode::CopyMenu
+        | Mode::SortMenu
+        | Mode::Help(..)
+        | Mode::Matrix(_)
+        | Mode::AddMenu(_)
+        | Mode::Picker(_)
+        | Mode::DriftMenu => Span::styled("  +", theme.fg(Role::Dim)),
+    };
+    pieces.push((Piece::NewGroup, adding));
+    let matrix = format!("  {}", look.glyphs.text("⋯"));
+    pieces.push((Piece::Matrix, Span::styled(matrix, theme.fg(Role::Dim))));
+    pieces.push((Piece::Gap, Span::raw("  ")));
+    pieces
+}
+
+/// The drift menu's two items, in order.
+pub const DRIFT_MENU: [(&str, &str); 2] = [("w", "save"), ("r", "revert")];
+
+/// The drift menu's box: just under the drift tag in the strip.
+pub fn drift_menu_area(app: &App, look: Look, size: Rect) -> Rect {
+    let who = areas(app, size).who;
+    let before: usize = strip_pieces(app, look)
+        .iter()
+        .take_while(|(piece, _)| *piece != Piece::Drift)
+        .map(|(_, span)| span.width())
+        .sum();
+    let x = who.x + u16::try_from(before).unwrap_or(0);
+    Rect::new(x, who.y + 1, 12, 4).intersection(size)
+}
+
+fn drift_menu(buf: &mut Buffer, size: Rect, app: &App, look: Look) {
+    let theme = look.theme;
+    let area = drift_menu_area(app, look, size);
+    Clear.render(area, buf);
+    Block::bordered()
+        .border_set(look.glyphs.rounded)
+        .border_style(theme.fg(Role::Accent))
+        .render(area, buf);
+    for ((key, label), y) in DRIFT_MENU.iter().zip(area.y + 1..) {
+        let x = put(buf, area, area.x + 2, y, key, theme.fg(Role::Accent));
+        put(buf, area, x + 1, y, label, theme.fg(Role::Dim));
+    }
+}
+
+/// The who strip as one line.
+pub fn strip(app: &App, look: Look) -> Line<'static> {
+    Line::from(
+        strip_pieces(app, look)
+            .into_iter()
+            .map(|(_, span)| span)
+            .collect::<Vec<_>>(),
+    )
 }
 
 /// Whether a block's legend fits beside its title in `width` columns.
@@ -999,6 +1072,23 @@ fn who(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
     }
 }
 
+/// The where border's question after its title: `asks open`, `context` or `not asked`, which a
+/// click hit-tests as `=`.
+pub fn where_question(app: &App, look: Look) -> Vec<Span<'static>> {
+    let theme = look.theme;
+    let marks = &app.marks;
+    match (marks.asks_where(), marks.rule, marks.places.is_empty()) {
+        (true, rule, _) => vec![
+            Span::styled(" asks ", theme.fg(Role::Dim)),
+            Span::styled(rule.word(), theme.fg(Role::Accent)),
+        ],
+        (false, Rule::Context, false) => vec![Span::styled(" context", theme.fg(Role::Dim))],
+        (false, Rule::Context, true) | (false, Rule::Open | Rule::Closed, _) => {
+            vec![Span::styled(" not asked", theme.fg(Role::Dim))]
+        }
+    }
+}
+
 fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
     let (theme, glyphs) = (look.theme, look.glyphs);
     let roster = app.roster();
@@ -1007,16 +1097,7 @@ fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
         WHERE_TITLE,
         theme.fg(Role::Text).add_modifier(Modifier::BOLD),
     )];
-    match (marks.asks_where(), marks.rule, marks.places.is_empty()) {
-        (true, rule, _) => title.extend([
-            Span::styled(" asks ", theme.fg(Role::Dim)),
-            Span::styled(rule.word(), theme.fg(Role::Accent)),
-        ]),
-        (false, Rule::Context, false) => title.push(Span::styled(" context", theme.fg(Role::Dim))),
-        (false, Rule::Context, true) | (false, Rule::Open | Rule::Closed, _) => {
-            title.push(Span::styled(" not asked", theme.fg(Role::Dim)));
-        }
-    }
+    title.extend(where_question(app, look));
     title.push(Span::raw(" "));
     let words = roster.shared_labels();
     let items = [
@@ -1215,7 +1296,13 @@ fn notice(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
         Mode::Prompt(input) => Some(format!("t  {input}_")),
         Mode::CopyMenu => Some("c  copy as".to_owned()),
         Mode::SortMenu => Some("s  sort by".to_owned()),
-        Mode::Normal | Mode::Help(_) => app
+        Mode::AddMenu(_) => Some("a  add".to_owned()),
+        Mode::Normal
+        | Mode::NewGroup(_)
+        | Mode::Help(..)
+        | Mode::Matrix(_)
+        | Mode::Picker(_)
+        | Mode::DriftMenu => app
             .notice
             .as_ref()
             .filter(|notice| notice.visible(app.now))
