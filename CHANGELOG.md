@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ## [Unreleased]
 
+### Added
+
+- A world map above the timeline shows the night side and the sun for the time you are viewing, with a marker for everyone and every place, labelled with each counted city's local time and each counted place's state, as in `UK closed 3-5am`.
+- The map shows when the terminal has at least 100 columns and 12 spare rows. `m` hides it, or opens it in a box over the timeline when there is no room, and `esc` closes the box.
+- The mouse works: the wheel moves the time (shift for an hour, sideways for a day), dragging draws a range or moves it and its ends, clicking a fitting run jumps to it, and clicking a row, a mark, a group name, the legend, a block title, `y copy`, `u undo`, `◂` or the header's now does what its key does. Clicking outside a dialog closes it.
+- `M` releases the mouse so you can select text, and says `mouse off` in the footer until `M` again.
+
+### Changed
+
+- The footer offers `m map`, and keeps it ahead of other hints while the map is hidden for want of room.
+
 ## [0.7.0] - 2026-10-25
 
 ### Changed
