@@ -58,3 +58,67 @@ fn the_sun_sits_within_a_cell_of_the_subsolar_point_at_the_range_s_midpoint() {
         (x, y)
     );
 }
+
+/// The app as a terminal of `cols` by `rows` reports itself.
+fn sized(app: App, cols: u16, rows: u16) -> App {
+    update(app, Msg::Resize(cols, rows)).0
+}
+
+/// Whether any row but an answer row (whose fills are Braille too) draws Braille land.
+fn shows_map(buf: &Buffer) -> bool {
+    text(buf)
+        .lines()
+        .filter(|line| !line.contains('≡'))
+        .any(|line| line.chars().any(|c| ('⠁'..='⣿').contains(&c)))
+}
+
+/// Renders `app` at the size it last reported.
+fn frame(app: &App) -> Buffer {
+    render(app, app.size.0, app.size.1)
+}
+
+#[test]
+fn at_120_by_36_the_map_shows_and_m_hides_it_until_m_again() {
+    let app = sized(team_monday(), 120, 36);
+    assert!(shows_map(&frame(&app)));
+    let hidden = press(app, &chars("m"));
+    assert!(!shows_map(&frame(&hidden)), "{}", text(&frame(&hidden)));
+    assert!(shows_map(&frame(&press(hidden, &chars("m")))));
+}
+
+#[test]
+fn where_there_is_no_room_m_opens_the_map_as_an_overlay_until_esc() {
+    for (cols, rows) in [(120, 24), (80, 24)] {
+        let app = sized(team_monday(), cols, rows);
+        assert!(!shows_map(&frame(&app)), "{cols}x{rows}");
+        let open = press(app, &chars("m"));
+        let buf = frame(&open);
+        assert!(shows_map(&buf), "{cols}x{rows}\n{}", text(&buf));
+        assert!(
+            text(&buf).contains(" map "),
+            "{cols}x{rows}\n{}",
+            text(&buf)
+        );
+        let closed = press(open, &[Key::Esc]);
+        assert!(!shows_map(&frame(&closed)), "{cols}x{rows}");
+    }
+}
+
+#[test]
+fn a_resize_recomputes_the_choice_and_a_group_switch_never_does() {
+    let hidden = press(sized(team_monday(), 120, 36), &chars("m"));
+    for switched in [
+        press(hidden.clone(), &chars("3")),
+        press(hidden.clone(), &chars("40")),
+    ] {
+        assert!(!shows_map(&frame(&switched)));
+    }
+    let shown = sized(team_monday(), 120, 36);
+    let shrunk = sized(shown.clone(), 120, 24);
+    assert!(!shows_map(&frame(&shrunk)), "{}", text(&frame(&shrunk)));
+    assert!(shows_map(&frame(&press(shown, &chars("34")))));
+    assert!(
+        shows_map(&frame(&sized(hidden, 120, 36))),
+        "a resize drops the flip"
+    );
+}

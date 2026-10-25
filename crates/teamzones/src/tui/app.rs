@@ -2,11 +2,13 @@
 
 use chrono::{DateTime, NaiveDate, Offset, Utc};
 use teamzones_core::clock::{Range, Slot, When};
-use teamzones_core::config::{Config, PersonId, RangeStyle, Roster};
+use teamzones_core::config::{Config, MapShow, PersonId, RangeStyle, Roster};
 use teamzones_core::copy::{Format, Who, format_line};
 use teamzones_core::question::{Marks, Row};
 
+use super::glyphs::Glyphs;
 use super::keys::{Context, Sort};
+use super::layout::{MapChoice, MapView, map_view};
 use super::notice::Notice;
 
 /// Where the cursor sits: on exact now, or on a grid slot once anything moves it.
@@ -137,6 +139,12 @@ pub struct App {
     pub range_style: RangeStyle,
     /// The footer's note naming the range style, raised when `R` changes it.
     pub style_flash: Option<Notice>,
+    /// The terminal's columns and rows, as the last resize reported them.
+    pub size: (u16, u16),
+    /// Whether `m` has flipped the map's automatic choice since the last resize.
+    pub map_flipped: bool,
+    /// Whether the app holds mouse capture; `M` releases it for text selection.
+    pub mouse: bool,
 }
 
 impl App {
@@ -166,7 +174,31 @@ impl App {
             running: true,
             range_style,
             style_flash: None,
+            size: (0, 0),
+            map_flipped: false,
+            mouse: true,
         }
+    }
+
+    /// Where the map goes on a `cols` by `rows` screen; the ascii glyph set never draws it.
+    pub fn map_view_at(&self, cols: u16, rows: u16) -> MapView {
+        let count = |n: usize| u16::try_from(n).unwrap_or(u16::MAX);
+        let base = match (Glyphs::of(self.config.theme.glyphs).ascii, self.config.map) {
+            (true, _) | (false, MapShow::Never) => MapChoice::Hidden,
+            (false, MapShow::Auto) => MapChoice::Auto,
+            (false, MapShow::Always) => MapChoice::Always,
+        };
+        let ascii = Glyphs::of(self.config.theme.glyphs).ascii;
+        let roster = (
+            count(self.roster().people().count()),
+            count(self.roster().places().count()),
+        );
+        map_view(cols, rows, roster, base, self.map_flipped && !ascii)
+    }
+
+    /// Where the map goes at the size the terminal last reported.
+    pub fn map_view(&self) -> MapView {
+        self.map_view_at(self.size.0, self.size.1)
     }
 
     pub fn roster(&self) -> &Roster {

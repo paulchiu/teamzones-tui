@@ -100,6 +100,8 @@ pub enum Action {
     Erase,
     Submit,
     CycleRangeStyle,
+    FlipMap,
+    ToggleMouse,
 }
 
 /// A footer hint: the keys as the footer writes them, a short label, and when it shows.
@@ -108,6 +110,8 @@ pub struct Hint {
     pub keys: &'static str,
     pub label: &'static str,
     pub shown: Shown,
+    /// The priority it takes instead while the map is hidden for want of room.
+    pub raised: Option<u8>,
 }
 
 /// When a hint earns its footer space.
@@ -149,11 +153,17 @@ const fn hint(keys: &'static str, label: &'static str) -> Hint {
         keys,
         label,
         shown: Shown::Always,
+        raised: None,
     }
 }
 
 const fn hint_when(keys: &'static str, label: &'static str, shown: Shown) -> Hint {
-    Hint { keys, label, shown }
+    Hint {
+        keys,
+        label,
+        shown,
+        raised: None,
+    }
 }
 
 /// The footer priority of a mode hint: below the pinned ones, above everything else.
@@ -402,13 +412,23 @@ pub const BINDINGS: &[Binding] = &[
             Context::Main,
         )
     },
-    row(
-        "m",
-        "Flip the map's automatic choice (overlay when there is no room)",
-        "M4",
-        Context::Main,
-    ),
-    row("M", "Release or recapture the mouse", "M4", Context::Main),
+    Binding {
+        hints: &[Hint {
+            raised: Some(6),
+            ..hint("m", "map")
+        }],
+        chords: &[(Key::Char('m'), Action::FlipMap)],
+        ..row(
+            "m",
+            "Flip the map's automatic choice (overlay when there is no room)",
+            "M4",
+            Context::Main,
+        )
+    },
+    Binding {
+        chords: &[(Key::Char('M'), Action::ToggleMouse)],
+        ..row("M", "Release or recapture the mouse", "M4", Context::Main)
+    },
     row(
         "a e d",
         "Add, edit or delete a person or place",
@@ -648,8 +668,8 @@ mod tests {
         assert_eq!(compiled, spec_rows());
     }
 
-    /// The milestones built so far: M3 and the hands-on feedback rounds after it.
-    const BUILT: [&str; 2] = ["M3", "FB2"];
+    /// The milestones built so far: M3, M4 and the hands-on feedback rounds after M3.
+    const BUILT: [&str; 3] = ["M3", "M4", "FB2"];
 
     #[test]
     fn a_row_dispatches_only_when_its_milestone_is_built() {
@@ -682,7 +702,9 @@ mod tests {
         let hinted: Vec<&str> = hints(Context::Main).iter().map(|(h, _)| h.keys).collect();
         assert_eq!(
             hinted,
-            ["h/l", ".", "v", "n", "space", "y", "c", "esc", "?", "q"]
+            [
+                "h/l", ".", "v", "n", "space", "y", "c", "m", "esc", "?", "q"
+            ]
         );
     }
 

@@ -300,8 +300,9 @@ fn copy_setup(setup: &str) -> App {
 fn copied(effects: &[Effect]) -> Vec<String> {
     effects
         .iter()
-        .map(|effect| match effect {
-            Effect::Copy { text, .. } => text.clone(),
+        .filter_map(|effect| match effect {
+            Effect::Copy { text, .. } => Some(text.clone()),
+            Effect::CaptureMouse(_) => None,
         })
         .collect()
 }
@@ -500,7 +501,8 @@ fn the_footer_at_now_leaves_out_the_group_hint_and_the_mode_hints() {
     let buf = render(&fixture(), 80, 24);
     assert_eq!(
         row(&buf, 23),
-        "h/l time  v range  n next fit  space mark  y copy  c copy as  ? help  q quit"
+        "h/l time  v range  n next fit  space mark  y copy  m map  ? help  q quit",
+        "with the map hidden for want of room, m outranks c"
     );
 }
 
@@ -1450,3 +1452,4 @@ fn below_60_columns_without_the_height_to_stack_the_screen_is_a_plain_list() {
 }
 
 mod map;
+mod mouse;

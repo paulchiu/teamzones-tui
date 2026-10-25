@@ -2,11 +2,38 @@
 
 use ratatui::layout::Rect;
 
-/// Whether the map takes the spare rows: by the hiding rule, or forced either way.
+/// Whether the map takes the spare rows: by the hiding rule, whenever there are any, or never.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MapChoice {
     Auto,
+    Always,
     Hidden,
+}
+
+/// Where the map is drawn: in the spare rows, nowhere, or over the grid in a box.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MapView {
+    InPlace,
+    Hidden,
+    Overlay,
+}
+
+/// The map's place for a screen whose configured choice is `base`, after `m` has `flipped` it:
+/// a shown map hides, and a hidden one shows where the hiding rule finds room, else as an overlay.
+pub fn map_view(
+    cols: u16,
+    rows: u16,
+    (people, places): (u16, u16),
+    base: MapChoice,
+    flipped: bool,
+) -> MapView {
+    let shown = |choice| layout(cols, rows, people, places, choice).map.is_some();
+    match (shown(base), flipped) {
+        (true, false) => MapView::InPlace,
+        (true, true) | (false, false) => MapView::Hidden,
+        (false, true) if shown(MapChoice::Auto) => MapView::InPlace,
+        (false, true) => MapView::Overlay,
+    }
 }
 
 /// How each grid row splits into its label and its track; the track's columns split the viewed
@@ -126,6 +153,7 @@ pub fn layout(cols: u16, rows: u16, roster_len: u16, places_len: u16, map: MapCh
     let spare = rows.saturating_sub(rows_needed(lines, roster_len, places_len));
     let shows_map = match map {
         MapChoice::Auto => cols >= MAP_MIN_COLS && spare >= MAP_MIN_ROWS,
+        MapChoice::Always => spare > 0,
         MapChoice::Hidden => false,
     };
     let mut y = 0;
@@ -266,6 +294,19 @@ mod tests {
     fn a_hidden_map_leaves_its_rows_blank_above_the_slider() {
         let areas = layout(120, 36, 7, 3, MapChoice::Hidden);
         assert_eq!((areas.map, areas.slider.y, areas.footer.y), (None, 13, 35));
+    }
+
+    #[test]
+    fn m_flips_each_configured_choice_to_the_other_or_to_an_overlay_without_room() {
+        let view = |cols, rows, base, flipped| map_view(cols, rows, (7, 3), base, flipped);
+        assert_eq!(view(120, 36, MapChoice::Auto, false), MapView::InPlace);
+        assert_eq!(view(120, 36, MapChoice::Auto, true), MapView::Hidden);
+        assert_eq!(view(120, 24, MapChoice::Auto, true), MapView::Overlay);
+        assert_eq!(view(120, 36, MapChoice::Hidden, true), MapView::InPlace);
+        // `always` takes any spare rows, so 30 rows leave it 6 even under the 12 auto needs.
+        assert_eq!(view(120, 30, MapChoice::Auto, false), MapView::Hidden);
+        assert_eq!(view(120, 30, MapChoice::Always, false), MapView::InPlace);
+        assert_eq!(view(120, 30, MapChoice::Always, true), MapView::Hidden);
     }
 
     #[test]

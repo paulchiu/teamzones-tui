@@ -12,6 +12,7 @@ use super::app::{
     App, Cursor, Lanes, Lens, Mode, Undo, Visual, base_marks, next_style, style_name,
 };
 use super::keys::{Action, Context, Key, action_for};
+use super::layout::MapView;
 use super::notice::{Notice, TIMEOUT};
 use super::prompt;
 use super::say::duration_text;
@@ -35,12 +36,21 @@ pub enum Msg {
         expect(dead_code, reason = "the r key that sends it lands with write-back")
     )]
     Reload(Box<Config>),
+    /// The terminal is now this many columns and rows.
+    Resize(u16, u16),
+    /// Whether switching mouse capture worked.
+    Captured(Result<(), String>),
 }
 
 /// Work the effects layer does on the update's behalf.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Effect {
-    Copy { key: String, text: String },
+    Copy {
+        key: String,
+        text: String,
+    },
+    /// Turn mouse capture on or off.
+    CaptureMouse(bool),
 }
 
 /// The context whose bindings read the next key: a modal, range mode while drawing, or main.
@@ -68,6 +78,24 @@ pub fn update(app: App, msg: Msg) -> (App, Vec<Effect>) {
             };
             let now = app.now;
             (with_notice(app, &key, &words, now), Vec::new())
+        }
+        Msg::Resize(cols, rows) => (
+            App {
+                size: (cols, rows),
+                map_flipped: false,
+                ..app
+            },
+            Vec::new(),
+        ),
+        Msg::Captured(result) => {
+            let now = app.now;
+            match result {
+                Ok(()) => (app, Vec::new()),
+                Err(error) => (
+                    with_notice(app, "M", &format!("mouse capture failed: {error}"), now),
+                    Vec::new(),
+                ),
+            }
         }
         Msg::Reload(config) => (
             App {
@@ -246,6 +274,14 @@ fn act(app: App, action: Action, key: Key) -> (App, Vec<Effect>) {
                 ..app
             })
         }
+        Action::ToggleMouse => {
+            let mouse = !app.mouse;
+            (App { mouse, ..app }, vec![Effect::CaptureMouse(mouse)])
+        }
+        Action::FlipMap => only(App {
+            map_flipped: !app.map_flipped,
+            ..app
+        }),
     }
 }
 
@@ -329,6 +365,12 @@ fn edge(app: App, start: i64, end: i64) -> App {
 }
 
 fn unwind(app: App) -> App {
+    if app.mode == Mode::Normal && app.map_view() == MapView::Overlay {
+        return App {
+            map_flipped: false,
+            ..app
+        };
+    }
     match (&app.mode, app.visual, app.range) {
         (Mode::Prompt(_) | Mode::CopyMenu | Mode::SortMenu | Mode::Help(_), _, _) => normal(app),
         (Mode::Normal, Some(v), _) => App {

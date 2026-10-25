@@ -9,14 +9,14 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Widget};
 use teamzones_core::clock::{Range, Slot, When};
-use teamzones_core::config::{MapShow, PersonId, Rule};
+use teamzones_core::config::{PersonId, Rule};
 use teamzones_core::fit::{day_start, slot_fits};
 use teamzones_core::question::{Row, evaluate, person_band};
 use teamzones_core::schedule::{Band, Level, band, is_day};
 
 use super::app::{App, Cursor, Lanes, Mode, without_colour};
 use super::glyphs::Glyphs;
-use super::layout::{Areas, MapChoice, layout};
+use super::layout::{Areas, MapChoice, MapView, layout};
 use super::say::{detail, duration_text, local_text, summary};
 use super::theme::{Role, Theme};
 use super::update::context;
@@ -205,29 +205,61 @@ impl Track {
     }
 }
 
-fn map_choice(app: &App, glyphs: &Glyphs) -> MapChoice {
-    match (glyphs.ascii, app.config.map) {
-        (true, _) | (false, MapShow::Never) => MapChoice::Hidden,
-        (false, MapShow::Auto | MapShow::Always) => MapChoice::Auto,
-    }
-}
-
 /// The screen's areas for this frame size and roster.
-pub fn areas(app: &App, glyphs: &Glyphs, size: Rect) -> Areas {
+pub fn areas(app: &App, size: Rect) -> Areas {
     let count = |n: usize| u16::try_from(n).unwrap_or(u16::MAX);
+    let choice = match app.map_view_at(size.width, size.height) {
+        MapView::InPlace => MapChoice::Always,
+        MapView::Hidden | MapView::Overlay => MapChoice::Hidden,
+    };
     layout(
         size.width,
         size.height,
         count(app.roster().people().count()),
         count(app.roster().places().count()),
-        map_choice(app, glyphs),
+        choice,
     )
+}
+
+/// The map overlay's box: centred, up to twelve map rows inside its border.
+pub fn map_overlay_area(size: Rect) -> Rect {
+    let width = size.width.saturating_sub(4).min(120);
+    let height = size.height.saturating_sub(4).min(14);
+    Rect::new(
+        size.x + (size.width - width) / 2,
+        size.y + (size.height - height) / 2,
+        width,
+        height,
+    )
+}
+
+fn map_overlay(buf: &mut Buffer, size: Rect, app: &App, look: Look) {
+    let theme = look.theme;
+    let area = map_overlay_area(size);
+    Clear.render(area, buf);
+    let block = Block::bordered()
+        .border_set(look.glyphs.rounded)
+        .border_style(theme.fg(Role::Accent))
+        .title(Span::styled(
+            " map ",
+            theme.fg(Role::Text).add_modifier(Modifier::BOLD),
+        ))
+        .title_bottom(
+            Line::from(vec![
+                Span::styled(" esc", theme.fg(Role::Accent)),
+                Span::styled(" close ", theme.fg(Role::Dim)),
+            ])
+            .right_aligned(),
+        );
+    let inner = block.inner(area);
+    block.render(area, buf);
+    super::map::draw(buf, inner, app, look);
 }
 
 /// Draws the whole screen.
 pub fn draw(frame: &mut Frame, app: &App, look: Look) {
     let size = frame.area();
-    let areas = areas(app, look.glyphs, size);
+    let areas = areas(app, size);
     let clip = |area: Rect| size.intersection(area);
     let track = Track {
         x: areas.columns.track_x(),
@@ -248,7 +280,10 @@ pub fn draw(frame: &mut Frame, app: &App, look: Look) {
     places(buf, clip(areas.place), app, look, &track);
     say_panel(buf, clip(areas.say), app, look);
     notice(buf, clip(areas.notice), app, look);
-    footer_row(buf, clip(areas.footer), app, look);
+    footer_row(buf, clip(areas.footer), app, look, areas.map.is_none());
+    if app.map_view_at(size.width, size.height) == MapView::Overlay {
+        map_overlay(buf, size, app, look);
+    }
     match app.mode {
         Mode::Help(from) => help_overlay(buf, size, from, look),
         Mode::CopyMenu => copy_dialog(buf, size, app, look),
@@ -1147,24 +1182,30 @@ fn notice(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
     }
 }
 
-fn footer_row(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
+fn footer_row(buf: &mut Buffer, area: Rect, app: &App, look: Look, map_hidden: bool) {
     let theme = look.theme;
     let context = context(app);
     let main = context == keys::Context::Main;
     let situation = footer::Situation {
         range: main && app.range.is_some(),
         away: main && !app.at_now(),
+        map_hidden,
     };
     let flash = app
         .style_flash
         .as_ref()
         .filter(|flash| flash.visible(app.now))
         .map(|flash| flash.text.as_str());
-    let room = flash.map_or(area.width, |label| {
+    let notes: Vec<&str> = flash
+        .into_iter()
+        .chain((!app.mouse).then_some("mouse off"))
+        .collect();
+    let right = (!notes.is_empty()).then(|| notes.join("  "));
+    let room = right.as_ref().map_or(area.width, |label| {
         area.width
             .saturating_sub(u16::try_from(label.len() + 2).unwrap_or(u16::MAX))
     });
-    if let Some(label) = flash {
+    if let Some(label) = &right {
         let x = area
             .right()
             .saturating_sub(u16::try_from(label.len()).unwrap_or(0));

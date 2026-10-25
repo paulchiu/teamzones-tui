@@ -35,9 +35,22 @@ use view::Look;
 /// The longest the loop sleeps when nothing on screen can change by itself.
 const IDLE: Duration = Duration::from_secs(3600);
 
+/// The terminal modes the app switches while it runs, behind a seam so tests can watch them.
+pub trait Modes {
+    /// Turns mouse capture on or off.
+    ///
+    /// # Errors
+    ///
+    /// The terminal write failing.
+    fn capture_mouse(&mut self, on: bool) -> std::io::Result<()>;
+}
+
 /// Runs one effect and returns the message carrying its result.
-fn run_effect(effect: Effect, clipboard: &mut dyn Clipboard) -> Msg {
+fn run_effect(effect: Effect, clipboard: &mut dyn Clipboard, modes: &mut dyn Modes) -> Msg {
     match effect {
+        Effect::CaptureMouse(on) => {
+            Msg::Captured(modes.capture_mouse(on).map_err(|error| error.to_string()))
+        }
         Effect::Copy { key, text } => Msg::Copied {
             result: clipboard.copy(&text),
             key,
@@ -82,8 +95,18 @@ pub fn run(
         theme: &theme,
         glyphs: Glyphs::of(config.theme.glyphs),
     };
-    let mut terminal = ratatui::try_init().inspect_err(|_| ratatui::restore())?;
+    let mut terminal = ratatui::try_init().inspect_err(|_| restore())?;
+    hook_restore_on_panic();
+    let mut modes = Stdout;
     let mut app = App::new(config, clock.now());
+    if let Err(error) = modes.capture_mouse(app.mouse) {
+        drop(terminal);
+        restore();
+        return Err(error);
+    }
+    if let Ok(size) = terminal.size() {
+        app = update(app, Msg::Resize(size.width, size.height)).0;
+    }
     let result = loop {
         if let Err(error) = terminal.draw(|frame| view::draw(frame, &app, look)) {
             break Err(error);
@@ -96,6 +119,7 @@ pub fn run(
                 Ok(Event::Key(key)) if key.kind == KeyEventKind::Press => {
                     Some(Msg::Key(keys::Key::from_crossterm(key)))
                 }
+                Ok(Event::Resize(cols, rows)) => Some(Msg::Resize(cols, rows)),
                 Ok(_) => None,
                 Err(error) => break Err(error),
             },
@@ -106,12 +130,42 @@ pub fn run(
         if let Some(msg) = input {
             let (next, effects) = update(app, msg);
             app = effects.into_iter().fold(next, |app, effect| {
-                update(app, run_effect(effect, clipboard)).0
+                update(app, run_effect(effect, clipboard, &mut modes)).0
             });
         }
     };
-    ratatui::restore();
+    drop(terminal);
+    restore();
     result
+}
+
+/// The real terminal: modes switch by writing crossterm commands to stdout.
+struct Stdout;
+
+impl Modes for Stdout {
+    fn capture_mouse(&mut self, on: bool) -> std::io::Result<()> {
+        let mut out = std::io::stdout();
+        if on {
+            crossterm::execute!(out, crossterm::event::EnableMouseCapture)
+        } else {
+            crossterm::execute!(out, crossterm::event::DisableMouseCapture)
+        }
+    }
+}
+
+/// Releases everything the TUI enables: mouse capture, then raw mode and the alternate screen.
+fn restore() {
+    let _ = Stdout.capture_mouse(false);
+    ratatui::restore();
+}
+
+/// Chains a restore onto the panic hook ratatui installed, so a panic releases the mouse too.
+fn hook_restore_on_panic() {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        restore();
+        previous(info);
+    }));
 }
 
 #[cfg(test)]
