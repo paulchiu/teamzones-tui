@@ -51,6 +51,7 @@ fn home_s_row_is_marked_here_and_its_own_city_follows_as_a_dim_uncounted_referen
         "{}",
         text(&buf)
     );
+    insta::assert_snapshot!("travelling_120x30", text(&buf));
 }
 
 #[test]
@@ -61,6 +62,9 @@ fn typed_times_are_read_in_the_travel_city_and_the_say_line_copies_home_s_zone()
         say_line(&buf),
         "3pm GMT / Tue 2am AEDT / Tue 1am AEST / 5pm SAST"
     );
+    // 3pm GMT is in Paul's hours on London's clock, though 2am on Melbourne's.
+    let answer = row(&buf, y_of(&buf, "≡ in hours"));
+    assert!(answer.contains("1/5"), "{answer}");
 }
 
 #[test]
@@ -88,5 +92,16 @@ fn a_running_screen_comes_home_when_the_clock_passes_until_in_the_travel_city() 
         "{}",
         row(&buf, 0)
     );
-    assert!(!text(&buf).contains("⌂ Melbourne    "), "{}", text(&buf));
+    let who = y_of(&buf, " who ");
+    assert!(row(&buf, who + 1).starts_with("⌂ Paul"), "{}", text(&buf));
+    assert!(row(&buf, who + 2).starts_with("● Priya"), "{}", text(&buf));
+}
+
+#[test]
+fn scrubbing_past_until_never_moves_the_axis() {
+    // Tue 3 Nov is after until, but now is still Mon 26 Oct.
+    let app = go_to(in_london(), "3 nov 3pm");
+    let buf = render(&app, 120, 30);
+    assert!(row(&buf, 0).ends_with("✈ London GMT"), "{}", row(&buf, 0));
+    assert!(say_line(&buf).starts_with("3pm GMT"), "{}", say_line(&buf));
 }

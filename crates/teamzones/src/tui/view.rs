@@ -1042,15 +1042,10 @@ fn who(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track, entri
             .chain(reference.map(|r| r.city.as_str())),
     );
     let city_width = city_width(app, usize::from(label_width), names);
-    let home_mark = app.home_mark(glyphs);
     let draw_person = |buf: &mut Buffer, y: u16, id: PersonId| {
         let person = roster.person(id);
         let counted = app.is_counted(Row::Person(id));
-        let (mark, mark_role) = match (id == PersonId::HOME, counted) {
-            (true, _) => (home_mark, Role::Marker),
-            (false, true) => (glyphs.person, Role::Marker),
-            (false, false) => (glyphs.person_other, Role::Dim),
-        };
+        let (mark, mark_role) = person_mark(app, glyphs, id);
         label(
             buf,
             area,
@@ -1172,18 +1167,23 @@ fn clock_cells(
         .collect()
 }
 
+/// A person's mark and its role: home's own, counted, or dim.
+fn person_mark(app: &App, glyphs: &Glyphs, id: PersonId) -> (&'static str, Role) {
+    match (id == PersonId::HOME, app.is_counted(Row::Person(id))) {
+        (true, _) => (app.home_mark(glyphs), Role::Marker),
+        (false, true) => (glyphs.person, Role::Marker),
+        (false, false) => (glyphs.person_other, Role::Dim),
+    }
+}
+
 /// One line of the fold list: the mark, the name, then the local time or the place's state.
 fn entry_text(app: &App, look: Look, entry: &Entry) -> String {
     let glyphs = look.glyphs;
     let roster = app.roster();
     match entry {
-        Entry::Row(row @ Row::Person(id)) => {
+        Entry::Row(Row::Person(id)) => {
             let person = roster.person(*id);
-            let mark = match (*id == PersonId::HOME, app.is_counted(*row)) {
-                (true, _) => app.home_mark(glyphs),
-                (false, true) => glyphs.person,
-                (false, false) => glyphs.person_other,
-            };
+            let (mark, _) = person_mark(app, glyphs, *id);
             let time = &time_candidates(app, person.location.tz)[0];
             format!("{mark} {}  {time}", person.name)
         }

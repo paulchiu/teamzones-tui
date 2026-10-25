@@ -272,7 +272,7 @@ impl App {
 
     /// The whole roster's people (with home's reference row while travelling) and places,
     /// which size the blocks.
-    pub fn roster_size(&self) -> (u16, u16) {
+    fn roster_size(&self) -> (u16, u16) {
         let count = |n: usize| u16::try_from(n).unwrap_or(u16::MAX);
         let roster = self.roster();
         (
@@ -404,7 +404,8 @@ impl App {
     }
 
     fn line_of(&self, format: &Format) -> String {
-        format_line(self.roster(), &self.marks, self.focus, self.when(), format)
+        let focus = self.focused_row().unwrap_or(Row::Person(PersonId::HOME));
+        format_line(self.roster(), &self.marks, focus, self.when(), format)
     }
 
     /// The line the format with `key` copies, or `None` when no format has that key.
@@ -417,7 +418,7 @@ impl App {
     /// format whose line an earlier row already shows.
     pub fn copy_menu(&self) -> Vec<(char, String, String)> {
         let roster = self.roster();
-        let focused = match self.focus {
+        let focused = match self.focused_row().unwrap_or(Row::Person(PersonId::HOME)) {
             Row::Person(id) => &roster.person(id).name,
             Row::Place(id) => &roster.place(id).name,
         };
@@ -548,6 +549,20 @@ impl App {
             .chain(&place)
             .filter_map(|entry| entry.rows().first().copied())
             .collect()
+    }
+
+    /// The row focus is on, or none on a `+N more` line, which stands for no single row.
+    pub fn focused_row(&self) -> Option<Row> {
+        self.focused_more().is_none().then_some(self.focus)
+    }
+
+    /// The row standing for the `+N more` line that folds `row`, if a line folds it.
+    pub fn fold_holding(&self, row: Row) -> Option<Row> {
+        let (who, place) = self.entries();
+        who.iter().chain(&place).find_map(|entry| match entry {
+            Entry::More(_) if entry.rows().contains(&row) => entry.rows().first().copied(),
+            Entry::More(_) | Entry::Row(_) | Entry::Reference | Entry::Answer => None,
+        })
     }
 
     /// The `+N more` line focus is on, if any.

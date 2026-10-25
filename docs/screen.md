@@ -55,7 +55,7 @@ The mouse is on from the start, because the track is meant to be scrubbed. The w
 
 The layout keeps the label column in proportion to the track as the terminal widens. Below 80 columns each row stacks its label over a full-width lane when the terminal is tall enough, and below 60 columns without that height it becomes a plain list of labels and states.
 
-When the terminal is too short for every row, the blocks fold. The where block gives up rows first, down to three places, then the who block, down to home and one more. The last row of a folded block becomes `○ +5 more, 3 counted`, and `enter` on it (or a click) lists the rows it stands for. The answer rows and the times box never fold, and a group switch still moves nothing. Below 40 columns or 10 rows the screen only says `terminal too small`, and `q` still quits.
+When the terminal is too short for every row, the blocks fold. The where block gives up rows first, down to three places, then the who block, down to home and one more. The last row of a folded block becomes `○ +5 more, 3 counted`, and `enter` on it (or a click) lists the rows it stands for. It stands for no single row, so `space`, `e` and `d` leave it alone. The answer rows and the times box never fold, and a group switch still moves nothing. Below 40 columns or 10 rows the screen only says `terminal too small`, and `q` still quits.
 
 ## Editing from the screen
 

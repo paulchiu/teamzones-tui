@@ -1,0 +1,24 @@
+---
+source: crates/teamzones/src/tui/tests/fold.rs
+expression: text(&buf)
+---
+teamzones   now Sat 24 Oct 9:04am AEDT   viewing Mon 26 Oct +2d ⌂ Melbourne AEDT
+Mon 26 Oct AEDT                 12a · · · · 6a· · · · · 12p · · · · 6p· · · · ·
+▸ 5-6pm AEDT 1h                ◂──────────────────────────────────┣┫────────────
+ who   1 team  2 au  3 regions  4 deploy  0 all  +  ⋯  ─────────────────────────
+⌂ Paul   Melbourne        5-6pm Mon░░░░░░░░░░▚▚▚▚▚▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▚▚▚▚░░░░░░░░
+● Priya  Brisbane         4-5pm ░░Mon░░░░░░░░▚▚▚▚▚▚▚▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▚▚▚░░░░░░░░░
+○ +5 more, 3 counted
+≡ in hours                  5/5 ··················⡀⡀⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇━━⡆⡆⡆⡆⡆⡆⡆⡆⡆⡆⡆⡆
+ where  not asked ──────────────────────────────────── ▁ closed  ▄ open  █ busy
+≡ where                      --  not asked: team has no places
+◇ AU  5-6pm AEDT           busy Mon▁▁▁▁▁▁▁▁▁▁▁▄▄▄▄▄▄▄▄▄█████▄▄▄▄▄▄▄███████▄▄▄▄▁▁
+◇ UK  6-7am GMT          closed ██▄▄▄▄▄▄▄███████▄▄▄▄▁▁Mon▁▁▁▁▁▁▁▁▁▁▁▄▄▄▄▄▄▄▄▄███
+◇ US  1-2am CDT          closed ▄▄▄▄▄▄▄█████▄▄▄▄▄▄▄███████▄▄▄▄▁▁Mon▁▁▁▁▁▁▁▁▁▁▁▄▄
+────────────────────────────────────────────────────────────────────────────────
+▶ Paul  Melbourne  AEDT UTC+11  hours 9am-6pm Mon-Fri
+╭ times for team ────────────────────────────────────────────────────── y copy ╮
+│ 5-6pm AEDT / 4-5pm AEST / 8-9am SAST                                         │
+╰──────────────────────────────────────────────────────── 3 zones for 5 people ╯
+
+h/l time  . now  space mark  y copy  m map  esc clear range  ? help  q quit

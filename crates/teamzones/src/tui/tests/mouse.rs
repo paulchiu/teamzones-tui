@@ -662,3 +662,26 @@ fn with_the_map_off_a_click_on_a_label_lands_on_the_row_drawn_there() {
         [Msg::Focus(focused.focus)]
     );
 }
+
+#[test]
+fn a_click_on_the_fold_row_while_drawing_a_range_only_focuses_it() {
+    let folded = update(team_monday(), Msg::Resize(80, 20)).0;
+    let at = (2, y_of(&render(&folded, 80, 20), "○ +5 more"));
+    let fold_row = press(folded.clone(), &chars("jj")).focus;
+    let drawing = press(folded, &chars("v"));
+    assert_eq!(
+        msgs(&drawing, left(MouseEventKind::Down, at)),
+        [Msg::Focus(fold_row)]
+    );
+    let clicked = send(drawing, &[left(MouseEventKind::Down, at)]);
+    assert!(clicked.visual.is_some(), "the range is still being drawn");
+}
+
+#[test]
+fn on_the_too_small_screen_the_mouse_does_nothing() {
+    let small = update(team_monday(), Msg::Resize(30, 8)).0;
+    let everywhere = (0..30).flat_map(|x| (0..8).map(move |y| (x, y)));
+    for at in everywhere {
+        assert_eq!(msgs(&small, left(MouseEventKind::Down, at)), [], "{at:?}");
+    }
+}

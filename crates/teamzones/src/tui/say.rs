@@ -10,6 +10,8 @@ use teamzones_core::schedule::{Band, Hours};
 use teamzones_core::status::place_next;
 
 use super::app::App;
+use super::fold::Entry;
+use super::view::more_text;
 
 /// A length in grid slots as the track label and notices write it: `1h`, `30m` or `1h15m`.
 pub fn duration_text(slots: i64) -> String {
@@ -103,6 +105,9 @@ fn groups_text(app: &App, row: Row) -> Option<String> {
 
 /// The focused row's name and its detail pieces, which the panel drops whole from the right.
 pub fn detail(app: &App) -> (String, Vec<String>) {
+    if let Some(Entry::More(folded)) = app.focused_more() {
+        return (more_text(app, &folded), vec!["enter lists them".to_owned()]);
+    }
     let roster = app.roster();
     let when = app.when();
     let start = when.start();

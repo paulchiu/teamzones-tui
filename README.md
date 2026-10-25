@@ -5,7 +5,7 @@ Who's available and where it's busy, on one time axis. A Rust TUI.
 Picking a time for a call across Melbourne, Brisbane and Johannesburg is a sum you do in your head, and picking one for a deploy adds a second question: is any region we trade in at its lunch or dinner rush? `teamzones` answers both on one home-time axis. People (who you tell) are drawn by their hours and daylight, places (regions you operate in) by their trading load, and it finds the slots where everyone a group counts is free and every place it counts is quiet enough. Then it copies the answer as one line you can paste into Slack:
 
 ```
-5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST, open in AU and UK
+5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST, open in AU, closed in UK
 ```
 
 ## Install

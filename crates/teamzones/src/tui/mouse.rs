@@ -8,10 +8,10 @@ use teamzones_core::fit::slot_fits;
 use super::app::{App, Mode};
 use super::fold::Entry;
 use super::glyphs::Glyphs;
-use super::keys::Key;
-use super::layout::{Areas, MapView};
+use super::keys::{Context, Key};
+use super::layout::{Areas, MapView, too_small};
 use super::theme::{TerminalEnv, Theme};
-use super::update::Msg;
+use super::update::{Msg, context};
 use super::view::{self, Look, Piece, Track};
 
 /// What the pointer did: the left button's press, drag and release, or a wheel notch.
@@ -105,6 +105,9 @@ pub fn msgs(app: &App, pointer: Pointer) -> Vec<Msg> {
         theme: &theme,
         glyphs: Glyphs::of(app.config.theme.glyphs),
     };
+    if too_small(app.size.0, app.size.1) {
+        return Vec::new();
+    }
     let size = Rect::new(0, 0, app.size.0, app.size.1);
     let at = Position::new(pointer.x, pointer.y);
     let outside = |area: Rect| pointer.kind == Kind::Down && !area.contains(at);
@@ -391,10 +394,11 @@ fn pressed(app: &App, look: Look, areas: &Areas, track: &Track, pointer: Pointer
     let in_label = track.dy == 1 || x < track.label;
     let entry = entry_at(app, areas, track, y).filter(|_| in_label);
     if let Some(more @ Entry::More(_)) = &entry {
-        return more
-            .rows()
-            .first()
-            .map_or_else(Vec::new, |row| vec![Msg::Focus(*row), Msg::Key(Key::Enter)]);
+        // Range mode reads `enter` as commit, so a click there only focuses the fold row.
+        let list = (context(app) == Context::Main).then_some(Msg::Key(Key::Enter));
+        return more.rows().first().map_or_else(Vec::new, |row| {
+            std::iter::once(Msg::Focus(*row)).chain(list).collect()
+        });
     }
     if let Some(Entry::Row(row)) = entry {
         let focus = Msg::Focus(row);
