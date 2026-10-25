@@ -263,7 +263,7 @@ fn say(args: &SayArgs, now: DateTime<Utc>, io: &mut Io) -> Result<(), Failure> {
         words: tokens,
     } = args;
     let config = load(io)?;
-    let roster = &config.roster;
+    let roster = config.roster_at(now);
     let expr = parse_expr(&words(tokens), roster, now).map_err(expr_failure)?;
     let dated = expr.moment == Moment::Next;
     let when = resolve(expr.moment, roster, &expr.marks, now)
@@ -305,7 +305,7 @@ fn say(args: &SayArgs, now: DateTime<Utc>, io: &mut Io) -> Result<(), Failure> {
 
 /// The marks `status` reports on: one `@place` alone, or a who-expression at now.
 fn status_marks(tokens: &[&str], config: &Config, now: DateTime<Utc>) -> Result<Marks, Failure> {
-    let roster = &config.roster;
+    let roster = config.roster_at(now);
     if let [token] = tokens
         && let Some(name) = token.strip_prefix('@')
     {
@@ -329,7 +329,7 @@ fn status_marks(tokens: &[&str], config: &Config, now: DateTime<Utc>) -> Result<
 fn status(tokens: &[String], now: DateTime<Utc>, io: &mut Io) -> Result<(), Failure> {
     let config = load(io)?;
     let marks = status_marks(&words(tokens), &config, now)?;
-    let lines = status_lines(&config.roster, &marks, now);
+    let lines = status_lines(config.roster_at(now), &marks, now);
     if lines.is_empty() {
         return Err(Failure::Nothing(
             "nothing to show: the expression has no rows besides home".to_owned(),

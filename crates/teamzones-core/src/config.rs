@@ -204,6 +204,14 @@ pub struct Roster {
     people: Vec<Person>,
     places: Vec<Place>,
     pub groups: Vec<Group>,
+    reference: Option<Reference>,
+}
+
+/// Home's own city while travel has moved home: drawn and copied, never counted.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Reference {
+    pub city: String,
+    pub location: Location,
 }
 
 impl Roster {
@@ -214,6 +222,22 @@ impl Roster {
 
     pub fn person(&self, id: PersonId) -> &Person {
         &self.people[id.0]
+    }
+
+    /// This roster with home moved to `city`, keeping its own city as the reference.
+    fn travelling(&self, city: &str, location: Location) -> Self {
+        let mut away = self.clone();
+        let home = &mut away.people[PersonId::HOME.0];
+        away.reference = Some(Reference {
+            city: std::mem::replace(&mut home.city, city.to_owned()),
+            location: std::mem::replace(&mut home.location, location),
+        });
+        away
+    }
+
+    /// Home's own city while travelling, or `None` at home.
+    pub fn reference(&self) -> Option<&Reference> {
+        self.reference.as_ref()
     }
 
     pub fn place(&self, id: PlaceId) -> &Place {
@@ -331,12 +355,13 @@ pub struct Theme {
     pub overrides: BTreeMap<String, String>,
 }
 
-/// A dated travel override from `[travel]`.
+/// A dated travel override from `[travel]`, with the roster as it stands while it holds.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Travel {
     pub here: String,
     pub location: Location,
     pub until: NaiveDate,
+    away: Roster,
 }
 
 impl Travel {
@@ -561,6 +586,14 @@ impl Config {
         build(raw, &lines)
     }
 
+    /// The roster as it stands at `now`: the travelling one while `[travel]` holds, else home's.
+    pub fn roster_at(&self, now: chrono::DateTime<chrono::Utc>) -> &Roster {
+        match &self.travel {
+            Some(travel) if travel.is_active(now) => &travel.away,
+            Some(_) | None => &self.roster,
+        }
+    }
+
     /// The config for `text`, where no file, or one holding only comments, means the defaults.
     ///
     /// # Errors
@@ -601,6 +634,7 @@ impl Config {
                 people: vec![home],
                 places: Vec::new(),
                 groups: Vec::new(),
+                reference: None,
             },
             map: MapShow::default(),
             travel: None,
@@ -657,15 +691,19 @@ fn build(raw: RawConfig, lines: &Lines) -> Result<Config, ConfigError> {
         people,
         places,
         groups: Vec::new(),
+        reference: None,
     };
     roster.groups = group
         .iter()
         .map(|raw| resolve_group(raw, &roster, lines))
         .collect::<Result<_, _>>()?;
+    let travel = travel
+        .map(|raw| resolve_travel(&raw, &roster, lines))
+        .transpose()?;
     Ok(Config {
         roster,
         map: map.and_then(|RawMap { show }| show).unwrap_or_default(),
-        travel: travel.map(|raw| resolve_travel(&raw, lines)).transpose()?,
+        travel,
         theme: theme
             .map(|raw| resolve_theme(raw, lines))
             .transpose()?
@@ -1163,7 +1201,7 @@ fn resolve_group(raw: &RawGroup, roster: &Roster, lines: &Lines) -> Result<Group
     })
 }
 
-fn resolve_travel(raw: &RawTravel, lines: &Lines) -> Result<Travel, ConfigError> {
+fn resolve_travel(raw: &RawTravel, roster: &Roster, lines: &Lines) -> Result<Travel, ConfigError> {
     let RawTravel { here, until } = raw;
     let city = cities::lookup(here.get_ref()).or_else(|error| fail(lines.of(here), error))?;
     let until = match until.get_ref() {
@@ -1179,14 +1217,16 @@ fn resolve_travel(raw: &RawTravel, lines: &Lines) -> Result<Travel, ConfigError>
         _ => None,
     }
     .map_or_else(|| fail(lines.of(until), Reason::BadUntil), Ok)?;
+    let location = Location {
+        tz: city.tz,
+        lat: city.lat,
+        lon: city.lon,
+    };
     Ok(Travel {
         here: city.name.to_owned(),
-        location: Location {
-            tz: city.tz,
-            lat: city.lat,
-            lon: city.lon,
-        },
+        location,
         until,
+        away: roster.travelling(city.name, location),
     })
 }
 
@@ -1746,6 +1786,52 @@ mod tests {
             "{:?}",
             home.location
         );
+    }
+
+    fn travelling() -> Config {
+        Config::parse(&format!(
+            "{FIXTURE}\n[travel]\nhere = \"London\"\nuntil = 2026-11-01\n"
+        ))
+        .unwrap()
+    }
+
+    #[test]
+    fn while_travelling_home_moves_to_the_travel_city_and_its_own_city_is_the_reference() {
+        let config = travelling();
+        // Mon 26 Oct 6am GMT.
+        let roster = config.roster_at("2026-10-26T06:00:00Z".parse().unwrap());
+        let home = roster.person(PersonId::HOME);
+        assert_eq!(roster.axis(), chrono_tz::Europe::London);
+        assert_eq!((home.name.as_str(), home.city.as_str()), ("Paul", "London"));
+        assert_eq!(
+            home.hours,
+            config.roster.person(PersonId::HOME).hours,
+            "home keeps its hours"
+        );
+        let reference = roster.reference().map(|r| (r.city.as_str(), r.location.tz));
+        assert_eq!(reference, Some(("Melbourne", MELBOURNE)));
+    }
+
+    #[test]
+    fn travel_leaves_the_places_and_everyone_else_where_they_are() {
+        let config = travelling();
+        let roster = config.roster_at("2026-10-26T06:00:00Z".parse().unwrap());
+        let others = |roster: &Roster| {
+            let people: Vec<Person> = roster.people().skip(1).map(|(_, p)| p.clone()).collect();
+            let places: Vec<Place> = roster.places().map(|(_, p)| p.clone()).collect();
+            (people, places, roster.groups.clone())
+        };
+        assert_eq!(others(roster), others(&config.roster));
+    }
+
+    #[test]
+    fn from_the_day_after_until_in_the_travel_city_home_is_back_without_a_write() {
+        let config = travelling();
+        // Mon 2 Nov 12:00am GMT.
+        let roster = config.roster_at("2026-11-02T00:00:00Z".parse().unwrap());
+        assert_eq!(roster, &config.roster);
+        assert_eq!(roster.axis(), MELBOURNE);
+        assert_eq!(roster.reference(), None);
     }
 
     #[test]
