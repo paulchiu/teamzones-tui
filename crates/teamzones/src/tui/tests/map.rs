@@ -268,7 +268,23 @@ fn z_opens_map_mode_while_the_map_is_drawn_and_its_footer_names_its_keys_until_e
     let left = press(mapping, &[Key::Esc]);
     assert_eq!(footer_of(&left), footer_of(&shown));
     let hidden = sized(team_monday(), 120, 24);
-    assert_eq!(frame(&press(hidden.clone(), &chars("z"))), frame(&hidden));
+    let refused = press(hidden, &chars("z"));
+    assert!(!footer_of(&refused).starts_with("map  "));
+    assert!(
+        text(&frame(&refused)).contains("z  no map on screen: m shows it"),
+        "{}",
+        text(&frame(&refused))
+    );
+    let ascii = go_to(
+        App::new(config("glyphs = \"ascii\"\n"), now()),
+        "26 oct 5-6pm",
+    );
+    let ascii = press(sized(ascii, 120, 36), &chars("z"));
+    assert!(
+        text(&frame(&ascii)).contains("z  no map with ascii glyphs"),
+        "{}",
+        text(&frame(&ascii))
+    );
 }
 
 #[test]
@@ -279,7 +295,25 @@ fn map_mode_works_on_the_overlay_and_esc_leaves_it_before_closing_the_overlay() 
         "{}",
         footer_of(&overlay)
     );
+    let above_footer = |app: &App| {
+        let buf = frame(app);
+        (0..app.size.1 - 1)
+            .map(|y| row(&buf, y))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    assert!(
+        above_footer(&overlay).contains(" esc done "),
+        "{}",
+        above_footer(&overlay)
+    );
+    assert!(!above_footer(&overlay).contains("esc close"));
     let left = press(overlay, &[Key::Esc]);
+    assert!(
+        above_footer(&left).contains(" esc close "),
+        "{}",
+        above_footer(&left)
+    );
     assert!(shows_map(&frame(&left)), "the overlay is still open");
     assert!(!footer_of(&left).starts_with("map  "));
     assert!(!shows_map(&frame(&press(left, &[Key::Esc]))));
@@ -309,6 +343,49 @@ fn k_pans_north_until_the_map_s_edge_and_holds_there() {
         map_of(&edge),
         "held, not wound up"
     );
+}
+
+#[test]
+fn the_terminator_draws_in_the_dawn_colour_and_keeps_its_shape_under_mono() {
+    let app = sized(team_monday(), 120, 36);
+    let env = |no_color| TerminalEnv {
+        no_color,
+        truecolor: true,
+    };
+    let (colour, mono) = (
+        render_with(&app, 120, 36, env(false)),
+        render_with(&app, 120, 36, env(true)),
+    );
+    let dawn = Theme::resolve(&app.config.theme, env(false)).color(crate::tui::theme::Role::Dawn);
+    let line: Vec<(u16, u16)> = (1..13)
+        .flat_map(|y| (0..120).map(move |x| (x, y)))
+        .filter(|cell| colour[*cell].fg == dawn)
+        .collect();
+    // The dusk and dawn edges both cross all 12 map rows at 120 columns on Mon 26 Oct.
+    assert!(line.len() >= 24, "{line:?}");
+    for cell in line {
+        let symbol = colour[cell].symbol();
+        assert!(
+            symbol
+                .chars()
+                .all(|c| ('\u{2801}'..='\u{28ff}').contains(&c)),
+            "{cell:?} {symbol:?}"
+        );
+        assert_eq!(mono[cell].symbol(), symbol, "{cell:?}");
+    }
+}
+
+#[test]
+fn the_first_k_from_a_band_held_at_the_southern_edge_pans_a_full_step() {
+    // Team's markers centre the band on 32S, which the map holds at 58S; a step is a quarter
+    // of the 12 map rows.
+    let mapping = press(sized(team_monday(), 120, 36), &chars("z"));
+    let home_row = |app: &App| {
+        let buf = frame(app);
+        (1..13).find(|y| row(&buf, *y).contains('⌂'))
+    };
+    let start = home_row(&mapping).unwrap();
+    assert_eq!(home_row(&press(mapping, &chars("k"))), Some(start + 3));
 }
 
 #[test]

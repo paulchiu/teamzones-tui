@@ -314,14 +314,13 @@ Why: The fit predates this milestone and the new `w` and `tab` hints only expose
 
 Held by: the `regions_80x24` snapshot in `teamzones`
 
-
 ## D39: The map keeps its proportions and frames its markers once, never per group (2026-10-25)
 
 Decision: A Braille dot spans the same degrees of longitude and latitude, so the map never stretches. The default view fills the width and crops latitude to a band centred on home and the counted markers, held inside 80N to 58S, or shows the whole map centred when the area is tall enough. The view is a stored camera, worked out at start, on `0` in map mode and on resize, and a group switch never recomputes it. See the Map bullets in [screen](spec/screen.md).
 
-Why: On wide terminals the stretched map flattened the continents, and Paul asked for the macOS Clock app's zoom-to-fill. The issue also asked for the band to be centred on the counted markers and for a group switch never to move the map (D2); a band recomputed every frame would satisfy the first and break the second, so the band is framed on the markers counted when the view is set and then held.
+Why: On wide terminals the stretched map flattened the continents, and Paul asked for the macOS Clock app's zoom-to-fill. The issue also asked for the band to be centred on the counted markers and for a group switch never to move the map (D2); a band recomputed every frame would satisfy the first and break the second, so the band is framed on the markers counted when the view is set and then held. This supersedes M4's check that the UK, US, AU and Melbourne labels all show at 120x36: that band now crops the UK and Melbourne, so the four-label check runs at 120x48, where the whole map fits.
 
-Held by: `tui::map::tests::a_degree_of_longitude_and_of_latitude_take_the_same_distance_at_every_size`, `the_band_never_shows_beyond_the_map_s_latitudes` and `an_area_taller_than_the_map_centres_it_with_blank_rows_above_and_below`, and `tui::tests::map::the_band_is_centred_on_home_and_the_counted_markers_within_the_map_s_bounds`, `a_group_switch_never_moves_the_map` and the `regions_map_120x36` snapshot in `teamzones`
+Held by: `tui::map::tests::a_degree_of_longitude_and_of_latitude_take_the_same_distance_at_every_size`, `the_band_never_shows_beyond_the_map_s_latitudes` and `an_area_taller_than_the_map_centres_it_with_blank_rows_above_and_below`, and `tui::tests::map::the_band_is_centred_on_home_and_the_counted_markers_within_the_map_s_bounds`, `a_group_switch_never_moves_the_map`, `the_map_labels_home_and_each_counted_place_with_its_state_over_the_range` (at 120x48) and the `regions_map_120x36` snapshot in `teamzones`
 
 ## D40: Map mode is a modal with its own keys, entered with `z` (2026-10-25)
 
@@ -329,4 +328,12 @@ Decision: `z` opens map mode only while the map is drawn, in place or as the ove
 
 Why: Panning needs `h j k l`, which the main screen already uses for time and focus, so the keys cannot fall through to main the way range mode's do. `z` (zoom) was free on the main screen.
 
-Held by: `tui::tests::map::z_opens_map_mode_while_the_map_is_drawn_and_its_footer_names_its_keys_until_esc`, `map_mode_works_on_the_overlay_and_esc_leaves_it_before_closing_the_overlay`, `a_resize_that_hides_the_map_leaves_map_mode`, `tui::tests::each_modal_context_swallows_the_keys_it_does_not_advertise` and `tui::tests::mouse::every_built_mouse_equivalent_in_the_keymap_sends_what_its_key_does` in `teamzones`
+Held by: `tui::tests::map::z_opens_map_mode_while_the_map_is_drawn_and_its_footer_names_its_keys_until_esc`, `map_mode_works_on_the_overlay_and_esc_leaves_it_before_closing_the_overlay`, `a_resize_that_hides_the_map_leaves_map_mode`, `the_first_k_from_a_band_held_at_the_southern_edge_pans_a_full_step`, `tui::map::tests::a_pan_or_zoom_starts_from_the_band_as_drawn_not_a_centre_past_the_edge`, `tui::keys::tests::the_map_mode_bindings_are_the_keys_the_spec_s_map_sentence_names`, `tui::tests::each_modal_context_swallows_the_keys_it_does_not_advertise` and `tui::tests::mouse::every_built_mouse_equivalent_in_the_keymap_sends_what_its_key_does` in `teamzones`
+
+## D41: The night side's edge is a Braille line in the dawn colour (2026-10-25)
+
+Decision: The map draws the terminator at Braille dot resolution: every dark dot with a lit dot beside, above or below it. The line's cells take the `dawn` theme colour and show only its dots, over the cell shading, so it reads by shape under `mono`. It follows the view and the range's or cursor's instant, and the ascii glyph set, which never draws the map, has no line. See the Map bullets in [screen](spec/screen.md).
+
+Why: A cell background cannot go finer than a cell, so the shading alone drew a staircase, and Paul asked for the Clock app's smooth line. `dawn` already means twilight on the lanes, so no new theme key is needed, and showing only the line's dots in its cells keeps it one dot thick where it crosses a coast.
+
+Held by: `tui::map::tests::the_terminator_s_dots_sit_within_one_dot_of_the_computed_edge_of_night` and `tui::tests::map::the_terminator_draws_in_the_dawn_colour_and_keeps_its_shape_under_mono` in `teamzones`

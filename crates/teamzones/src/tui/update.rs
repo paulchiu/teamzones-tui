@@ -11,6 +11,7 @@ use teamzones_core::time::Moment;
 use super::app::{App, Cursor, Lanes, Lens, Mode, Visual, base_marks, next_style, style_name};
 use super::edit;
 use super::editor::Loaded;
+use super::footer::MapKey;
 use super::keys::{Action, Context, Key, action_for};
 use super::layout::MapView;
 use super::map;
@@ -515,7 +516,14 @@ fn act(app: App, action: Action, key: Key) -> (App, Vec<Effect>) {
             mode: Mode::Map,
             ..app
         }),
-        Action::MapMode => only(app),
+        Action::MapMode => {
+            let text = match app.map_key_at(app.size.0, app.size.1) {
+                MapKey::Inert => "no map with ascii glyphs",
+                MapKey::Opens | MapKey::Flips => "no map on screen: m shows it",
+            };
+            let now = app.now;
+            only(with_notice(app, "z", text, now))
+        }
         Action::Pan(across, down) => {
             let camera = map::panned(&app, (across, down));
             only(App { camera, ..app })

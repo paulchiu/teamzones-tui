@@ -1072,6 +1072,113 @@ mod tests {
         }
     }
 
+    /// The clauses of the keymap's `Map mode keys:` sentence, each with the keys it names in
+    /// backticks; a clause naming no key (a list of directions) belongs to the one before it.
+    fn map_clauses() -> Vec<(String, Vec<Key>)> {
+        let (_, after) = KEYS_SPEC
+            .split_once("Map mode keys: ")
+            .expect("keys.md lists map mode's keys");
+        let (sentence, _) = after
+            .split_once(". The footer")
+            .expect("the sentence ends before the footer");
+        let clauses = sentence
+            .split(", ")
+            .fold(Vec::<String>::new(), |mut acc, part| {
+                match acc.last_mut() {
+                    Some(last) if !part.contains('`') => *last = format!("{last}, {part}"),
+                    _ => acc.push(part.to_owned()),
+                }
+                acc
+            });
+        clauses
+            .into_iter()
+            .map(|clause| {
+                let named = clause.split('`').skip(1).step_by(2).flat_map(|keys| {
+                    keys.split_whitespace().map(|word| match word {
+                        "esc" => Key::Esc,
+                        other => Key::Char(other.chars().next().unwrap_or(' ')),
+                    })
+                });
+                let arrows = clause
+                    .contains(" arrows ")
+                    .then_some([Key::Left, Key::Down, Key::Up, Key::Right])
+                    .into_iter()
+                    .flatten();
+                let keys = named.chain(arrows).collect();
+                (clause, keys)
+            })
+            .collect()
+    }
+
+    /// The pan each direction word names, east and south positive.
+    fn pan_towards(word: &str) -> Option<Action> {
+        match word {
+            "west" => Some(Action::Pan(-1, 0)),
+            "south" => Some(Action::Pan(0, 1)),
+            "north" => Some(Action::Pan(0, -1)),
+            "east" => Some(Action::Pan(1, 0)),
+            _ => None,
+        }
+    }
+
+    /// What each map clause says its keys do: the pan clause's keys in the order its directions
+    /// are listed (the four letters, then the four arrows).
+    fn map_actions(clause: &str, keys: &[Key]) -> Vec<Action> {
+        let one: [(&str, Action); 5] = [
+            ("zooms in", Action::Zoom(1)),
+            ("zooms out", Action::Zoom(-1)),
+            ("resets", Action::ResetMap),
+            ("opens help", Action::Help),
+            ("leaves map mode", Action::Unwind),
+        ];
+        if clause.contains(" pan ") {
+            let directions: Vec<Action> = clause
+                .split(|c: char| !c.is_alphabetic())
+                .filter_map(pan_towards)
+                .collect();
+            return directions
+                .iter()
+                .cycle()
+                .take(keys.len())
+                .copied()
+                .collect();
+        }
+        one.into_iter()
+            .find(|(verb, _)| clause.contains(verb))
+            .map(|(_, action)| vec![action; keys.len()])
+            .unwrap_or_default()
+    }
+
+    #[test]
+    fn the_map_mode_bindings_are_the_keys_the_spec_s_map_sentence_names() {
+        let clauses = map_clauses();
+        for (clause, keys) in &clauses {
+            let actions = map_actions(clause, keys);
+            assert!(!keys.is_empty() && actions.len() == keys.len(), "{clause}");
+            for (key, expected) in keys.iter().zip(actions) {
+                assert_eq!(
+                    action_for(Context::Map, *key),
+                    Some(expected),
+                    "{clause}: {key:?}"
+                );
+            }
+        }
+        let named: Vec<Key> = clauses.into_iter().flat_map(|(_, keys)| keys).collect();
+        let bound = BINDINGS
+            .iter()
+            .filter(|b| b.context == Context::Map)
+            .flat_map(|b| b.chords.iter());
+        for (key, action) in bound {
+            assert!(
+                named.contains(key),
+                "{key:?} ({action:?}) is not in the spec"
+            );
+        }
+        for key in [Key::Char('q'), Key::Ctrl('c')] {
+            assert_eq!(action_for(Context::Map, key), Some(Action::Quit), "{key:?}");
+        }
+    }
+
     #[test]
     fn ctrl_c_quits_even_in_a_prompt() {
         assert_eq!(

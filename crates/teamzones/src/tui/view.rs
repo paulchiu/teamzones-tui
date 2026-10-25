@@ -258,6 +258,11 @@ fn map_overlay(buf: &mut Buffer, size: Rect, app: &App, look: Look) {
     let theme = look.theme;
     let area = map_overlay_area(size);
     Clear.render(area, buf);
+    let esc = if app.mode == Mode::Map {
+        " done "
+    } else {
+        " close "
+    };
     let block = Block::bordered()
         .border_set(look.glyphs.rounded)
         .border_style(theme.fg(Role::Accent))
@@ -268,7 +273,7 @@ fn map_overlay(buf: &mut Buffer, size: Rect, app: &App, look: Look) {
         .title_bottom(
             Line::from(vec![
                 Span::styled(" esc", theme.fg(Role::Accent)),
-                Span::styled(" close ", theme.fg(Role::Dim)),
+                Span::styled(esc, theme.fg(Role::Dim)),
             ])
             .right_aligned(),
         );
