@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-25
+
 ### Added
 
 - `[[copy]]` tables in config add your own copy-as formats, replace a built-in one, or hide one with `hide = true`. The format marked `default = true` is the line in the times box, what `y` copies and what `teamzones say` prints.
