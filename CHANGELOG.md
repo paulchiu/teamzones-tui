@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-10-25
+
 ### Added
 
 - Marks you leave unsaved on a group, or on `0 all`, are kept in the state file when you quit and come back the next time you open that group.
