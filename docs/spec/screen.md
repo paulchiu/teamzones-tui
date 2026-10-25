@@ -7,15 +7,16 @@ Mockup lines are right-trimmed: trailing spaces were dropped from every frame li
 The layout runs top to bottom with no outer frame and a horizontal margin of 0:
 
 * header (1 row)
-* map (rest of the height, or hidden)
+* map (rest of the height, while it is drawn in place)
 * slider: ruler and track (2)
 * who block: top border holding the lens strip, every person, and the answer row (people + 2)
 * where block: top border, every place, answer row, bottom border (places + 3)
 * say panel (4): the detail line, then the copy box (3)
+* spare rows (rest of the height, while the map is not drawn in place)
 * notice row (1)
 * footer (1)
 
-The fixture has 7 people (home included) and 3 places, so the fixed rows total 24. Block heights come from the whole roster, never from the active group.
+The fixture has 7 people (home included) and 3 places, so the fixed rows total 24. Block heights come from the whole roster, never from the active group. The rows the fixed rows leave go to the map when it is drawn in place. Otherwise the ruler starts on the row under the header and the spare rows sit together, blank, between the times box and the notice row, so the footer stays on the last row.
 
 The mockups below predate the hands-on round after M3 ([D17 to D22](../decisions.md)): they still show the old level words (`quiet`, `off-peak`, `peak`), the `say` panel with the detail line inside it and the old footer. They also predate [D39](../decisions.md), so their maps are stretched to the area rather than kept in proportion. Where they disagree with this text, the text wins.
 
@@ -114,7 +115,8 @@ h/l time  v range  n next fit  space mark  1-9 group  w save  tab groups  y copy
 * **Map hiding**:
   + The map shows only if there are at least 100 columns and at least 12 rows are left after the fixed rows.
   + Recompute on resize only, never on a group switch. `m` flips the automatic choice.
-  + When the map is hidden and there is no room, `m` opens it as an overlay (a centred `Clear` box) until `esc`.
+  + Whenever the map is not drawn in place (hidden by `m`, by `[map] show = "never"`, by this rule, or under `glyphs = "ascii"`), the blocks move up under the header and the spare rows go below the times box, as in the layout above. `m` bringing the map back pushes the blocks down again. A group switch never moves the blocks. `m`, a resize, a config reload or a roster edit (`a`, `d`) can.
+  + When the map is hidden and there is no room, `m` opens it as an overlay (a centred `Clear` box) until `esc`. The overlay is drawn over the blocks and never moves them.
 * **Folding** (M6), used when the fixed rows exceed the terminal even without the map:
   + Block heights are recomputed per resize, never per group switch. The where block shrinks first, to its borders, the answer row and `min(places, 3)` rows. Then the who block shrinks to whatever is left, with at least home, the answer row and one more row.
   + Inside a block, rows fill in their usual order. The last row becomes `○ +N more` or `◇ +N more` when rows remain, listing how many of them are counted (`○ +3 more, 1 counted`). `enter` on it opens an overlay listing the folded rows.

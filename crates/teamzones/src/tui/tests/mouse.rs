@@ -633,3 +633,15 @@ fn two_presses_on_a_label_far_apart_on_the_loop_s_clock_are_not_a_double_click()
         quick.mode
     );
 }
+
+#[test]
+fn with_the_map_off_a_click_on_a_label_lands_on_the_row_drawn_there() {
+    let hidden = press(team(), &chars("m"));
+    let sam = find(&hidden, "Sam");
+    assert!(sam.1 < 13, "the blocks moved up under the header: {sam:?}");
+    let focused = focus_on(hidden.clone(), "Sam");
+    assert_eq!(
+        msgs(&hidden, left(MouseEventKind::Down, sam)),
+        [Msg::Focus(focused.focus)]
+    );
+}
