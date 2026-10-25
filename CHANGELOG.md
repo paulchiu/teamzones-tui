@@ -9,7 +9,8 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 ### Changed
 
 - On wide terminals the timeline takes the spare width, with finer columns, so the names column stays at most about a third of the screen and the ruler labels space out to match.
-- Below 80 columns each row puts its name and time on one line and its lane on the full-width line under it, when the terminal is tall enough; otherwise it shows the rows as a plain list.
+- From 92 to 103 columns, and from 145 to 151, the names column is narrower than before (28 columns at 100, down from 52), so the city column and each place's local time no longer show there.
+- Below 80 columns each row puts its name and time on one line and its lane on the full-width line under it, when the terminal is tall enough. A terminal too short for that keeps its lanes beside the names from 60 columns, and shows a plain list below 60.
 
 ## [0.6.0] - 2026-10-25
 

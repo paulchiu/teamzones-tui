@@ -231,8 +231,8 @@ pub fn draw(frame: &mut Frame, app: &App, look: Look) {
     let clip = |area: Rect| size.intersection(area);
     let track = Track {
         x: areas.columns.track_x(),
-        cells: areas.columns.track,
-        label: areas.columns.label,
+        cells: areas.columns.track(),
+        label: areas.columns.label(),
         dy: areas.columns.lines() - 1,
         start: day_start(app.day(), app.roster().axis()),
         when: app.when(),
