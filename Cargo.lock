@@ -1928,6 +1928,7 @@ dependencies = [
  "iana-time-zone",
  "insta",
  "ratatui",
+ "rustix",
  "teamzones-core",
  "thiserror 2.0.21",
  "toml_edit",
