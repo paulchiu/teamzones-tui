@@ -227,6 +227,38 @@ mod tests {
         assert_eq!(split(320), (104, 216));
     }
 
+    const SCREEN_SPEC: &str = include_str!("../../../../docs/spec/screen.md");
+
+    /// The `N columns: L + T` examples in the screen spec's Columns bullet.
+    fn spec_splits() -> Vec<(u16, u16, u16)> {
+        let bullet = SCREEN_SPEC
+            .lines()
+            .find(|line| line.starts_with("* **Columns**"))
+            .expect("the screen spec has a Columns bullet");
+        bullet
+            .split('`')
+            .filter_map(|code| {
+                let (cols, split) = code.split_once(" columns: ")?;
+                let (label, track) = split.split_once(" + ")?;
+                Some((cols.parse().ok()?, label.parse().ok()?, track.parse().ok()?))
+            })
+            .collect()
+    }
+
+    #[test]
+    fn the_split_matches_every_example_in_the_screen_spec() {
+        let splits = spec_splits();
+        assert!(splits.len() >= 6, "{splits:?}");
+        for (cols, label, track) in splits {
+            let columns = layout(cols, 60, 7, 3, MapChoice::Auto).columns;
+            assert_eq!(
+                (columns.label, columns.track),
+                (label, track),
+                "{cols} columns"
+            );
+        }
+    }
+
     #[test]
     fn under_100_columns_the_map_stays_hidden_however_tall() {
         assert_eq!(layout(99, 60, 7, 3, MapChoice::Auto).map, None);

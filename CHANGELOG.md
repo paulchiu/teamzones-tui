@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ## [Unreleased]
 
+### Changed
+
+- On wide terminals the timeline takes the spare width, with finer columns, so the names column stays at most about a third of the screen and the ruler labels space out to match.
+- Below 80 columns each row puts its name and time on one line and its lane on the full-width line under it, when the terminal is tall enough; otherwise it shows the rows as a plain list.
+
 ## [0.6.0] - 2026-10-25
 
 ### Added
