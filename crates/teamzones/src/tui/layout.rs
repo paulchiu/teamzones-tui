@@ -9,12 +9,11 @@ pub enum MapChoice {
     Hidden,
 }
 
-/// The label and track widths and the minutes each track cell covers.
+/// The label and track widths; the track's columns split the viewed day evenly.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Columns {
     pub label: u16,
     pub track: u16,
-    pub minutes: u16,
 }
 
 /// Every area of the screen, top to bottom; `map` is `None` while the map is hidden.
@@ -37,20 +36,24 @@ const FIXED_ROWS: u16 = 1 + 2 + 2 + 3 + 4 + 1 + 1;
 /// The map needs this many columns, and this many rows left after the fixed rows.
 const MAP_MIN_COLS: u16 = 100;
 const MAP_MIN_ROWS: u16 = 12;
-/// The track never takes the first 20 columns, which hold the labels.
+/// The labels keep at least this many columns beside the track.
 const LABEL_MIN: u16 = 20;
 
-/// The smallest of 15, 30 or 60 minutes a cell for which a whole day fits beside the labels.
+/// The fewest whole columns per hour that make the track at least twice the label, cut back
+/// while the label would drop under its minimum.
+///
+/// So 120 columns gives four an hour (a 96-column track beside a 24-column label) and 80 gives
+/// two (48 beside 32), and the label stays a third of the width or less as the terminal widens.
 fn columns(cols: u16) -> Columns {
-    let minutes = [15, 30, 60]
-        .into_iter()
-        .find(|minutes| 1440 / minutes <= cols.saturating_sub(LABEL_MIN))
-        .unwrap_or(60);
-    let track = (1440 / minutes).min(cols);
+    let ideal = cols.div_ceil(36).max(1);
+    let per_hour = (1..=ideal)
+        .rev()
+        .find(|per_hour| cols.saturating_sub(24 * per_hour) >= LABEL_MIN)
+        .unwrap_or(1);
+    let track = (24 * per_hour).min(cols);
     Columns {
         label: cols - track,
         track,
-        minutes,
     }
 }
 
@@ -117,8 +120,7 @@ mod tests {
             areas.columns,
             Columns {
                 label: 24,
-                track: 96,
-                minutes: 15
+                track: 96
             }
         );
     }
@@ -141,11 +143,40 @@ mod tests {
             areas.columns,
             Columns {
                 label: 32,
-                track: 48,
-                minutes: 30
+                track: 48
             }
         );
         assert_eq!(areas.footer, Rect::new(0, 23, 80, 1));
+    }
+
+    #[test]
+    fn from_80_columns_the_label_never_outgrows_the_track_and_from_120_stays_within_half() {
+        for cols in 80..=400 {
+            let Columns { label, track, .. } = layout(cols, 60, 7, 3, MapChoice::Auto).columns;
+            assert_eq!(label + track, cols, "{cols} columns");
+            assert!(
+                label <= track,
+                "{cols} columns: label {label}, track {track}"
+            );
+            if cols >= 120 {
+                assert!(
+                    2 * label <= track,
+                    "{cols} columns: label {label}, track {track}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn wide_terminals_give_the_track_whole_columns_per_hour() {
+        let split = |cols| {
+            let columns = layout(cols, 60, 7, 3, MapChoice::Auto).columns;
+            (columns.label, columns.track)
+        };
+        assert_eq!(split(160), (40, 120));
+        assert_eq!(split(200), (56, 144));
+        assert_eq!(split(250), (82, 168));
+        assert_eq!(split(320), (104, 216));
     }
 
     #[test]

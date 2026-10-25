@@ -704,6 +704,43 @@ fn the_update_layer_names_no_io_crate() {
     assert!(named.is_empty(), "the update layer names {named:?}");
 }
 
+/// The columns at or right of `from` on row `y` drawn with the selection (a background or
+/// reverse video).
+fn shaded(buf: &Buffer, y: u16, from: u16) -> Vec<u16> {
+    use ratatui::style::{Color, Modifier};
+    (from..buf.area.width)
+        .filter(|x| {
+            let cell = &buf[(*x, y)];
+            cell.bg != Color::Reset || cell.modifier.contains(Modifier::REVERSED)
+        })
+        .collect()
+}
+
+#[test]
+fn at_250_columns_every_grid_row_marks_the_range_on_the_same_columns() {
+    let buf = render(&team_monday(), 250, 36);
+    // 168 track columns, seven an hour after the 82 label columns: 5pm is column 82 + 17 * 7.
+    let range: Vec<u16> = (201..=207).collect();
+    let track = y_of(&buf, "▸ 5-6pm AEDT 1h");
+    assert_eq!(
+        (buf[(201, track)].symbol(), buf[(207, track)].symbol()),
+        ("┣", "┫")
+    );
+    let ruler = y_of(&buf, "Mon 26 Oct AEDT");
+    let lanes = [
+        "⌂ Paul",
+        "● Priya",
+        "● Thandi",
+        "≡ in hours",
+        "○ Ellie",
+        "◇ AU",
+    ];
+    for y in std::iter::once(ruler).chain(lanes.map(|label| y_of(&buf, label))) {
+        assert_eq!(shaded(&buf, y, 82), range, "{}", row(&buf, y));
+    }
+    assert_eq!(buf[(201, y_of(&buf, "≡ in hours"))].symbol(), "━");
+}
+
 #[test]
 fn small_terminals_draw_without_panicking_until_folding_lands() {
     for (cols, rows) in [(1, 1), (30, 8), (44, 12), (60, 20), (200, 60)] {

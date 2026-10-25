@@ -1,6 +1,6 @@
 //! The pure view: draws the app into a frame, deciding nothing the core has not decided.
 
-use chrono::{DateTime, Timelike, Utc};
+use chrono::{DateTime, Offset, TimeDelta, Timelike, Utc};
 use chrono_tz::Tz;
 use ratatui::Frame;
 use ratatui::buffer::Buffer;
@@ -22,6 +22,8 @@ use super::theme::{Role, Theme};
 use super::update::context;
 use super::{footer, help, keys};
 use teamzones_core::config::RangeStyle;
+
+const DAY_SECONDS: i64 = 24 * 60 * 60;
 
 /// How the screen looks: the resolved theme and the glyph set.
 #[derive(Clone, Copy)]
@@ -78,10 +80,11 @@ fn set_char(buf: &mut Buffer, area: Rect, x: u16, y: u16, c: char, style: Style)
 }
 
 /// The track's geometry: where it starts, how many cells, and the instant each cell covers.
+///
+/// The cells split the viewed day evenly, so cell `index` is the same instant in every row.
 struct Track {
     x: u16,
     cells: u16,
-    minutes: u16,
     start: DateTime<Utc>,
     when: When,
     /// How the range is marked, already fallen back for a theme without colour.
@@ -154,13 +157,26 @@ impl Track {
     }
 
     fn cell_start(&self, index: u16) -> DateTime<Utc> {
-        self.start + chrono::TimeDelta::minutes(i64::from(index) * i64::from(self.minutes))
+        let seconds = i64::from(index) * DAY_SECONDS / i64::from(self.cells.max(1));
+        self.start + TimeDelta::seconds(seconds)
     }
 
-    /// The grid slots inside cell `index`.
+    /// The grid slots cell `index` overlaps, first to last.
     fn slots(&self, index: u16) -> impl Iterator<Item = Slot> {
         let first = Slot::containing(self.cell_start(index));
-        (0..i64::from(self.minutes / 15).max(1)).map(move |step| first.offset(step))
+        let last = Slot::containing(self.cell_start(index + 1) - TimeDelta::seconds(1));
+        (0..=last.since(first).max(0)).map(move |step| first.offset(step))
+    }
+
+    /// Whether `key` of the local time in `tz` changes inside cell `index`, so the cell holds
+    /// that boundary (a local midnight, say).
+    fn crosses<K: PartialEq>(&self, index: u16, tz: Tz, key: impl Fn(DateTime<Tz>) -> K) -> bool {
+        key(self.last_second(index, tz)) != key(self.last_second(index + 1, tz))
+    }
+
+    /// The local time in `tz` one second before cell `index` starts.
+    fn last_second(&self, index: u16, tz: Tz) -> DateTime<Tz> {
+        (self.cell_start(index) - TimeDelta::seconds(1)).with_timezone(&tz)
     }
 
     /// Whether cell `index` overlaps the range, or holds the cursor's instant.
@@ -204,7 +220,6 @@ pub fn draw(frame: &mut Frame, app: &App, look: Look) {
     let track = Track {
         x: areas.columns.label,
         cells: areas.columns.track,
-        minutes: areas.columns.minutes,
         start: day_start(app.day(), app.roster().axis()),
         when: app.when(),
         marking: without_colour(app.range_style, look.theme.is_mono()),
@@ -312,7 +327,7 @@ fn slider(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
         &viewed.format("%Z").to_string(),
         theme.fg(Role::Dim),
     );
-    let every = if track.minutes == 15 { 3 } else { 6 };
+    let every = if track.cells >= 96 { 3 } else { 6 };
     for (index, column) in track.columns() {
         set_char(buf, area, column, ruler_y, ' ', Style::new());
         let fitting = track
@@ -329,9 +344,12 @@ fn slider(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
     }
     let hours: Vec<(u32, u16)> = track
         .columns()
-        .map(|(index, column)| (track.cell_start(index).with_timezone(&axis), column))
-        .filter(|(local, _)| local.minute() == 0)
-        .map(|(local, column)| (local.hour(), column))
+        .filter(|(index, _)| {
+            track.crosses(*index, axis, |local| {
+                (local.date_naive(), local.hour(), local.offset().fix())
+            })
+        })
+        .map(|(index, column)| (track.last_second(index + 1, axis).hour(), column))
         .collect();
     for (_, column) in hours.iter().filter(|(hour, _)| hour % every != 0) {
         set_char(
@@ -430,10 +448,9 @@ fn lane(
         set_char(buf, area, column, y, *glyph, style);
     }
     for (index, column) in track.columns() {
-        let local = track.cell_start(index).with_timezone(&tz);
-        if local.hour() * 60 + local.minute() < u32::from(track.minutes) {
+        if track.crosses(index, tz, |local| local.date_naive()) {
             let end = area.right().min(track.x + track.cells);
-            let tag = local.format("%a").to_string();
+            let tag = track.last_second(index + 1, tz).format("%a").to_string();
             put(
                 buf,
                 Rect::new(column, y, end.saturating_sub(column), 1).intersection(area),
