@@ -1,6 +1,7 @@
 //! Runs the real binary on a real pseudo-terminal and reads back what it wrote, proving it
-//! releases mouse capture and the alternate screen on quit. A `TestBackend` never sees these
-//! escape sequences, and `rustix` opens the pty without any unsafe code.
+//! releases mouse capture, raw mode and the alternate screen on quit and around the editor
+//! handoff. A `TestBackend` never sees these escape sequences, and `rustix` opens the pty
+//! without any unsafe code.
 
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
@@ -135,60 +136,165 @@ fn contains(haystack: &[u8], needle: &str) -> bool {
         .any(|window| window == needle.as_bytes())
 }
 
-#[test]
-fn quitting_releases_mouse_capture_and_then_leaves_the_alternate_screen() {
-    let (master, slave_path) = open_pty();
-    // Held until the child is reaped, so the master reports end of output only after that.
-    let held = open_slave(&slave_path);
-    tcsetwinsize(
-        &held,
-        Winsize {
-            ws_row: 36,
-            ws_col: 120,
-            ws_xpixel: 0,
-            ws_ypixel: 0,
-        },
-    )
-    .expect("size the pty");
-    let fixture = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../teamzones-core/tests/fixtures/sample.toml"
-    );
-    let mut writer = master.try_clone().expect("clone the master");
-    let rx = read_chunks(master);
-    let mut child = Command::new(env!("CARGO_BIN_EXE_teamzones"))
-        .args(["--now", "2026-10-23T22:04:00Z"])
-        .env("TEAMZONES_CONFIG", fixture)
-        .env("NO_COLOR", "1")
-        .stdin(Stdio::from(open_slave(&slave_path)))
-        .stdout(Stdio::from(open_slave(&slave_path)))
-        .stderr(Stdio::from(open_slave(&slave_path)))
-        .spawn()
-        .expect("spawn teamzones on the pty");
+/// The binary running on a 120 by 36 pty: the master to type into, its output, and the child.
+struct Session {
+    writer: File,
+    rx: mpsc::Receiver<Result<Vec<u8>, End>>,
+    child: Child,
+    /// Held until the child is reaped, so the master reports end of output only after that.
+    held: File,
+    output: Vec<u8>,
+}
 
-    let capture = ansi(crossterm::event::EnableMouseCapture);
-    let mut output = Vec::new();
-    read_until(&rx, &mut output, "start", |out, _| {
-        contains(out, &capture) && contains(out, "teamzones")
-    });
-    writer.write_all(b"q").expect("send q");
-    wait_for_exit(&mut child);
-    drop(held);
-    read_until(&rx, &mut output, "quit", |_, end| {
-        matches!(end, Some(End::Eof | End::EofViaEio))
-    });
+impl Session {
+    /// Starts teamzones on the fixture at the golden instant, with `env` set and `VISUAL` unset,
+    /// once it has captured the mouse and drawn.
+    fn start(config: &str, env: &[(&str, &str)]) -> Self {
+        let (master, slave_path) = open_pty();
+        let held = open_slave(&slave_path);
+        tcsetwinsize(
+            &held,
+            Winsize {
+                ws_row: 36,
+                ws_col: 120,
+                ws_xpixel: 0,
+                ws_ypixel: 0,
+            },
+        )
+        .expect("size the pty");
+        let writer = master.try_clone().expect("clone the master");
+        let rx = read_chunks(master);
+        let child = Command::new(env!("CARGO_BIN_EXE_teamzones"))
+            .args(["--now", "2026-10-23T22:04:00Z"])
+            .env("TEAMZONES_CONFIG", config)
+            .env("NO_COLOR", "1")
+            .env_remove("VISUAL")
+            .envs(env.iter().copied())
+            .stdin(Stdio::from(open_slave(&slave_path)))
+            .stdout(Stdio::from(open_slave(&slave_path)))
+            .stderr(Stdio::from(open_slave(&slave_path)))
+            .spawn()
+            .expect("spawn teamzones on the pty");
+        let mut session = Self {
+            writer,
+            rx,
+            child,
+            held,
+            output: Vec::new(),
+        };
+        let capture = ansi(crossterm::event::EnableMouseCapture);
+        session.read_until("start", |out| {
+            contains(out, &capture) && contains(out, "teamzones")
+        });
+        session
+    }
 
-    let output = String::from_utf8_lossy(&output);
-    let release = format!(
+    fn read_until(&mut self, what: &str, done: impl Fn(&[u8]) -> bool) {
+        read_until(&self.rx, &mut self.output, what, |out, _| done(out));
+    }
+
+    fn send(&mut self, bytes: &[u8]) {
+        self.writer.write_all(bytes).expect("type into the pty");
+    }
+
+    /// Sends `q`, waits for the child to exit and reads to the end; returns all of the output.
+    fn quit(mut self) -> String {
+        self.send(b"q");
+        wait_for_exit(&mut self.child);
+        drop(self.held);
+        read_until(&self.rx, &mut self.output, "quit", |_, end| {
+            matches!(end, Some(End::Eof | End::EofViaEio))
+        });
+        String::from_utf8_lossy(&self.output).into_owned()
+    }
+}
+
+const FIXTURE: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../teamzones-core/tests/fixtures/sample.toml"
+);
+
+/// Mouse capture off and then the alternate screen left, as crossterm encodes them.
+fn release() -> String {
+    format!(
         "{}{}",
         ansi(crossterm::event::DisableMouseCapture),
         ansi(crossterm::terminal::LeaveAlternateScreen)
-    );
+    )
+}
+
+#[test]
+fn quitting_releases_mouse_capture_and_then_leaves_the_alternate_screen() {
+    let output = Session::start(FIXTURE, &[]).quit();
     assert!(
-        output.ends_with(&release),
+        output.ends_with(&release()),
         "the output ends {:?}",
         &output[output.len().saturating_sub(120)..]
     );
+}
+
+/// What the stand-in editor prints: whether the terminal it was handed is in raw mode.
+const COOKED: &str = "editor saw a cooked terminal";
+const RAW: &str = "editor saw a raw terminal";
+
+/// A stand-in `$EDITOR` that reports the terminal mode it was handed and exits.
+fn reporting_editor(dir: &std::path::Path) -> PathBuf {
+    use std::os::unix::fs::PermissionsExt;
+    let path = dir.join("editor.sh");
+    let script = format!(
+        "#!/bin/sh\ncase \"$(stty -a)\" in *-icanon*) printf '{RAW}' ;; *) printf '{COOKED}' ;; esac\n"
+    );
+    std::fs::write(&path, script).expect("write the stand-in editor");
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
+        .expect("make the stand-in editor executable");
+    path
+}
+
+#[test]
+fn the_editor_gets_a_released_terminal_and_the_tui_takes_it_back_after() {
+    let dir = std::env::temp_dir().join(format!("teamzones-pty-editor-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("make a scratch dir");
+    let config = dir.join("config.toml");
+    std::fs::copy(FIXTURE, &config).expect("copy the fixture");
+    let editor = reporting_editor(&dir);
+    let mut session = Session::start(
+        &config.display().to_string(),
+        &[("EDITOR", &editor.display().to_string())],
+    );
+    let (enter, capture) = (
+        ansi(crossterm::terminal::EnterAlternateScreen),
+        ansi(crossterm::event::EnableMouseCapture),
+    );
+    session.send(b"E");
+    session.read_until("editor", |out| {
+        let out = String::from_utf8_lossy(out);
+        out.split_once(COOKED)
+            .or_else(|| out.split_once(RAW))
+            .is_some_and(|(_, after)| after.contains(&enter) && after.contains(&capture))
+    });
+    // Past the 20 ms drain after the editor exits, so the q is read as a key.
+    std::thread::sleep(Duration::from_millis(300));
+    let output = session.quit();
+    let (before, after) = output
+        .split_once(COOKED)
+        .unwrap_or_else(|| panic!("the editor never saw a cooked terminal: {output:?}"));
+    assert!(
+        before.ends_with(&format!("{}{}", release(), ansi(crossterm::cursor::Show))),
+        "before the editor ran the output ends {:?}",
+        &before[before.len().saturating_sub(120)..]
+    );
+    let entered = after
+        .find(&enter)
+        .expect("the alternate screen is entered again");
+    let captured = after.find(&capture).expect("the mouse is captured again");
+    assert!(entered < captured, "{after:?}");
+    assert_eq!(
+        std::fs::read_to_string(&config).expect("read the config back"),
+        std::fs::read_to_string(FIXTURE).expect("read the fixture"),
+        "the handoff wrote nothing"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 #[test]

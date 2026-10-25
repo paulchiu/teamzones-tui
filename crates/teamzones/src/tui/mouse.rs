@@ -31,18 +31,20 @@ pub enum Kind {
     Other,
 }
 
-/// A pointer event at a cell, independent of the terminal library that read it.
+/// A pointer event at a cell, independent of the terminal library that read it, and when it
+/// arrived on the event loop's monotonic clock (`--now` fixes the wall clock, not this one).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Pointer {
     pub kind: Kind,
     pub x: u16,
     pub y: u16,
     pub shift: bool,
+    pub at: chrono::TimeDelta,
 }
 
 impl Pointer {
-    /// The pointer event a crossterm mouse event names.
-    pub fn from_crossterm(event: crossterm::event::MouseEvent) -> Self {
+    /// The pointer event a crossterm mouse event names, arriving `at` on the loop's clock.
+    pub fn from_crossterm(event: crossterm::event::MouseEvent, at: chrono::TimeDelta) -> Self {
         use crossterm::event::{KeyModifiers, MouseButton, MouseEventKind};
         let kind = match event.kind {
             MouseEventKind::Down(MouseButton::Left) => Kind::Down,
@@ -61,6 +63,7 @@ impl Pointer {
             x: event.column,
             y: event.row,
             shift: event.modifiers.contains(KeyModifiers::SHIFT),
+            at,
         }
     }
 }
@@ -125,9 +128,9 @@ pub fn msgs(app: &App, pointer: Pointer) -> Vec<Msg> {
             let area = view::map_overlay_area(size);
             let map = area.inner(ratatui::layout::Margin::new(1, 1));
             match pointer.kind {
-                Kind::Down if area.contains(at) => map_double(app, map, pointer.x, pointer.y)
+                Kind::Down if area.contains(at) => map_double(app, map, pointer)
                     .into_iter()
-                    .chain([Msg::Clicked(pointer.x, pointer.y)])
+                    .chain([Msg::Clicked(pointer.x, pointer.y, pointer.at)])
                     .collect(),
                 Kind::Down => vec![Msg::Key(Key::Esc)],
                 Kind::Right | Kind::Middle if area.contains(at) => Vec::new(),
@@ -313,15 +316,18 @@ fn grab_at(track: &Track, cell: u16, ranged: bool) -> Grab {
 /// How close together two presses on one cell are a double click.
 const DOUBLE: chrono::TimeDelta = chrono::TimeDelta::milliseconds(400);
 
-/// Whether a press at (`x`, `y`) now makes a double click with the last one.
-fn is_double(app: &App, x: u16, y: u16) -> bool {
-    app.last_click
-        .is_some_and(|(cx, cy, at)| (cx, cy) == (x, y) && app.now - at <= DOUBLE)
+/// Whether the press `pointer` makes a double click with the last one.
+fn is_double(app: &App, pointer: Pointer) -> bool {
+    app.last_click.is_some_and(|(x, y, at)| {
+        (x, y) == (pointer.x, pointer.y)
+            && (chrono::TimeDelta::zero()..=DOUBLE).contains(&(pointer.at - at))
+    })
 }
 
-/// A double click on the map at (`x`, `y`) in `area`: add a person or place at that point.
-fn map_double(app: &App, area: Rect, x: u16, y: u16) -> Option<Msg> {
-    (area.contains(Position::new(x, y)) && is_double(app, x, y)).then(|| {
+/// A double click on the map in `area`: add a person or place at that point.
+fn map_double(app: &App, area: Rect, pointer: Pointer) -> Option<Msg> {
+    let Pointer { x, y, .. } = pointer;
+    (area.contains(Position::new(x, y)) && is_double(app, pointer)).then(|| {
         let (lat, lon) = super::map::unproject(area, x, y);
         Msg::AddAt(lat, lon)
     })
@@ -330,14 +336,14 @@ fn map_double(app: &App, area: Rect, x: u16, y: u16) -> Option<Msg> {
 /// A left-button press, followed by the note of where it was for spotting a double click.
 fn down(app: &App, look: Look, areas: &Areas, track: &Track, pointer: Pointer) -> Vec<Msg> {
     let mut msgs = pressed(app, look, areas, track, pointer);
-    msgs.push(Msg::Clicked(pointer.x, pointer.y));
+    msgs.push(Msg::Clicked(pointer.x, pointer.y, pointer.at));
     msgs
 }
 
 fn pressed(app: &App, look: Look, areas: &Areas, track: &Track, pointer: Pointer) -> Vec<Msg> {
     let Pointer { x, y, .. } = pointer;
     let slider = slider(areas, track);
-    if let Some(add) = areas.map.and_then(|map| map_double(app, map, x, y)) {
+    if let Some(add) = areas.map.and_then(|map| map_double(app, map, pointer)) {
         return vec![add];
     }
     if y == areas.header.y && view::header_now_columns(app).contains(&x) {
@@ -377,7 +383,7 @@ fn pressed(app: &App, look: Look, areas: &Areas, track: &Track, pointer: Pointer
         let focus = Msg::Focus(row);
         return if x == areas.who.x {
             vec![focus, key(' ')]
-        } else if is_double(app, x, y) {
+        } else if is_double(app, pointer) {
             vec![focus, key('e')]
         } else {
             vec![focus]

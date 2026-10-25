@@ -913,6 +913,86 @@ mod tests {
         assert_eq!(global, teamzones_core::copy::DIALOG_KEYS);
     }
 
+    /// The clauses of the keymap's `Matrix overlay keys:` sentence, each with the keys it names
+    /// in backticks (`arrows` standing for the four arrow keys).
+    fn matrix_clauses() -> Vec<(String, Vec<Key>)> {
+        let (_, after) = KEYS_SPEC
+            .split_once("Matrix overlay keys: ")
+            .expect("keys.md lists the matrix's keys");
+        let (sentence, _) = after
+            .split_once(". Mouse in the matrix")
+            .expect("the sentence ends before the mouse");
+        sentence
+            .split(", ")
+            .map(|clause| {
+                let named = clause.split('`').skip(1).step_by(2).flat_map(|keys| {
+                    keys.split_whitespace().map(|word| match word {
+                        "space" => Key::Char(' '),
+                        "enter" => Key::Enter,
+                        "esc" => Key::Esc,
+                        other => Key::Char(other.chars().next().unwrap_or(' ')),
+                    })
+                });
+                let arrows = clause
+                    .contains(" arrows ")
+                    .then_some([Key::Left, Key::Right, Key::Up, Key::Down])
+                    .into_iter()
+                    .flatten();
+                (clause.to_owned(), named.chain(arrows).collect())
+            })
+            .collect()
+    }
+
+    /// Whether an action is the one a clause names.
+    type Is = fn(Action) -> bool;
+
+    /// What each clause of the matrix sentence says its keys do.
+    fn matrix_action(clause: &str) -> Is {
+        let verbs: [(&str, Is); 10] = [
+            ("move the column", |a| matches!(a, Action::MoveGroup(_))),
+            ("move", |a| matches!(a, Action::Cell(..))),
+            ("toggles", |a| a == Action::ToggleCell),
+            ("uses the group", |a| a == Action::UseGroup),
+            ("copies", |a| a == Action::CopyGroup),
+            ("adds a group", |a| a == Action::AddGroup),
+            ("renames", |a| a == Action::RenameGroup),
+            ("closes the group", |a| a == Action::CloseColumn),
+            ("undoes", |a| a == Action::Undo),
+            ("finishes", |a| a == Action::FinishMatrix),
+        ];
+        verbs
+            .into_iter()
+            .find(|(verb, _)| clause.contains(verb))
+            .map_or(|_| false, |(_, is)| is)
+    }
+
+    #[test]
+    fn the_matrix_bindings_are_the_keys_the_spec_s_matrix_sentence_names() {
+        let clauses = matrix_clauses();
+        for (clause, keys) in &clauses {
+            assert!(!keys.is_empty(), "{clause}");
+            for key in keys {
+                let action = action_for(Context::Matrix, *key);
+                assert!(
+                    action.is_some_and(matrix_action(clause)),
+                    "{clause}: {key:?} does {action:?}"
+                );
+            }
+        }
+        let named: Vec<Key> = clauses.into_iter().flat_map(|(_, keys)| keys).collect();
+        let bound = BINDINGS
+            .iter()
+            .filter(|b| b.context == Context::Matrix)
+            .flat_map(|b| b.chords.iter())
+            .filter(|(_, action)| *action != Action::Help);
+        for (key, action) in bound {
+            assert!(
+                named.contains(key),
+                "{key:?} ({action:?}) is not in the spec"
+            );
+        }
+    }
+
     #[test]
     fn ctrl_c_quits_even_in_a_prompt() {
         assert_eq!(

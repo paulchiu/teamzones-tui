@@ -161,8 +161,9 @@ pub struct App {
     pub disk: Option<String>,
     /// When `text` is due on disk, while a close waits out its undo window unwritten.
     pub flush_at: Option<DateTime<Utc>>,
-    /// The cell and instant of the last left-button press, for spotting a double click.
-    pub last_click: Option<(u16, u16, DateTime<Utc>)>,
+    /// The cell of the last left-button press and when it came on the loop's monotonic clock,
+    /// for spotting a double click.
+    pub last_click: Option<(u16, u16, chrono::TimeDelta)>,
 }
 
 impl App {

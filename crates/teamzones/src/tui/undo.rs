@@ -6,13 +6,14 @@ use teamzones_core::question::{Marks, Row};
 
 use super::app::{App, Lens};
 
-/// What an undo puts back: the config and the text it came from, any write still pending, and
-/// the lens, marks and focus on screen.
+/// What an undo puts back: the config and the text it came from, any write still pending with
+/// what the file held while it waited, and the lens, marks and focus on screen.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Snapshot {
     pub config: Config,
     pub text: Option<String>,
     pub flush_at: Option<DateTime<Utc>>,
+    pub disk: Option<String>,
     pub lens: Lens,
     pub marks: Marks,
     pub focus: Row,
@@ -24,6 +25,7 @@ impl Snapshot {
             config: app.config.clone(),
             text: app.text.clone(),
             flush_at: app.flush_at,
+            disk: app.disk.clone(),
             lens: app.lens,
             marks: app.marks.clone(),
             focus: app.focus,
@@ -36,6 +38,7 @@ impl Snapshot {
             config,
             text,
             flush_at,
+            disk: _,
             lens,
             marks,
             focus,

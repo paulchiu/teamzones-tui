@@ -178,14 +178,14 @@ fn wake_after(app: &App, now: DateTime<Utc>) -> Duration {
         .unwrap_or(IDLE)
 }
 
-/// The message a terminal event stands for, if any.
-fn msg_of(event: &Event) -> Option<Msg> {
+/// The message a terminal event stands for, if any, read `at` on the loop's monotonic clock.
+fn msg_of(event: &Event, at: chrono::TimeDelta) -> Option<Msg> {
     match event {
         Event::Key(key) if key.kind == KeyEventKind::Press => {
             Some(Msg::Key(keys::Key::from_crossterm(*key)))
         }
         Event::Resize(cols, rows) => Some(Msg::Resize(*cols, *rows)),
-        Event::Mouse(event) => Some(Msg::Mouse(mouse::Pointer::from_crossterm(*event))),
+        Event::Mouse(event) => Some(Msg::Mouse(mouse::Pointer::from_crossterm(*event, at))),
         Event::Key(_) | Event::FocusGained | Event::FocusLost | Event::Paste(_) => None,
     }
 }
@@ -209,6 +209,7 @@ fn event_loop<B: Backend>(
 where
     B::Error: Send + Sync + 'static,
 {
+    let started = std::time::Instant::now();
     loop {
         if std::mem::take(&mut io.repaint) {
             terminal.clear().map_err(terminal_error)?;
@@ -225,7 +226,9 @@ where
             return Ok(app);
         }
         let input = if io.events.poll(wake_after(&app, clock.now()))? {
-            msg_of(&io.events.read()?)
+            let at =
+                chrono::TimeDelta::from_std(started.elapsed()).unwrap_or(chrono::TimeDelta::MAX);
+            msg_of(&io.events.read()?, at)
         } else {
             None
         };

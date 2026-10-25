@@ -273,7 +273,13 @@ pub fn rename_group(document: &mut DocumentMut, index: usize, name: &str) {
     let Some(old) = table.get("name").and_then(Item::as_str).map(str::to_owned) else {
         return;
     };
+    if old == name {
+        return;
+    }
     set_value(table, "name", Value::from(name), &[]);
+    if old.eq_ignore_ascii_case(name) {
+        return;
+    }
     let aliases: Vec<String> = table
         .get("aliases")
         .and_then(Item::as_array)
@@ -361,7 +367,9 @@ pub fn entry_value(text: &str, entry: Entry, key: &str) -> Option<String> {
             pair.iter()
                 .map(|n| {
                     n.as_float()
-                        .map_or_else(|| n.to_string(), |f| f.to_string())
+                        .map(|f| f.to_string())
+                        .or_else(|| n.as_integer().map(|i| i.to_string()))
+                        .unwrap_or_else(|| n.to_string().trim().to_owned())
                 })
                 .collect::<Vec<_>>()
                 .join(", "),
@@ -663,5 +671,31 @@ mod tests {
             document.to_string(),
             "[travel]\nhere = \"Paris\"\nuntil = 2026-12-05\n\n[theme]\nscheme = \"dark\"\n"
         );
+    }
+
+    #[test]
+    fn a_marker_with_whole_numbers_prefills_as_plain_numbers() {
+        let text = "[[place]]\nname = \"US\"\ntz = \"America/Chicago\"\nat = [39, -96]\n";
+        assert_eq!(
+            entry_value(text, Entry::Place(0), "at").as_deref(),
+            Some("39, -96")
+        );
+        let text = "[[place]]\nname = \"US\"\ntz = \"America/Chicago\"\nat = [39.5,   -96.0]\n";
+        assert_eq!(
+            entry_value(text, Entry::Place(0), "at").as_deref(),
+            Some("39.5, -96")
+        );
+    }
+
+    #[test]
+    fn renaming_a_group_to_its_own_name_or_another_case_adds_no_alias() {
+        let text = "[[group]]\nname = \"deploy\"\npeople = []\n";
+        let renamed = |name: &str| {
+            let mut document: DocumentMut = text.parse().unwrap();
+            rename_group(&mut document, 0, name);
+            document.to_string()
+        };
+        assert_eq!(renamed("deploy"), text);
+        assert_eq!(renamed("Deploy"), text.replacen("deploy", "Deploy", 1));
     }
 }

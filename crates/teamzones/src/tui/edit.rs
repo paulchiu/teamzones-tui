@@ -140,6 +140,25 @@ pub fn flush(app: App, key: &str) -> (App, Vec<Effect>) {
     (flushed, write.into_iter().collect())
 }
 
+/// Puts `disk` back in the file while keeping any pending close pending, for an undo that returns
+/// to a state whose close had not been written yet.
+pub fn write_back(app: App, disk: Option<String>, key: &str) -> (App, Vec<Effect>) {
+    let write = match (&disk, &app.disk) {
+        (Some(text), Some(over)) if text != over => Some(Effect::Write {
+            key: key.to_owned(),
+            text: text.clone(),
+            over: over.clone(),
+        }),
+        (Some(_) | None, Some(_) | None) => None,
+    };
+    let disk = if write.is_some() {
+        disk
+    } else {
+        app.disk.clone()
+    };
+    (App { disk, ..app }, write.into_iter().collect())
+}
+
 /// Offers `before` to `u` for 10 s and raises the notice `key  text`.
 pub fn undoable(app: App, before: Snapshot, key: &str, text: &str) -> App {
     let now = app.now;

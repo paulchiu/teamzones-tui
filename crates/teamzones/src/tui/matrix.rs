@@ -69,8 +69,10 @@ pub fn asks(group: &Group) -> &'static str {
     }
 }
 
-/// `tab`: opens the matrix with the cursor on the active group and the focused row.
-pub fn open(app: App) -> App {
+/// `tab`: opens the matrix with the cursor on the active group and the focused row, first writing
+/// any pending close, so nothing the matrix changes reaches the file before it closes.
+pub fn open(app: App) -> (App, Vec<Effect>) {
+    let (app, effects) = flush(app, "x");
     let column = match app.lens {
         Lens::Group(index) => index,
         Lens::All => 0,
@@ -87,10 +89,13 @@ pub fn open(app: App) -> App {
         opened: Box::new(Snapshot::of(&app)),
         held: None,
     };
-    App {
-        mode: Mode::Matrix(Box::new(matrix)),
-        ..app
-    }
+    (
+        App {
+            mode: Mode::Matrix(Box::new(matrix)),
+            ..app
+        },
+        effects,
+    )
 }
 
 /// The matrix the app shows, if it shows one.
@@ -468,10 +473,11 @@ pub fn hold(app: App, held: Option<usize>) -> App {
     })
 }
 
-/// Marks the held column as dragged, so letting go of it no longer uses the group.
+/// Marks the held group as dragged, so letting go of it no longer uses it, and holds it at the
+/// column it has moved to, so the next drag event moves it only from there.
 pub fn dragged(app: App) -> App {
     on_matrix(app, |app, matrix| {
-        let held = matrix.held.map(|(column, _)| (column, true));
+        let held = matrix.held.map(|_| (matrix.column, true));
         with(app, Matrix { held, ..matrix })
     })
 }

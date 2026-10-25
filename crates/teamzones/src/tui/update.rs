@@ -73,8 +73,9 @@ pub enum Msg {
     AddAt(f64, f64),
     /// Open the drift tag's menu.
     DriftMenu,
-    /// The left button went down at this cell, for spotting a double click.
-    Clicked(u16, u16),
+    /// The left button went down at this cell at this point on the loop's clock, for spotting a
+    /// double click.
+    Clicked(u16, u16, chrono::TimeDelta),
 }
 
 /// Work the effects layer does on the update's behalf.
@@ -179,16 +180,13 @@ pub fn update(app: App, msg: Msg) -> (App, Vec<Effect>) {
             },
             Vec::new(),
         ),
-        Msg::Clicked(x, y) => {
-            let at = app.now;
-            (
-                App {
-                    last_click: Some((x, y, at)),
-                    ..app
-                },
-                Vec::new(),
-            )
-        }
+        Msg::Clicked(x, y, at) => (
+            App {
+                last_click: Some((x, y, at)),
+                ..app
+            },
+            Vec::new(),
+        ),
         Msg::Wrote { key, over, result } => match result {
             Ok(()) => (app, Vec::new()),
             Err(error) => {
@@ -455,7 +453,7 @@ fn act(app: App, action: Action, key: Key) -> (App, Vec<Effect>) {
             effects.push(Effect::Edit { mouse: app.mouse });
             (app, effects)
         }
-        Action::Matrix => only(matrix::open(app)),
+        Action::Matrix => matrix::open(app),
         Action::Cell(columns, rows) => {
             only(matrix::step(app, isize::from(columns), isize::from(rows)))
         }
@@ -702,17 +700,18 @@ fn switch(app: App, lens: Lens, key: Key) -> App {
     }
 }
 
-/// Puts back the state before the last drop, write, close or delete, writing the file back
-/// unless the state it returns to still had a close pending.
+/// Puts back the state before the last drop, write, close or delete, and the file as it was
+/// then: its text, or, while a close still waited, what the file held before that close.
 fn undo(app: App) -> (App, Vec<Effect>) {
     match app.undo.clone() {
         Some(undo) if app.now < undo.expires => {
+            let disk = undo.before.disk.clone();
             let restored = undo.before.restore(App { undo: None, ..app });
             let now = restored.now;
             let text = format!("restored {}", restored.expression());
             let restored = with_notice(restored, "u", &text, now);
             match restored.flush_at {
-                Some(_) => (restored, Vec::new()),
+                Some(_) => edit::write_back(restored, disk, "u"),
                 None => edit::flush(restored, "u"),
             }
         }

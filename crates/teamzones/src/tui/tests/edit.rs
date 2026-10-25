@@ -272,8 +272,8 @@ fn matrix_changes_are_written_together_on_esc_and_the_old_name_still_says() {
     assert_eq!(groups[2].2, ["Priya", "Sam", "Thandi"]);
     assert!(after[0].contains("# the people I tell first\n[[group]]\nname   = \"team\""));
     assert_eq!(
-        say_on(&after[0], &["deploy", "next"]),
-        say_on(&before, &["deploy", "next"]),
+        say_on(&after[0], &["deploy", "next"]).as_deref(),
+        Ok("Mon 26 Oct, 5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST, open in AU, closed in UK\n"),
         "Sam works Priya's hours in her zone, so deploy's next fit reads the same"
     );
     assert_eq!(notice_text(&closed), "tab  groups saved  u undo");
@@ -626,4 +626,92 @@ fn a_failing_editor_still_gives_the_terminal_back_and_reloads_nothing() {
     .0;
     assert_eq!(app.config, editable(FIXTURE).config);
     assert_eq!(notice_text(&app), "E  could not run vi: no such editor");
+}
+
+#[test]
+fn a_close_pending_when_the_matrix_opens_is_written_then_and_never_with_its_changes() {
+    let before = commented();
+    let (open, effects) = press_all(
+        editable(&before),
+        &[Key::Char('4'), Key::Char('x'), Key::Tab],
+    );
+    assert_eq!(written(&effects), [without_group(&before, "deploy")]);
+    let toggled = press(open, &typed("jj "));
+    let (ticked, effects) = tick(toggled, 10);
+    assert!(matrix_of(&ticked).naming.is_none());
+    assert!(
+        written(&effects).is_empty(),
+        "nothing the matrix changed is written while it is open: {effects:?}"
+    );
+}
+
+#[test]
+fn u_on_a_write_made_while_a_close_waits_puts_the_file_back_and_the_close_still_waits() {
+    let before = commented();
+    let closed = press(editable(&before), &chars("4x"));
+    let (saved, effects) = press_all(focus_on(closed, "UK"), &chars(" w"));
+    assert_eq!(written(&effects).len(), 1, "w writes the close with it");
+    let (undone, effects) = press_all(saved, &chars("u"));
+    assert_eq!(
+        written(&effects),
+        std::slice::from_ref(&before),
+        "the file goes back to the bytes it held before w"
+    );
+    assert!(
+        !strip_row(&undone).contains("deploy"),
+        "deploy is still closed"
+    );
+    let (_, effects) = tick(undone, 10);
+    assert_eq!(written(&effects), [without_group(&before, "deploy")]);
+}
+
+#[test]
+fn renaming_a_group_to_its_own_name_changes_nothing() {
+    let open = press(editable(&commented()), &[Key::Char('4'), Key::Tab]);
+    let (renamed, effects) = press_all(open.clone(), &[Key::Char('R'), Key::Enter]);
+    assert_eq!(notice_text(&renamed), "");
+    assert_eq!(renamed.config, open.config);
+    let (_, effects_on_close) = press_all(renamed, &[Key::Esc]);
+    assert!(written(&effects).is_empty() && written(&effects_on_close).is_empty());
+}
+
+#[test]
+fn focus_stays_on_a_row_after_x_and_every_matrix_change() {
+    let on_us = || focus_on(editable(&commented()), "US");
+    let rename: Vec<Key> = [Key::Char('R'), Key::Char('2'), Key::Enter].into();
+    let add: Vec<Key> = [Key::Char('a'), Key::Char('z'), Key::Enter].into();
+    let cases: [(&str, Vec<Key>); 6] = [
+        ("x", chars("4x")),
+        ("matrix space", [Key::Tab, Key::Char(' ')].into()),
+        ("matrix >", [Key::Tab, Key::Char('>')].into()),
+        (
+            "matrix R",
+            std::iter::once(Key::Tab).chain(rename).collect(),
+        ),
+        ("matrix a", std::iter::once(Key::Tab).chain(add).collect()),
+        ("matrix esc", [Key::Tab, Key::Char(' '), Key::Esc].into()),
+    ];
+    for (name, keys) in cases {
+        let app = press(on_us(), &keys);
+        assert!(app.focus_rows().contains(&app.focus), "{name}");
+        assert_eq!(super::focus_name(&app), "US", "{name}");
+    }
+}
+
+#[test]
+fn a_reload_drops_the_undo_so_u_never_writes_over_the_file_read() {
+    let path = scratch_dir("reload-undo").join("config.toml");
+    let before = commented();
+    std::fs::write(&path, &before).unwrap();
+    let (saved, effects) = press_all(focus_on(editable(&before), "UK"), &chars(" w"));
+    let saved = run_against(saved, effects, &path, &mut Recorder::default());
+    let elsewhere = std::fs::read_to_string(&path)
+        .unwrap()
+        .replacen("Ellie", "Elena", 1);
+    std::fs::write(&path, &elsewhere).unwrap();
+    let (pressed, effects) = press_all(saved, &chars("r"));
+    let reloaded = run_against(pressed, effects, &path, &mut Recorder::default());
+    assert!(reloaded.undo.is_none());
+    let (_, effects) = press_all(reloaded, &chars("u"));
+    assert!(written(&effects).is_empty(), "{effects:?}");
 }
