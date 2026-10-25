@@ -223,11 +223,15 @@ pub fn focus_line(roster: &Roster, row: Row, when: When) -> String {
         Row::Place(id) => roster.place(id).location.tz,
     };
     let axis_date = when.start().with_timezone(&roster.axis()).date_naive();
-    format!(
-        "{} ({})",
+    let (focused, axis) = (
         entry(when, tz, axis_date),
-        entry(when, roster.axis(), axis_date)
-    )
+        entry(when, roster.axis(), axis_date),
+    );
+    if focused == axis {
+        focused
+    } else {
+        format!("{focused} ({axis})")
+    }
 }
 
 #[cfg(test)]
@@ -278,6 +282,16 @@ mod tests {
             line(&roster, "regions 2-4pm mon"),
             "2-4pm AEDT, open in AU and US, closed in UK"
         );
+    }
+
+    #[test]
+    fn the_focus_line_for_a_row_in_the_axis_zone_names_the_time_once() {
+        let roster = Config::parse(FIXTURE).unwrap().roster;
+        let now: DateTime<Utc> = "2026-10-23T22:04:00Z".parse().unwrap();
+        let home = Row::Person(crate::config::PersonId::HOME);
+        assert_eq!(focus_line(&roster, home, When::At(now)), "9:04am AEDT");
+        let au = Row::Place(roster.place_named("AU").unwrap());
+        assert_eq!(focus_line(&roster, au, When::At(now)), "9:04am AEDT");
     }
 
     #[test]
