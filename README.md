@@ -5,7 +5,7 @@ Who's available and where it's busy, on one time axis. A Rust TUI.
 Picking a time for a call across Melbourne, Brisbane and Johannesburg is a sum you do in your head, and picking one for a deploy adds a second question: is any region we trade in at its lunch or dinner rush? `teamzones` answers both on one home-time axis. People (who you tell) are drawn by their hours and daylight, places (regions you operate in) by their trading load, and it finds the slots where everyone a group counts is free and every place it counts is quiet enough. Then it copies the answer as one line you can paste into Slack:
 
 ```
-5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST, open in AU, closed in UK
+5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST / 6-6:30am GMT, open in AU, closed in UK
 ```
 
 ## Install
@@ -39,16 +39,16 @@ To have a coding agent write the config for you, point it at [llms.txt](llms.txt
 $ teamzones say team 3pm
 3pm AEDT / 2pm AEST / 6am SAST
 $ teamzones say apps 3pm
-3pm AEDT, open in AU, closed in UK and US
+3pm AEDT / 5am BST / Fri 11pm CDT, open in AU, closed in UK and US
 $ teamzones say deploy next
-Mon 26 Oct, 5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST, open in AU, closed in UK
+Mon 26 Oct, 5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST / 6-6:30am GMT, open in AU, closed in UK
 $ teamzones say team +@uk 5pm mon
-5pm AEDT / 4pm AEST / 8am SAST, closed in UK
+5pm AEDT / 4pm AEST / 8am SAST / 6am GMT, closed in UK
 $ teamzones say regions 2-4pm mon --zones
 2-4pm AEDT / 3-5am GMT / Sun 10pm-12am CDT
 ```
 
-A place adds its state to the line, never its clock, unless you ask for `--zones`. `next` finds the next slot where the group's question is answered. Away from home, `teamzones here London --until 2026-11-01` moves the axis to London until that date is over there.
+A place adds its clock to the line and its state after the comma; `--zones` keeps the clocks and drops the states. `next` finds the next slot where the group's question is answered. Away from home, `teamzones here London --until 2026-11-01` moves the axis to London until that date is over there.
 
 ## The screen
 
@@ -75,8 +75,8 @@ Sat 24 Oct AEDT                 12a · · · · 6a· · · · · 12p · · · ·
 ────────────────────────────────────────────────────────────────────────────────
 ▶ Paul  Melbourne  AEDT UTC+11  hours 9am-6pm Mon-Fri
 ╭ times for regions ─────────────────────────────────────────────────── y copy ╮
-│ 9:04am AEDT, open in AU and US, closed in UK                                 │
-╰───────────────────────────────────────────────────────── home zone, 3 places ╯
+│ 9:04am AEDT / Fri 11:04pm BST / Fri 5:04pm CDT, open in AU and US, closed in │
+╰──────────────────────────────────────────────────────── 3 zones for 3 places ╯
 
 h/l time  v range  space mark  w save  tab groups  y copy  m map  ? help  q quit
 ```

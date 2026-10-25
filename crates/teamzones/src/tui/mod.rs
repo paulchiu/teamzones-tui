@@ -251,7 +251,8 @@ pub struct File<'a> {
 }
 
 /// Opens the TUI on `config` until the user quits, restoring the terminal on the way out; starts
-/// on the group named `last_group` when there is one, and returns the group to remember.
+/// on the group the state names, with the marks it kept, and returns the group and marks to
+/// remember.
 ///
 /// # Errors
 ///
@@ -259,17 +260,17 @@ pub struct File<'a> {
 pub fn run(
     config: Config,
     file: File,
-    last_group: Option<&str>,
+    state: &crate::state::State,
     clock: Clock,
     clipboard: &mut dyn Clipboard,
     env: TerminalEnv,
-) -> std::io::Result<String> {
+) -> std::io::Result<(String, Vec<crate::state::LensMarks>)> {
     let mut terminal = ratatui::try_init().inspect_err(|_| restore())?;
     hook_restore_on_panic();
     let mut modes = Stdout;
     let app = App::new(config, clock.now())
         .with_source(file.text)
-        .on_group(last_group);
+        .on_group(state.last_group.as_deref(), &state.marks);
     if let Err(error) = modes.capture_mouse(app.mouse) {
         drop(terminal);
         restore();
@@ -289,7 +290,8 @@ pub fn run(
         editors: (std::env::var("VISUAL").ok(), std::env::var("EDITOR").ok()),
         repaint: false,
     };
-    let result = event_loop(&mut terminal, app, &clock, env, &mut io).map(|app| app.lens_name());
+    let result = event_loop(&mut terminal, app, &clock, env, &mut io)
+        .map(|app| (app.lens_name(), app.remembered()));
     drop(terminal);
     restore();
     result

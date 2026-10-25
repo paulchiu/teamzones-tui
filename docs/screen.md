@@ -16,7 +16,7 @@ From the top:
 - **The notice row** says what the last key did, such as `y  copied` or `n  next fit for deploy: ...`, and clears on the next key or after ten seconds.
 - **The footer** lists the keys that matter right now, dropping the least useful first when it runs out of room.
 
-`teamzones` opens on the group you last quit on, kept in `~/.local/state/teamzones/state.toml` (or under `$XDG_STATE_HOME`), and on the first group when that group is gone or there is no state yet. With no config file the notice row says `no config: E creates one` and the footer offers `E config`.
+`teamzones` opens on the group you last quit on, kept in `~/.local/state/teamzones/state.toml` (or under `$XDG_STATE_HOME`), and on the first group when that group is gone or there is no state yet. Marks that differ from a group's saved members (or from everyone, on `0 all`) are kept there too when you quit, and come back when you next open that lens. `w` saves them into the group instead. With no config file the notice row says `no config: E creates one` and the footer offers `E config`.
 
 Switching groups never moves anything: the blocks are sized by everyone in the config, not by the group, so the ruler, the borders and the times box stay put.
 

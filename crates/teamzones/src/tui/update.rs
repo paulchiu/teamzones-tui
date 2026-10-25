@@ -745,17 +745,16 @@ fn switch(app: App, lens: Lens, key: Key) -> App {
             },
         )
     });
-    let marks = base_marks(app.roster(), lens);
     let now = app.now;
     let next = App {
         lens,
-        marks,
         undo: dropped
             .as_ref()
             .map(|(_, undo)| undo.clone())
             .or(app.undo.clone()),
         ..app
-    };
+    }
+    .entered();
     match dropped {
         Some((expression, _)) => {
             let text = format!("dropped {expression}  u undo");

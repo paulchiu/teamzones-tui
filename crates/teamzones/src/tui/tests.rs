@@ -345,11 +345,11 @@ fn switching_groups_never_moves_the_ruler_the_borders_or_the_say_panel() {
     let [regions, deploy] = [&regions, &deploy].map(|app| render(app, 120, 36));
     assert_eq!(
         say_line(&regions),
-        "5-6pm AEDT, closed in UK and US, busy in AU"
+        "5-6pm AEDT / 6-7am GMT / 1-2am CDT, closed in UK and US, busy in AU"
     );
     assert_eq!(
         say_line(&deploy),
-        "5-6pm AEDT / 4-5pm AEST / 8-9am SAST, closed in UK, busy in AU"
+        "5-6pm AEDT / 4-5pm AEST / 8-9am SAST / 6-7am GMT, closed in UK, busy in AU"
     );
 }
 
@@ -383,7 +383,7 @@ fn repeated_n_steps_run_by_run() {
     let app = press(go_to(press(fixture(), &chars("3")), "mon 2pm"), &chars("n"));
     assert_eq!(
         app.say_line(),
-        "9-10pm AEDT, open in AU and UK, closed in US"
+        "9-10pm AEDT / 10-11am GMT / 5-6am CDT, open in AU and UK, closed in US"
     );
 }
 
@@ -392,7 +392,7 @@ fn shift_n_lands_on_the_start_of_the_previous_run() {
     let app = press(go_to(press(fixture(), &chars("3")), "mon 9pm"), &chars("N"));
     assert_eq!(
         app.say_line(),
-        "2-3pm AEDT, open in AU and US, closed in UK"
+        "2-3pm AEDT / 3-4am GMT / Sun 10-11pm CDT, open in AU and US, closed in UK"
     );
 }
 
@@ -411,7 +411,10 @@ fn n_with_nothing_in_seven_days_says_so_and_moves_to_the_best_slot() {
         app.notice.as_ref().unwrap().text,
         "n  no full slot in 7 days, best 2/3 at Sat 3pm AEDT"
     );
-    assert_eq!(app.say_line(), "3pm AEDT, closed in UK and US, open in AU");
+    assert_eq!(
+        app.say_line(),
+        "3pm AEDT / 5am BST / Fri 11pm CDT, closed in UK and US, open in AU"
+    );
 }
 
 /// Moves focus down until it sits on the row named `name`.
@@ -758,6 +761,19 @@ fn the_frames_at_120_by_24_and_80_by_24_sit_on_the_row_budget() {
         assert!(row(&buf, 1).starts_with("Sat 24 Oct AEDT"));
         insta::assert_snapshot!(snapshot, text(&buf));
     }
+}
+
+#[test]
+fn a_times_line_wider_than_its_box_ends_in_a_mark() {
+    let regions = press(fixture(), &chars("3"));
+    let line = regions.say_line();
+    let buf = render(&regions, 80, 24);
+    let shown = say_line(&buf);
+    let shown = shown.trim_end_matches(['│', ' ']);
+    assert!(shown.ends_with('…'), "{shown:?}");
+    assert!(line.starts_with(shown.trim_end_matches('…')), "{line:?}");
+    let wide = render(&regions, 120, 24);
+    assert_eq!(say_line(&wide), line);
 }
 
 /// Every key the main footer or binding table names, as probes for the modal tests.
@@ -1724,14 +1740,199 @@ fn the_screen_opens_on_the_saved_last_group_and_on_the_first_without_one() {
         let buf = render(app, 120, 36);
         row(&buf, y_of(&buf, " times for "))
     };
-    assert!(title(&fixture().on_group(Some("deploy"))).starts_with("╭ times for deploy "));
-    assert!(title(&fixture().on_group(Some("ALL"))).starts_with("╭ times for all "));
+    assert!(title(&fixture().on_group(Some("deploy"), &[])).starts_with("╭ times for deploy "));
+    assert!(title(&fixture().on_group(Some("ALL"), &[])).starts_with("╭ times for all "));
     for last in [None, Some("gone")] {
         assert!(
-            title(&fixture().on_group(last)).starts_with("╭ times for team "),
+            title(&fixture().on_group(last, &[])).starts_with("╭ times for team "),
             "{last:?}"
         );
     }
-    let deploy = fixture().on_group(Some("deploy"));
+    let deploy = fixture().on_group(Some("deploy"), &[]);
     assert_eq!(deploy.marks, press(fixture(), &chars("4")).marks);
+}
+
+#[test]
+fn marking_a_place_without_trading_adds_its_clock_to_the_times_box_and_the_summary_counts_it() {
+    let clock_only = FIXTURE.replacen(
+        "tz      = \"Europe/London\"\ntrading = \"venue\"\n",
+        "tz      = \"Europe/London\"\n",
+        1,
+    );
+    let team = go_to(
+        App::new(Config::parse(&clock_only).unwrap(), now()),
+        "26 oct 5-6pm",
+    );
+    let marked = press(focus_on(team, "UK"), &chars(" "));
+    let buf = render(&marked, 120, 36);
+    assert_eq!(
+        say_line(&buf),
+        "5-6pm AEDT / 4-5pm AEST / 8-9am SAST / 6-7am GMT"
+    );
+    let bottom = row(&buf, y_of(&buf, " times for ") + 2);
+    assert!(
+        bottom.contains(" 4 zones for 5 people, 1 place "),
+        "{bottom}"
+    );
+}
+
+#[test]
+fn a_places_only_summary_counts_the_zones_its_places_add() {
+    let regions = go_to(press(fixture(), &chars("3")), "26 oct 2-4pm");
+    let buf = render(&regions, 120, 36);
+    let bottom = row(&buf, y_of(&buf, " times for ") + 2);
+    assert!(bottom.contains(" 3 zones for 3 places "), "{bottom}");
+}
+
+#[test]
+fn a_places_only_summary_under_a_states_line_counts_no_zones() {
+    let states = App::new(
+        config("\n[[copy]]\nkey    = \"y\"\nlabel  = \"states\"\nplaces = \"states\"\n"),
+        now(),
+    );
+    let regions = go_to(press(states, &chars("3")), "26 oct 2-4pm");
+    let buf = render(&regions, 120, 36);
+    let bottom = row(&buf, y_of(&buf, " times for ") + 2);
+    assert!(bottom.contains(" home zone, 3 places "), "{bottom}");
+}
+
+const CLI_SPEC: &str = include_str!("../../../../docs/spec/cli.md");
+
+#[test]
+fn the_times_box_shows_what_say_prints_for_every_fixed_time_golden_row() {
+    use super::app::Cursor;
+    use teamzones_core::clock::{Slot, When};
+    use teamzones_core::time::Moment;
+    let rows: Vec<(String, String)> = CLI_SPEC
+        .split_once("## CLI golden table")
+        .unwrap()
+        .1
+        .lines()
+        .skip_while(|line| !line.starts_with('|'))
+        .take_while(|line| line.starts_with('|'))
+        .skip(2)
+        .filter_map(|line| {
+            let cells: Vec<&str> = line.trim_matches('|').split(" | ").collect();
+            let command = unticked(cells[0].trim()).strip_prefix("say ")?;
+            let stdout = cells[1].trim();
+            let plain = stdout.starts_with('`') && stdout.ends_with('`');
+            (plain && !command.contains("--") && !command.ends_with("next"))
+                .then(|| (command.to_owned(), unticked(stdout).to_owned()))
+        })
+        .collect();
+    assert_eq!(rows.len(), 7, "{rows:?}");
+    for (command, stdout) in rows {
+        let app = fixture();
+        let tokens: Vec<&str> = command.split(' ').collect();
+        let expr = teamzones_core::expr::parse_expr(&tokens, app.roster(), now()).unwrap();
+        let Moment::Fixed(when) = expr.moment else {
+            panic!("{command} has no fixed time");
+        };
+        let (cursor, range) = match when {
+            When::At(instant) => (Cursor::At(Slot::containing(instant)), None),
+            When::Over(range) => (Cursor::At(range.start()), Some(range)),
+        };
+        let shown = App {
+            marks: expr.marks,
+            cursor,
+            range,
+            ..app
+        };
+        assert_eq!(say_line(&render(&shown, 160, 36)), stdout, "say {command}");
+    }
+}
+
+fn kept(lens: &str, people: &[&str], places: &[&str]) -> crate::state::LensMarks {
+    let names = |names: &[&str]| names.iter().map(|name| (*name).to_owned()).collect();
+    crate::state::LensMarks {
+        lens: lens.to_owned(),
+        people: names(people),
+        places: names(places),
+    }
+}
+
+#[test]
+fn marks_a_person_and_a_place_on_all_and_keeps_them_for_the_next_run() {
+    let marked = press(
+        focus_on(
+            press(
+                focus_on(press(fixture(), &chars("0X")), "Ellie"),
+                &chars(" "),
+            ),
+            "UK",
+        ),
+        &chars(" "),
+    );
+    let remembered = marked.remembered();
+    assert_eq!(remembered, [kept("all", &["Paul", "Ellie"], &["UK"])]);
+    let reopened = go_to(fixture().on_group(Some("all"), &remembered), "26 oct 5-6pm");
+    assert_eq!(reopened.marks, go_to(marked, "26 oct 5-6pm").marks);
+    let buf = render(&reopened, 120, 36);
+    assert!(row(&buf, y_of(&buf, " times for ")).contains("times for all "));
+    assert_eq!(say_line(&buf), "5-6pm AEDT / 6-7am GMT, closed in UK");
+}
+
+#[test]
+fn kept_marks_without_home_s_name_still_count_home() {
+    let app = fixture().on_group(Some("all"), &[kept("all", &["Ellie"], &[])]);
+    assert!(
+        app.marks
+            .people
+            .contains(&teamzones_core::config::PersonId::HOME)
+    );
+    assert_eq!(app.remembered(), [kept("all", &["Paul", "Ellie"], &[])]);
+}
+
+#[test]
+fn a_switch_to_a_lens_with_kept_marks_puts_them_back_and_u_keeps_them_kept() {
+    let stored = [kept("deploy", &["Priya", "Sam"], &["US"])];
+    let app = fixture().on_group(Some("team"), &stored);
+    assert_eq!(app.drift(), Vec::<String>::new());
+    let deploy = press(app.clone(), &chars("4"));
+    assert_eq!(deploy.expression(), "deploy +Sam -Thandi -@AU -@UK +@US");
+    assert_eq!(deploy.remembered(), stored);
+    let back = press(press(app.clone(), &chars("4")), &chars("1"));
+    assert_eq!(
+        back.remembered(),
+        Vec::new(),
+        "the switch away dropped deploy's drift"
+    );
+    let drifted = press(focus_on(app, "UK"), &chars(" "));
+    let undone = press(press(drifted, &chars("4")), &chars("u"));
+    assert_eq!(undone.expression(), "team +@UK");
+    assert_eq!(
+        undone.remembered(),
+        [
+            stored[0].clone(),
+            kept("team", &["Priya", "Sam", "Thandi", "Johan"], &["UK"])
+        ]
+    );
+}
+
+#[test]
+fn names_and_lenses_the_config_no_longer_has_are_dropped_and_marks_matching_config_keep_nothing() {
+    let stored = [
+        kept("gone", &["Priya"], &[]),
+        kept(
+            "team",
+            &["Priya", "Sam", "Thandi", "Johan", "Nobody"],
+            &["Nowhere"],
+        ),
+    ];
+    let app = fixture().on_group(Some("team"), &stored);
+    assert_eq!(app.drift(), Vec::<String>::new());
+    assert_eq!(app.remembered(), Vec::new());
+}
+
+#[test]
+fn w_saving_the_marks_into_their_group_clears_its_kept_marks() {
+    let stored = [kept("team", &["Priya"], &["UK"])];
+    let app = fixture()
+        .with_source(Some(FIXTURE.to_owned()))
+        .on_group(Some("team"), &stored);
+    assert_eq!(app.expression(), "team -Sam -Thandi -Johan +@UK");
+    assert_eq!(app.remembered(), stored);
+    let saved = press(app, &chars("w"));
+    assert_eq!(saved.drift(), Vec::<String>::new());
+    assert_eq!(saved.remembered(), Vec::new());
 }

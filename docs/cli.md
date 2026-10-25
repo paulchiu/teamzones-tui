@@ -12,19 +12,19 @@ Prints the line for a group at a time and copies it. It copies only when stdout 
 $ teamzones say team 3pm
 3pm AEDT / 2pm AEST / 6am SAST
 $ teamzones say apps 3pm
-3pm AEDT, open in AU, closed in UK and US
+3pm AEDT / 5am BST / Fri 11pm CDT, open in AU, closed in UK and US
 $ teamzones say team 3pm --names
 3pm AEDT (Paul) / 2pm AEST (Priya, Sam) / 6am SAST (Thandi, Johan)
 ```
 
-The line starts with home's zone, then every other counted person's zone by descending UTC offset, merging zones that show the same time. A group with places adds their states after a comma. With no `EXPR` it uses the first group, and with no `TIME` it means now.
+The line starts with home's zone, then every other counted person's and place's zone by descending UTC offset, merging zones that show the same time. A group with places adds their states after a comma, so a place shows both its clock and whether it is open. With no `EXPR` it uses the first group, and with no `TIME` it means now.
 
 | Flag | Does |
 | --- | --- |
-| `--zones` | Names each counted place's clock instead of its state, the old `ttz` shape. |
-| `--names` | Adds who is in each zone after it, home included. |
+| `--zones` | Keeps each counted place's clock and drops its state, the old `ttz` shape. |
+| `--names` | Adds who and which places are in each zone after it, home included, as in `(Paul, AU)` or `(UK)`. |
 | `--date` | Starts the line with home's date, as in `Mon 26 Oct, `. |
-| `--no-clause` | Drops the places' states. |
+| `--no-clause` | Drops the places altogether, clocks and states, leaving the people's times. |
 | `--no-copy` | Prints without copying. |
 
 The flags can go anywhere on the line and combine. A `[[copy]]` table in config can change what plain `say` prints; the flags then add to that.
@@ -33,7 +33,7 @@ The flags can go anywhere on the line and combine. A `[[copy]]` table in config 
 
 ```
 $ teamzones say deploy next
-Mon 26 Oct, 5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST, open in AU, closed in UK
+Mon 26 Oct, 5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST / 6-6:30am GMT, open in AU, closed in UK
 ```
 
 When nothing fits in seven days, it says which slot came closest on stderr and exits 1.

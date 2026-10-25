@@ -129,7 +129,7 @@ A `kind = "trading"` profile has `open` hours and `peak` ranges on the place's o
 labels = { closed = "after hours", open = "trading hours", busy = "rush" }
 ```
 
-A place with no `trading` is just a clock: it is drawn with day and night and never counts.
+A place with no `trading` is just a clock: it is drawn with day and night and never counts, but marked, its clock still joins the line.
 
 ## Groups
 
@@ -180,7 +180,7 @@ accent = "#0969da"   # any colour role by name, as #rrggbb
 
 ## Copy formats
 
-`c` in the TUI lists every copy format with a preview of its line. The built-ins are `y` (the times), `d` (with the date), `w` (with names), `t` (the focused row's time first), `z` (each place's clock instead of its state), `s` (times only) and `a` (for everyone). A `[[copy]]` table with a built-in key replaces that format, `hide = true` removes one, and a new key adds one:
+`c` in the TUI lists every copy format with a preview of its line. The built-ins are `y` (the times), `d` (with the date), `w` (with names), `t` (the focused row's time first), `z` (each place's clock without its state), `s` (the people's times only, without the places) and `a` (for everyone). A `[[copy]]` table with a built-in key replaces that format, `hide = true` removes one, and a new key adds one:
 
 ```toml
 [[copy]]

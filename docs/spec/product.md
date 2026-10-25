@@ -63,7 +63,7 @@ Mon 26 Oct AEDT   │   Thandi  Johannesburg    ●          ·          ·     
 ○ Johan   8-8:30am│                                                                                 │▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 ○ Ellie    6-6:30a│ deploy   5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST, off-peak in AU and UK   │▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
 ○ Marcus   1-1:30a│ cli      teamzones say deploy 5-5:30pm mon                                      │░░░░░░░░░░░░░░░░░░▒
- where  asks off-p│ cursor   space adds the place US to deploy (its state, not its zone)            │▄ off-peak  █ peak
+ where  asks off-p│ cursor   space adds the place US to deploy (its clock and its state)            │▄ off-peak  █ peak
 ◆ AU           off╰──────────────────────────────────────────────── written to config.toml on close ╯███████▄▄▄▄▄▄▄▄▁▁▁▁
 ◆ UK              quiet ████▄▄▄▄▄▄▄▄▄▄▄▄▄▄██████████████▄▄▄▄▄▄▄▄▁▁▁▁Mon▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄██████
 ≡ off-peak          2/2 ⡇⡇⡇⡇━━━━━━━━━━━━━━⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇━━━━━━━━━━━━━━⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇━━━━━━━━━━━━━━⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇━━━━━━⡇⡇⡇⡇⡇⡇

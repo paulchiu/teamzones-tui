@@ -84,13 +84,13 @@ fn open_tui(
     match tui::run(
         config,
         file,
-        state.last_group.as_deref(),
+        &state,
         parsed.clock(),
         clipboard,
         tui::TerminalEnv::from_env(),
     ) {
-        Ok(group) => {
-            remember(&state_path, state.text.as_deref(), &group);
+        Ok((group, marks)) => {
+            remember(&state_path, state.text.as_deref(), &group, &marks);
             ExitCode::SUCCESS
         }
         Err(error) => {
@@ -100,9 +100,10 @@ fn open_tui(
     }
 }
 
-/// Saves `group` as the last group in the state file, warning on stderr when that fails.
-fn remember(path: &std::path::Path, text: Option<&str>, group: &str) {
-    let written = state::with_last_group(text, group)
+/// Saves `group` as the last group and `marks` as each lens's marks in the state file, warning on
+/// stderr when that fails.
+fn remember(path: &std::path::Path, text: Option<&str>, group: &str, marks: &[state::LensMarks]) {
+    let written = state::with_remembered(text, group, marks)
         .map_err(|error| error.to_string())
         .and_then(|text| state::write(path, &text).map_err(|error| error.to_string()));
     if let Err(error) = written {

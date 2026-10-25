@@ -25,16 +25,16 @@ Sat 24 Oct AEDT   │   Priya   Brisbane         ●          ●          ·   
 ○ Johan    12:04am│   UK      venue profile    ·          ·          ◆          ◆                    │╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
 ○ Ellie     Fri 11│   US      venue profile    ·          ·          ◆          ·                    │▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
 ○ Marcus Fri 5:04p│                                                                                  │░░░░░░░░░░░░░░░░░▒
- where  asks open │ deploy   9:04am AEDT / 8:04am AEST / 12:04am SAST, open in AU, closed in UK      │d  ▄ open  █ busy
+ where  asks open │ deploy   9:04am AEDT / 8:04am AEST / 12:04am SAST / Fri 11:04pm BST, open in AU,…│d  ▄ open  █ busy
 ◆ AU              │ cli      teamzones say deploy now                                                │██████████▄▄▄▄▁▁▁▁
-◆ UK             c│ cursor   space adds the place US to deploy (its state, not its zone)             │▄▄▄▄▄▄▄▄██████████
+◆ UK             c│ cursor   space adds the place US to deploy (its clock and its state)             │▄▄▄▄▄▄▄▄██████████
 ≡ open            ╰───────────────────────────────────────────────── written to config.toml on close ╯⡇⡇⡇⡇⡇⡇⡇⡇··⡇⡇⡇⡇⡇⡇⡇⡇
 ◇ US               open ▄▄▄▄▄▄▄▄▄▄▄▄▄▄████████████▄▄▄▄▄▄▄▄▄▄▄▄▄▄████████████████▄▄▄▄▁▁▁▁Sat▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▄▄▄▄
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 ▶ US  Fri 5:04pm open  busy 6-10pm  CDT UTC-5  America/Chicago  venue profile  groups regions
 
 ╭ times for deploy ──────────────────────────────────────────────────────────────────────────────────────────── y copy ╮
-│ 9:04am AEDT / 8:04am AEST / 12:04am SAST, open in AU, closed in UK                                                   │
-╰────────────────────────────────────────────────────────────────────────────────────── 3 zones for 3 people, 2 places ╯
+│ 9:04am AEDT / 8:04am AEST / 12:04am SAST / Fri 11:04pm BST, open in AU, closed in UK                                 │
+╰────────────────────────────────────────────────────────────────────────────────────── 4 zones for 3 people, 2 places ╯
 
 space member  enter use  y copy  a new  R rename  </> move  x close  u undo  ? help  esc done

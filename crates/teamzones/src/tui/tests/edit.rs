@@ -273,7 +273,9 @@ fn matrix_changes_are_written_together_on_esc_and_the_old_name_still_says() {
     assert!(after[0].contains("# the people I tell first\n[[group]]\nname   = \"team\""));
     assert_eq!(
         say_on(&after[0], &["deploy", "next"]).as_deref(),
-        Ok("Mon 26 Oct, 5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST, open in AU, closed in UK\n"),
+        Ok(
+            "Mon 26 Oct, 5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST / 6-6:30am GMT, open in AU, closed in UK\n"
+        ),
         "Sam works Priya's hours in her zone, so deploy's next fit reads the same"
     );
     assert_eq!(notice_text(&closed), "tab  groups saved  u undo");
@@ -308,9 +310,26 @@ fn the_matrix_draws_people_then_places_against_every_group_with_its_question() {
     assert_eq!(cells("Priya   Brisbane"), "●●·●");
     assert_eq!(cells("Paul    Melbourne"), "⌂⌂⌂⌂");
     assert_eq!(cells("US      venue profile"), "··◆·");
-    assert!(line("cursor").contains("space adds the place US to deploy (its state, not its zone)"));
+    assert!(line("cursor").contains("space adds the place US to deploy (its clock and its state)"));
     assert!(line("cli ").contains("teamzones say deploy now"));
     insta::assert_snapshot!("matrix_120x36", text(&buf));
+}
+
+#[test]
+fn the_matrix_cursor_says_a_place_without_trading_adds_only_its_clock() {
+    let clock_only = FIXTURE.replacen(
+        "tz      = \"America/Chicago\"\ntrading = \"venue\"\n",
+        "tz      = \"America/Chicago\"\n",
+        1,
+    );
+    let open = press(
+        focus_on(editable(&clock_only), "US"),
+        &[Key::Char('4'), Key::Tab],
+    );
+    assert_eq!(
+        super::super::matrix::cursor_text(&open, matrix_of(&open)),
+        "space adds the place US to deploy (its clock)"
+    );
 }
 
 #[test]

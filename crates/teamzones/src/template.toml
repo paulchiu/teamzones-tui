@@ -84,7 +84,7 @@
 ## Copy-as formats: the c dialog lists each one with its key, a preview and its label. These are
 ## the built-ins. A [[copy]] with a built-in key replaces it, hide = true removes it, and a new key
 ## adds a format. who is "marked", "all" or "focused-first" (the focused row's time, then yours),
-## and places is "states", "zones" or "none". The one default = true format is the line in the
+## and places is "both", "states", "zones" or "none". The one default = true format is the line in the
 ## times box, what y copies and what `teamzones say` prints, so it cannot be "focused-first".
 # [[copy]]
 # key = "y"
@@ -92,7 +92,7 @@
 # who = "marked"
 # date = false
 # names = false
-# places = "states"
+# places = "both"
 # default = true
 
 # [[copy]]
@@ -101,7 +101,7 @@
 # who = "marked"
 # date = true
 # names = false
-# places = "states"
+# places = "both"
 
 # [[copy]]
 # key = "w"
@@ -109,7 +109,7 @@
 # who = "marked"
 # date = false
 # names = true
-# places = "states"
+# places = "both"
 
 # [[copy]]
 # key = "t"
@@ -141,4 +141,4 @@
 # who = "all"
 # date = false
 # names = false
-# places = "states"
+# places = "both"
