@@ -10,6 +10,7 @@ mod help;
 mod keys;
 mod layout;
 mod map;
+mod mouse;
 mod notice;
 mod prompt;
 mod say;
@@ -120,6 +121,7 @@ pub fn run(
                     Some(Msg::Key(keys::Key::from_crossterm(key)))
                 }
                 Ok(Event::Resize(cols, rows)) => Some(Msg::Resize(cols, rows)),
+                Ok(Event::Mouse(event)) => Some(Msg::Mouse(mouse::Pointer::from_crossterm(event))),
                 Ok(_) => None,
                 Err(error) => break Err(error),
             },

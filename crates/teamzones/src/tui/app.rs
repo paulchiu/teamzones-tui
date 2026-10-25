@@ -9,6 +9,7 @@ use teamzones_core::question::{Marks, Row};
 use super::glyphs::Glyphs;
 use super::keys::{Context, Sort};
 use super::layout::{MapChoice, MapView, map_view};
+use super::mouse::Drag;
 use super::notice::Notice;
 
 /// Where the cursor sits: on exact now, or on a grid slot once anything moves it.
@@ -145,6 +146,8 @@ pub struct App {
     pub map_flipped: bool,
     /// Whether the app holds mouse capture; `M` releases it for text selection.
     pub mouse: bool,
+    /// The left-button drag in progress, if any.
+    pub drag: Option<Drag>,
 }
 
 impl App {
@@ -177,6 +180,7 @@ impl App {
             size: (0, 0),
             map_flipped: false,
             mouse: true,
+            drag: None,
         }
     }
 

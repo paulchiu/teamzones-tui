@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use teamzones_core::clock::{Range, Slot, When};
 use teamzones_core::config::{Config, PersonId};
 use teamzones_core::copy::{clock_text, span_text};
-use teamzones_core::fit::{NoFit, blocker, next_run, previous_run};
+use teamzones_core::fit::{NoFit, blocker, next_run, previous_run, slot_fits};
 use teamzones_core::question::{Marks, Row, person_band, place_level};
 use teamzones_core::time::Moment;
 
@@ -13,6 +13,7 @@ use super::app::{
 };
 use super::keys::{Action, Context, Key, action_for};
 use super::layout::MapView;
+use super::mouse::{self, Drag, Pointer};
 use super::notice::{Notice, TIMEOUT};
 use super::prompt;
 use super::say::duration_text;
@@ -40,6 +41,16 @@ pub enum Msg {
     Resize(u16, u16),
     /// Whether switching mouse capture worked.
     Captured(Result<(), String>),
+    /// A pointer event, which stands for the messages its keymap row's key would send.
+    Mouse(Pointer),
+    /// Focus this row.
+    Focus(Row),
+    /// Put the cursor on this slot, dropping any range.
+    Cursor(Slot),
+    /// Move the range to the start of the fitting run holding this slot.
+    Run(Slot),
+    /// The drag in progress, or none once the button is released.
+    Drag(Option<Drag>),
 }
 
 /// Work the effects layer does on the update's behalf.
@@ -87,6 +98,27 @@ pub fn update(app: App, msg: Msg) -> (App, Vec<Effect>) {
             },
             Vec::new(),
         ),
+        Msg::Mouse(pointer) => {
+            let msgs = mouse::msgs(&app, pointer);
+            msgs.into_iter()
+                .fold((app, Vec::new()), |(app, mut effects), msg| {
+                    let (next, more) = update(app, msg);
+                    effects.extend(more);
+                    (next, effects)
+                })
+        }
+        Msg::Focus(row) => (App { focus: row, ..app }, Vec::new()),
+        Msg::Cursor(slot) => (
+            App {
+                cursor: Cursor::At(slot),
+                range: None,
+                visual: None,
+                ..app
+            },
+            Vec::new(),
+        ),
+        Msg::Run(slot) => (run_at(app, slot), Vec::new()),
+        Msg::Drag(drag) => (App { drag, ..app }, Vec::new()),
         Msg::Captured(result) => {
             let now = app.now;
             match result {
@@ -577,6 +609,36 @@ fn landed(app: App, step: Step, run: Range, length: i64, now: DateTime<Utc>) -> 
         ..app
     };
     with_notice(next, key, &text, now)
+}
+
+/// The fitting run holding `slot`, found by walking out from it a day either way.
+fn run_around(app: &App, slot: Slot) -> Option<Range> {
+    let fits = |slot: Slot| slot_fits(app.roster(), &app.marks, slot);
+    if !fits(slot) {
+        return None;
+    }
+    let start = (1..=DAY)
+        .map(|step| slot.offset(-step))
+        .take_while(|slot| fits(*slot))
+        .last()
+        .unwrap_or(slot);
+    let end = (1..=DAY)
+        .map(|step| slot.offset(step))
+        .find(|slot| !fits(*slot))
+        .unwrap_or(slot.offset(DAY));
+    Range::new(start, end)
+}
+
+/// A click on a fitting run: the range moves to the run's start, shortened to the run if needed.
+fn run_at(app: App, slot: Slot) -> App {
+    let length = app
+        .shown_range()
+        .map_or(HOUR, |range| range.end().since(range.start()));
+    let now = app.now;
+    match run_around(&app, slot) {
+        Some(run) => landed(app, Step::Next, run, length, now),
+        None => app,
+    }
 }
 
 fn missed(app: App, step: Step, no_fit: NoFit, now: DateTime<Utc>) -> App {
