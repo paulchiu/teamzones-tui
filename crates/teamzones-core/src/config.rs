@@ -76,7 +76,7 @@ pub enum Reason {
     #[error("\"{0}\" labels two levels")]
     RepeatedLabel(String),
     #[error(
-        "copy key \"{0}\" must be one character other than whitespace, esc, ? or q, which the copy-as dialog uses"
+        "copy key \"{0}\" must be one character you can type, other than whitespace, esc, ? or q, which the copy-as dialog uses"
     )]
     CopyKey(String),
     #[error("\"{key}\" is already a copy key on line {first}")]
@@ -87,6 +87,8 @@ pub enum Reason {
     NothingToHide(char),
     #[error("a hidden copy format cannot be the default")]
     HiddenDefault,
+    #[error("a hidden copy format takes no other field than key")]
+    HiddenWithFields,
     #[error("a second default copy format; \"{key}\" on line {first} is already the default")]
     SecondDefault { key: char, first: usize },
     #[error("no copy format is the default, so set default = true on one")]
@@ -1192,7 +1194,11 @@ fn resolve_travel(raw: &RawTravel, lines: &Lines) -> Result<Travel, ConfigError>
 fn copy_key(raw: &Spanned<String>, lines: &Lines) -> Result<char, ConfigError> {
     let mut chars = raw.get_ref().chars();
     match (chars.next(), chars.next()) {
-        (Some(key), None) if !key.is_whitespace() && !DIALOG_KEYS.contains(&key) => Ok(key),
+        (Some(key), None)
+            if !key.is_whitespace() && !key.is_control() && !DIALOG_KEYS.contains(&key) =>
+        {
+            Ok(key)
+        }
         (Some(_) | None, _) => fail(lines.of(raw), Reason::CopyKey(raw.get_ref().clone())),
     }
 }
@@ -1234,6 +1240,17 @@ fn resolve_copy(raw: &[RawCopy], lines: &Lines) -> Result<Formats, ConfigError> 
             if *default == Some(true) {
                 return fail(line, Reason::HiddenDefault);
             }
+            let others = [
+                label.is_some(),
+                who.is_some(),
+                date.is_some(),
+                names.is_some(),
+                places.is_some(),
+                default.is_some(),
+            ];
+            if others.contains(&true) {
+                return fail(line, Reason::HiddenWithFields);
+            }
             match at.filter(|_| builtin.get(key).is_some()) {
                 Some(index) => {
                     formats.remove(index);
@@ -1273,10 +1290,14 @@ fn resolve_copy(raw: &[RawCopy], lines: &Lines) -> Result<Formats, ConfigError> 
             None => formats.push(format),
         }
     }
+    let y_line = seen
+        .iter()
+        .find(|(known, _)| *known == 'y')
+        .map_or(1, |(_, line)| *line);
     let (key, line) = match chosen {
         Some(choice) => choice,
-        None if y_kept => ('y', 1),
-        None => return fail(seen.first().map_or(1, |(_, line)| *line), Reason::NoDefault),
+        None if y_kept => ('y', y_line),
+        None => return fail(y_line, Reason::NoDefault),
     };
     let default = formats
         .iter()
@@ -1930,6 +1951,22 @@ mod tests {
     }
 
     #[test]
+    fn a_default_error_from_the_y_table_names_the_y_table_s_line() {
+        let cases = [
+            "[[copy]]\nkey = \"k\"\nlabel = \"x\"\n\n[[copy]]\nkey = \"y\"\nlabel = \"mine\"\nwho = \"focused-first\"\n",
+            "[[copy]]\nkey = \"k\"\nlabel = \"x\"\n\n[[copy]]\nkey = \"y\"\nhide = true\n",
+        ];
+        for tables in cases {
+            let text = format!("{FIXTURE}\n{tables}");
+            assert_eq!(
+                rejection(&text).line,
+                line_of(&text, "key = \"y\""),
+                "{tables}"
+            );
+        }
+    }
+
+    #[test]
     fn a_copy_table_rejects_unknown_fields_values_and_clashing_or_repeated_keys() {
         let cases = [
             (
@@ -1948,6 +1985,15 @@ mod tests {
             ("key = \"q\"\nlabel = \"x\"", "copy key \"q\""),
             ("key = \"?\"\nlabel = \"x\"", "copy key \"?\""),
             ("key = \" \"\nlabel = \"x\"", "copy key \" \""),
+            ("key = \"\\u0003\"\nlabel = \"x\"", "copy key \"\u{3}\""),
+            (
+                "key = \"d\"\nhide = true\nlabel = \"x\"",
+                "a hidden copy format takes no other field than key",
+            ),
+            (
+                "key = \"d\"\nhide = true\nwho = \"all\"",
+                "a hidden copy format takes no other field than key",
+            ),
             ("key = \"k\"", "copy format \"k\" needs a label"),
             (
                 "key = \"k\"\nhide = true",

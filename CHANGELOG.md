@@ -15,7 +15,7 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ### Changed
 
-- The copy-as dialog describes each format in plain words, and leaves out a row whose line repeats an earlier one (its key still copies).
+- The copy-as dialog describes each format in plain words, naming the focused row for `t`, and leaves out a row whose line repeats an earlier one (its key still copies). When the formats do not fit two rows each, it lists one row per format.
 - The copy-as dialog's footer shows only `? help` and `q quit`, since the dialog lists its own keys.
 
 ### Fixed

@@ -25,17 +25,17 @@ The `c` menu applies one format at a time, and previews each format's line befor
 
 ## Formats
 
-Each copy-as format is data: a dialog `key`, a `label` (the dialog's description), `who` (`marked`, `all` for the `0 all` line, or `focused-first` for the focused row's entry before the axis entry in parentheses), `date`, `names` and `places` (`states` for the clause, `zones` for the places' zone entries, `none` for neither). The built-ins, in dialog order:
+Each copy-as format is data: a dialog `key`, a `label` (the dialog's description), `who` (`marked`, `all` for the `0 all` line, or `focused-first` for the focused row's entry before the axis entry in parentheses, or after ` / ` when `names` is on, so parentheses never nest), `date`, `names` and `places` (`states` for the clause, `zones` for the places' zone entries, `none` for neither). The built-ins, in dialog order:
 
-| Key | Label | who | date | names | places |
-| --- | --- | --- | --- | --- | --- |
-| `y` | the times | marked | no | no | states |
-| `d` | with the date | marked | yes | no | states |
-| `w` | with names | marked | no | yes | states |
-| `t` | the focused row's time first | focused-first | no | no | none |
-| `z` | with each place's time instead of its state | marked | no | no | zones |
-| `s` | times only | marked | no | no | none |
-| `a` | for everyone | all | no | no | states |
+| Key | Label | who | date | names | places | default |
+| --- | --- | --- | --- | --- | --- | --- |
+| `y` | the times | marked | no | no | states | yes |
+| `d` | with the date | marked | yes | no | states | no |
+| `w` | with names | marked | no | yes | states | no |
+| `t` | the focused row's time first | focused-first | no | no | none | no |
+| `z` | with each place's time instead of its state | marked | no | no | zones | no |
+| `s` | times only | marked | no | no | none | no |
+| `a` | for everyone | all | no | no | states | no |
 
 `[[copy]]` tables in config add, replace or hide formats ([config](config.md)). One format is the default (`y` unless config says otherwise): its line is the `times for <group>` box line, what `y` copies, and what `teamzones say` prints, with say's flags adding to it. A `focused-first` format cannot be the default, because `say` has no focused row. Labels are plain words, never internal terms such as `ttz` or `clause`.
 

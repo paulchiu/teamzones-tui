@@ -344,7 +344,7 @@ pub fn say_line(roster: &Roster, marks: &Marks, when: When, variant: Variant) ->
 }
 
 /// The focused row's entry, then the axis (and any place zones) in parentheses unless they
-/// render the same time.
+/// render the same time; with names on, the rest follows after ` / ` so parentheses never nest.
 fn focused_first(roster: &Roster, marks: &Marks, row: Row, when: When, variant: Variant) -> String {
     let focused = match row {
         Row::Person(id) => {
@@ -363,6 +363,7 @@ fn focused_first(roster: &Roster, marks: &Marks, row: Row, when: When, variant: 
     let zones = match entries(sources, when, axis_date(roster, when), variant.names).as_slice() {
         [] => String::new(),
         [only] => only.clone(),
+        [first, rest @ ..] if variant.names => format!("{first} / {}", rest.join(" / ")),
         [first, rest @ ..] => format!("{first} ({})", rest.join(" / ")),
     };
     wrapped(roster, marks, when, variant, &zones)
@@ -450,13 +451,69 @@ mod tests {
         }
     }
 
+    const COPY_SPEC: &str = include_str!("../../../docs/spec/copy.md");
+
+    /// The `who` and `places` words of one spec row, read by serde as config reads them.
+    #[derive(Deserialize)]
+    struct Words {
+        who: Who,
+        places: Clause,
+    }
+
+    /// The spec's `## Formats` table as formats, plus the key its `default` column marks.
+    fn spec_formats() -> (Vec<Format>, Vec<char>) {
+        let yes = |cell: &str| match cell {
+            "yes" => true,
+            "no" => false,
+            other => panic!("{other} is not yes or no"),
+        };
+        let rows: Vec<Vec<String>> = COPY_SPEC
+            .lines()
+            .skip_while(|line| *line != "## Formats")
+            .skip_while(|line| !line.starts_with("| Key |"))
+            .take_while(|line| line.starts_with('|'))
+            .skip(2)
+            .map(|line| {
+                line.trim_matches('|')
+                    .split(" | ")
+                    .map(|cell| cell.trim().trim_matches('`').to_owned())
+                    .collect()
+            })
+            .collect();
+        let formats = rows
+            .iter()
+            .map(|cells| {
+                let words: Words = toml::from_str(&format!(
+                    "who = \"{}\"\nplaces = \"{}\"",
+                    cells[2], cells[5]
+                ))
+                .unwrap();
+                Format {
+                    key: cells[0].chars().next().unwrap(),
+                    label: cells[1].clone(),
+                    who: words.who,
+                    variant: Variant {
+                        date: yes(&cells[3]),
+                        names: yes(&cells[4]),
+                        clause: words.places,
+                    },
+                }
+            })
+            .collect();
+        let defaults = rows
+            .iter()
+            .filter(|cells| yes(&cells[6]))
+            .map(|cells| cells[0].chars().next().unwrap())
+            .collect();
+        (formats, defaults)
+    }
+
     #[test]
-    fn the_built_in_formats_are_y_d_w_t_z_s_a_with_y_the_default() {
-        let formats = Formats::builtin();
-        let keys: String = formats.all().iter().map(|format| format.key).collect();
-        assert_eq!(keys, "ydwtzsa");
-        assert_eq!(formats.default_format().key, 'y');
-        assert_eq!(formats.get('t').map(|f| f.who), Some(Who::FocusedFirst));
+    fn the_built_in_formats_are_the_spec_formats_table_row_for_row() {
+        let (formats, defaults) = spec_formats();
+        let builtin = Formats::builtin();
+        assert_eq!(builtin.all(), formats.as_slice());
+        assert_eq!(defaults, [builtin.default_format().key]);
     }
 
     #[test]
@@ -481,7 +538,37 @@ mod tests {
         };
         assert_eq!(
             format_line(&roster, &expr.marks, uk, when, &format),
-            "Mon 26 Oct, 3-5am GMT (UK) (2-4pm AEDT), open in AU and US, closed in UK"
+            "Mon 26 Oct, 3-5am GMT (UK) / 2-4pm AEDT, open in AU and US, closed in UK"
+        );
+    }
+
+    #[test]
+    fn a_focused_first_format_with_names_never_nests_parentheses() {
+        let roster = Config::parse(FIXTURE).unwrap().roster;
+        let tokens = ["team", "5-6pm", "mon"];
+        let now = "2026-10-23T22:04:00Z".parse().unwrap();
+        let expr = crate::expr::parse_expr(&tokens, &roster, now).unwrap();
+        let Moment::Fixed(when) = expr.moment else {
+            panic!("no fixed time");
+        };
+        let thandi = roster
+            .people()
+            .find(|(_, person)| person.name == "Thandi")
+            .map(|(id, _)| Row::Person(id))
+            .unwrap();
+        let format = Format {
+            key: 'k',
+            label: "mine".to_owned(),
+            who: Who::FocusedFirst,
+            variant: Variant {
+                date: false,
+                names: true,
+                clause: Clause::Drop,
+            },
+        };
+        assert_eq!(
+            format_line(&roster, &expr.marks, thandi, when, &format),
+            "8-9am SAST (Thandi) / 5-6pm AEDT (Paul)"
         );
     }
 

@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;
-use teamzones_core::config::Config;
+use teamzones_core::config::{Config, RangeStyle};
 
 use super::app::App;
 use super::glyphs::Glyphs;
@@ -607,10 +607,17 @@ fn each_modal_context_swallows_the_keys_it_does_not_advertise() {
     for opener in ["c", "s", "?"] {
         let open = press(fixture(), &chars(opener));
         let context = super::update::context(&open);
+        let formats = open
+            .config
+            .copy
+            .all()
+            .iter()
+            .map(|format| Key::Char(format.key));
         let own: Vec<Key> = super::keys::BINDINGS
             .iter()
             .filter(|b| b.context == context || b.context == super::keys::Context::Global)
             .flat_map(|b| b.chords.iter().map(|(key, _)| *key))
+            .chain(formats.filter(|_| context == super::keys::Context::CopyMenu))
             .collect();
         for key in main_keys().into_iter().filter(|key| !own.contains(key)) {
             let (after, effects) = press_all(open.clone(), &[key]);
@@ -998,7 +1005,7 @@ fn c_opens_a_dialog_previewing_every_format_with_its_key_and_description() {
             "w  5-6pm AEDT (Paul) / 4-5pm AEST (Priya, Sam) / 8-9am SAST (Thandi, Johan)",
             "with names",
             "t  8-9am SAST (5-6pm AEDT)",
-            "the focused row's time first",
+            "the focused row's time first (Thandi)",
             "a  5-6pm AEDT / 4-5pm AEST / 8-9am SAST / 6-7am GMT / 1-2am CDT, closed in UK and US, busy in AU",
             "for everyone",
         ]
@@ -1132,6 +1139,59 @@ fn a_preview_too_wide_for_the_dialog_is_cut_with_a_mark_but_copies_whole() {
     );
 }
 
+#[test]
+fn a_label_is_cut_with_a_mark_and_spelt_in_ascii_under_ascii_glyphs() {
+    let label = format!("flights \u{b7} {}", "and more ".repeat(20));
+    let text = FIXTURE.replacen(
+        "scheme = \"dark\"",
+        &format!("scheme = \"dark\"\nglyphs = \"ascii\"\n\n[[copy]]\nkey = \"k\"\nlabel = \"{label}\"\nwho = \"all\"\nnames = true"),
+        1,
+    );
+    let app = go_to(
+        App::new(Config::parse(&text).unwrap(), now()),
+        "26 oct 5-6pm",
+    );
+    let buf = render(&press(app, &chars("c")), 120, 36);
+    let line = row(&buf, y_of(&buf, "flights"));
+    let from = line.find("flights").unwrap();
+    let about = line[from..].split('|').next().unwrap().trim_end();
+    assert!(about.starts_with("flights . and more"), "{about}");
+    assert!(about.ends_with("..."), "{about}");
+}
+
+#[test]
+fn a_dialog_too_tall_for_two_rows_a_format_lists_every_key_on_one_row_each() {
+    let shapes = [
+        "who = \"all\"\ndate = true",
+        "who = \"all\"\nnames = true",
+        "who = \"all\"\nplaces = \"zones\"",
+        "who = \"all\"\ndate = true\nplaces = \"none\"",
+        "who = \"all\"\ndate = true\nnames = true",
+        "who = \"focused-first\"\ndate = true",
+        "who = \"focused-first\"\nnames = true",
+    ];
+    let tables = "befghij"
+        .chars()
+        .zip(shapes)
+        .map(|(key, shape)| {
+            format!("\n[[copy]]\nkey = \"{key}\"\nlabel = \"extra {key}\"\n{shape}\n")
+        })
+        .collect::<Vec<_>>()
+        .concat();
+    let open = press(focus_on(team_monday_with(&tables), "Thandi"), &chars("c"));
+    let shown: String = open.copy_menu().iter().map(|(key, _, _)| *key).collect();
+    assert_eq!(shown, "ydwtabefghij");
+    let tall = dialog_rows(&render(&open, 120, 36));
+    assert_eq!(tall.len(), shown.len() * 2, "{tall:?}");
+    let short = dialog_rows(&render(&open, 80, 24));
+    let keys: String = short
+        .iter()
+        .filter_map(|row| row.split_once("  ").map(|(key, _)| key.to_owned()))
+        .collect();
+    assert_eq!(keys, shown, "{short:?}");
+    assert_eq!(short.len(), shown.len());
+}
+
 /// The team frame at Mon 26 Oct 5-6pm, with `[theme] range` set to `style`.
 fn team_monday_styled(style: &str) -> App {
     let text = FIXTURE.replacen(
@@ -1205,18 +1265,30 @@ fn capital_r_cycles_the_range_style_for_the_session_and_the_footer_names_it_brie
             "range style: edges",
         ]
     );
-    let cycled = press(plain, &chars("R"));
-    assert_eq!(
-        cycled.config,
-        team_monday().config,
-        "the config is untouched"
-    );
+    let (cycled, effects) = press_all(plain, &chars("R"));
+    assert!(effects.is_empty(), "nothing is written: {effects:?}");
     let later = update(cycled, Msg::Tick(now() + chrono::TimeDelta::seconds(10))).0;
     assert!(
         !footer(&later).contains("range style"),
         "{}",
         footer(&later)
     );
+}
+
+#[test]
+fn each_style_s_footer_name_is_the_word_theme_range_takes() {
+    let styles = std::iter::successors(Some(RangeStyle::default()), |style| {
+        Some(super::app::next_style(*style)).filter(|next| *next != RangeStyle::default())
+    });
+    for style in styles {
+        let name = super::app::style_name(style);
+        let text = FIXTURE.replacen(
+            "scheme = \"dark\"",
+            &format!("scheme = \"dark\"\nrange = \"{name}\""),
+            1,
+        );
+        assert_eq!(Config::parse(&text).unwrap().theme.range, style, "{name}");
+    }
 }
 
 #[test]

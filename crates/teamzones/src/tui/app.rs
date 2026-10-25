@@ -3,7 +3,7 @@
 use chrono::{DateTime, NaiveDate, Offset, Utc};
 use teamzones_core::clock::{Range, Slot, When};
 use teamzones_core::config::{Config, PersonId, RangeStyle, Roster};
-use teamzones_core::copy::{Format, format_line};
+use teamzones_core::copy::{Format, Who, format_line};
 use teamzones_core::question::{Marks, Row};
 
 use super::keys::{Context, Sort};
@@ -268,13 +268,23 @@ impl App {
     }
 
     /// The copy-as dialog's rows, in format order: each format's key, the exact line it copies
-    /// now, and its label, leaving out a format whose line an earlier row already shows.
+    /// now, and its label (naming the focused row for a focused-first format), leaving out a
+    /// format whose line an earlier row already shows.
     pub fn copy_menu(&self) -> Vec<(char, String, String)> {
+        let roster = self.roster();
+        let focused = match self.focus {
+            Row::Person(id) => &roster.person(id).name,
+            Row::Place(id) => &roster.place(id).name,
+        };
         let mut rows: Vec<(char, String, String)> = Vec::new();
         for format in self.config.copy.all() {
             let line = self.line_of(format);
+            let about = match format.who {
+                Who::FocusedFirst => format!("{} ({focused})", format.label),
+                Who::Marked | Who::All => format.label.clone(),
+            };
             if rows.iter().all(|(_, shown, _)| *shown != line) {
-                rows.push((format.key, line, format.label.clone()));
+                rows.push((format.key, line, about));
             }
         }
         rows

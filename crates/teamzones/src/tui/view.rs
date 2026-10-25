@@ -1150,14 +1150,17 @@ fn footer_row(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
     );
 }
 
-/// The copy-as dialog: each format's key and the line it copies, with a dim description under it.
+/// The copy-as dialog: each format's key and the line it copies, with a dim description under it,
+/// or one row per format with no descriptions when two rows each would not fit.
 fn copy_dialog(buf: &mut Buffer, size: Rect, app: &App, look: Look) {
     let theme = look.theme;
     let rows = app.copy_menu();
     let width = size.width.min(110);
+    let tall = u16::try_from(rows.len() * 2 + 2).unwrap_or(u16::MAX);
+    let step = if tall <= size.height { 2 } else { 1 };
     let height = size
         .height
-        .min(u16::try_from(rows.len() * 2 + 2).unwrap_or(u16::MAX));
+        .min(u16::try_from(rows.len() * step + 2).unwrap_or(u16::MAX));
     let area = Rect::new(
         size.x + (size.width - width) / 2,
         size.y + (size.height - height) / 2,
@@ -1184,11 +1187,15 @@ fn copy_dialog(buf: &mut Buffer, size: Rect, app: &App, look: Look) {
     let x = inner.x + 1;
     let room = usize::from(inner.width.saturating_sub(5));
     let mark = look.glyphs.text("…");
-    for ((key, line, about), y) in rows.iter().zip((inner.top()..inner.bottom()).step_by(2)) {
-        put(buf, inner, x, y, &key.to_string(), theme.fg(Role::Accent));
+    for ((key, line, about), y) in rows.iter().zip((inner.top()..inner.bottom()).step_by(step)) {
+        let key = look.glyphs.text(&key.to_string());
+        put(buf, inner, x, y, &key, theme.fg(Role::Accent));
         let preview = truncate_with_mark(&look.glyphs.text(line), room, &mark);
         put(buf, inner, x + 3, y, &preview, theme.fg(Role::Text));
-        put(buf, inner, x + 3, y + 1, about, theme.fg(Role::Dim));
+        if step == 2 {
+            let about = truncate_with_mark(&look.glyphs.text(about), room, &mark);
+            put(buf, inner, x + 3, y + 1, &about, theme.fg(Role::Dim));
+        }
     }
 }
 

@@ -513,23 +513,6 @@ pub const BINDINGS: &[Binding] = &[
         )
     },
     Binding {
-        chords: &[
-            (Key::Char('y'), Action::CopyAs('y')),
-            (Key::Char('d'), Action::CopyAs('d')),
-            (Key::Char('w'), Action::CopyAs('w')),
-            (Key::Char('t'), Action::CopyAs('t')),
-            (Key::Char('z'), Action::CopyAs('z')),
-            (Key::Char('s'), Action::CopyAs('s')),
-            (Key::Char('a'), Action::CopyAs('a')),
-        ],
-        ..row(
-            "y d w t z s a",
-            "Copy that format's line and close; a `[[copy]]` table's key copies its own format",
-            "",
-            Context::CopyMenu,
-        )
-    },
-    Binding {
         hints: &[hint("o", "offset"), hint("n", "name")],
         priority: 5,
         chords: &[

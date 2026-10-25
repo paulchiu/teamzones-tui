@@ -144,7 +144,7 @@ accent = "#0969da"
 
 ### [[copy]]
 
-A copy-as format in the `c` dialog. The built-ins are `y d w t z s a`. A `[[copy]]` with a built-in key replaces it, `hide = true` removes it, and a new key adds a format. `who` is `"marked"`, `"all"` or `"focused-first"`, and `places` is `"states"`, `"zones"` or `"none"`. Exactly one format is the default (`y` unless one sets `default = true`): its line is the times box, what `y` copies and what `teamzones say` prints. `key` is one character other than `?` or `q`.
+A copy-as format in the `c` dialog. The built-ins are `y d w t z s a`. A `[[copy]]` with a built-in key replaces it, `hide = true` removes it, and a new key adds a format. `who` is `"marked"`, `"all"` or `"focused-first"`, and `places` is `"states"`, `"zones"` or `"none"`. Exactly one format is the default (`y` unless one sets `default = true`): its line is the times box, what `y` copies and what `teamzones say` prints. `key` is one character other than `?` or `q`, and a table with `hide = true` has only `key`.
 
 ```toml
 [[copy]]
