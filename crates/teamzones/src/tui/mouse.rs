@@ -327,10 +327,9 @@ fn is_double(app: &App, pointer: Pointer) -> bool {
 /// A double click on the map in `area`: add a person or place at that point.
 fn map_double(app: &App, area: Rect, pointer: Pointer) -> Option<Msg> {
     let Pointer { x, y, .. } = pointer;
-    (area.contains(Position::new(x, y)) && is_double(app, pointer)).then(|| {
-        let (lat, lon) = super::map::unproject(area, x, y);
-        Msg::AddAt(lat, lon)
-    })
+    let at = (area.contains(Position::new(x, y)) && is_double(app, pointer))
+        .then(|| super::map::Projection::new(area, app.camera).unproject(x, y))?;
+    at.map(|(lat, lon)| Msg::AddAt(lat, lon))
 }
 
 /// A left-button press, followed by the note of where it was for spotting a double click.

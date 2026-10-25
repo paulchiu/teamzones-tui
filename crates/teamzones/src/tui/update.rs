@@ -13,6 +13,7 @@ use super::edit;
 use super::editor::Loaded;
 use super::keys::{Action, Context, Key, action_for};
 use super::layout::MapView;
+use super::map;
 use super::matrix;
 use super::mouse::{self, Drag, Pointer};
 use super::notice::{Notice, TIMEOUT};
@@ -138,6 +139,7 @@ pub fn update(app: App, msg: Msg) -> (App, Vec<Effect>) {
             App {
                 size: (cols, rows),
                 map_flipped: false,
+                camera: map::framing(&app),
                 ..app
             },
             Vec::new(),

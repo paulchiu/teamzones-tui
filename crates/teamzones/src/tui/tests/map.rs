@@ -7,18 +7,24 @@ fn regions_monday() -> App {
     go_to(press(fixture(), &chars("3")), "26 oct 2-4pm")
 }
 
-/// The map's rows: everything between the header and the ruler.
-fn map_text(buf: &Buffer) -> String {
-    let ruler = y_of(buf, "Mon 26 Oct AEDT");
+/// The map's rows: everything between the header and the ruler, which reads `ruler`.
+fn rows_above(buf: &Buffer, ruler: &str) -> String {
+    let ruler = y_of(buf, ruler);
     (1..ruler)
         .map(|y| row(buf, y))
         .collect::<Vec<_>>()
         .join("\n")
 }
 
+/// The map's rows on Mon 26 Oct in Melbourne.
+fn map_text(buf: &Buffer) -> String {
+    rows_above(buf, "Mon 26 Oct AEDT")
+}
+
 #[test]
 fn the_map_labels_home_and_each_counted_place_with_its_state_over_the_range() {
-    let map = map_text(&render(&regions_monday(), 120, 36));
+    // 24 spare rows hold the whole map at 120 columns, so nothing is cropped.
+    let map = map_text(&frame(&sized(regions_monday(), 120, 48)));
     for label in [
         "UK closed 3-5am",
         "US open 10pm-12am",
@@ -27,21 +33,34 @@ fn the_map_labels_home_and_each_counted_place_with_its_state_over_the_range() {
     ] {
         assert!(map.contains(label), "no {label:?} in\n{map}");
     }
+}
+
+#[test]
+fn at_120_by_36_regions_fills_the_width_and_crops_to_the_band_around_its_markers() {
+    // Melbourne (38S) to the UK (54.5N) centres the band on 8N, and 12 rows at 120 columns
+    // show 72 degrees, so the band runs from about 44N to 28S: AU and the US are in it.
+    let map = map_text(&frame(&sized(regions_monday(), 120, 36)));
+    for label in ["US open 10pm-12am", "AU open 2-4pm"] {
+        assert!(map.contains(label), "no {label:?} in\n{map}");
+    }
+    for cropped in ["UK closed", "Melbourne"] {
+        assert!(!map.contains(cropped), "{cropped:?} in\n{map}");
+    }
     insta::assert_snapshot!("regions_map_120x36", map);
 }
 
-/// The cell a latitude and longitude falls in on a 120 by 12 map one row below the header,
-/// by plain arithmetic: 360 degrees over 120 columns, and 80N to 58S over 12 rows.
+/// The cell a latitude and longitude falls in on a whole 120-column map one row below the
+/// header, by plain arithmetic: 3 degrees a column, and twice that a row, from 80N.
 fn cell_of(lat: f64, lon: f64) -> (i32, i32) {
     let x = ((lon + 180.0) / 3.0).floor() as i32;
-    let y = 1 + ((80.0 - lat) / 11.5).floor() as i32;
+    let y = 1 + ((80.0 - lat) / 6.0).floor() as i32;
     (x, y)
 }
 
 #[test]
 fn the_sun_sits_within_a_cell_of_the_subsolar_point_at_the_range_s_midpoint() {
-    let buf = render(&regions_monday(), 120, 36);
-    let suns: Vec<(i32, i32)> = (1..13)
+    let buf = frame(&sized(regions_monday(), 120, 48));
+    let suns: Vec<(i32, i32)> = (1..25)
         .flat_map(|y| (0..120).map(move |x| (x, y)))
         .filter(|(x, y)| buf[(*x, *y)].symbol() == "☼")
         .map(|(x, y)| (i32::from(x), i32::from(y)))
@@ -168,4 +187,63 @@ fn main_keys_still_work_under_the_map_overlay() {
         press(team_monday(), &chars("l")).say_line()
     );
     assert!(shows_map(&frame(&scrubbed)), "{}", text(&frame(&scrubbed)));
+}
+
+/// Paul in Oslo, with Ari in Reykjavik counted in the only group: every marker sits above 59N.
+fn northern() -> App {
+    let config = Config::parse(
+        "[home]\nname = \"Paul\"\ncity = \"Oslo\"\n\n\
+         [[person]]\nname = \"Ari\"\ncity = \"Reykjavik\"\n\n\
+         [[group]]\nname = \"north\"\npeople = [\"Ari\"]\n",
+    )
+    .unwrap();
+    App::new(config, now())
+}
+
+#[test]
+fn the_band_is_centred_on_home_and_the_counted_markers_within_the_map_s_bounds() {
+    // 14 map rows at 120 columns show 84 degrees, so a band centred on the equator would end
+    // at 42N; centred on 62N it is held at the map's northern edge instead.
+    let app = sized(northern(), 120, 30);
+    let map = rows_above(&frame(&app), "Sat 24 Oct CEST");
+    for label in ["Oslo ", "Reykjavík "] {
+        assert!(map.contains(label), "no {label:?} in\n{map}");
+    }
+}
+
+/// Each map cell that shows land or sea rather than a marker, the sun or a (bold) label, with
+/// its symbol.
+fn land(buf: &Buffer, rows: std::ops::Range<u16>) -> Vec<((u16, u16), String)> {
+    rows.flat_map(|y| (0..buf.area.width).map(move |x| (x, y)))
+        .filter(|cell| !buf[*cell].modifier.contains(ratatui::style::Modifier::BOLD))
+        .map(|cell| (cell, buf[cell].symbol().to_owned()))
+        .filter(|(_, symbol)| {
+            symbol
+                .chars()
+                .all(|c| c == ' ' || ('\u{2800}'..='\u{28ff}').contains(&c))
+        })
+        .collect()
+}
+
+#[test]
+fn a_group_switch_never_moves_the_map() {
+    let team = sized(team_monday(), 120, 36);
+    let regions = press(team.clone(), &chars("3"));
+    let (before, after) = (frame(&team), frame(&regions));
+    let sun = |buf: &Buffer| {
+        (1..13)
+            .flat_map(|y| (0..120).map(move |x| (x, y)))
+            .find(|cell| buf[*cell].symbol() == "☼")
+    };
+    assert_eq!(sun(&before), sun(&after));
+    let unmarked: Vec<_> = land(&after, 1..13);
+    let shared: Vec<_> = land(&before, 1..13)
+        .into_iter()
+        .filter(|(cell, _)| unmarked.iter().any(|(other, _)| other == cell))
+        .collect();
+    let moved: Vec<_> = shared
+        .iter()
+        .filter(|cell| !unmarked.contains(cell))
+        .collect();
+    assert!(moved.is_empty(), "{moved:?}");
 }

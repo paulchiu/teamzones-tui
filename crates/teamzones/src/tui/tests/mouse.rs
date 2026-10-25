@@ -352,7 +352,8 @@ fn a_e_d() {
         })
         .expect("a double click on the map adds at the point");
     let area = ratatui::layout::Rect::new(0, 1, 120, 12);
-    assert_eq!(added, crate::tui::map::unproject(area, map.0, map.1));
+    let projection = crate::tui::map::Projection::new(area, once.camera);
+    assert_eq!(Some(added), projection.unproject(map.0, map.1));
     let opened = send(once, &[down_at(map)]);
     assert_eq!(opened.mode, crate::tui::app::Mode::AddMenu(Some(added)));
     let sam = find(&team(), "Sam");

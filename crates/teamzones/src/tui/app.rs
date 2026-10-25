@@ -10,6 +10,7 @@ use super::footer::MapKey;
 use super::glyphs::Glyphs;
 use super::keys::{Context, Sort};
 use super::layout::{MapChoice, MapView, map_view, room_for_map};
+use super::map::{Camera, framing};
 use super::matrix::Matrix;
 use super::mouse::Drag;
 use super::notice::Notice;
@@ -151,6 +152,8 @@ pub struct App {
     pub size: (u16, u16),
     /// Whether `m` has flipped the map's automatic choice since the last resize.
     pub map_flipped: bool,
+    /// What the map is framed on, kept until map mode resets it or the terminal is resized.
+    pub camera: Camera,
     /// Whether the app holds mouse capture; `M` releases it for text selection.
     pub mouse: bool,
     /// The left-button drag in progress, if any.
@@ -176,7 +179,7 @@ impl App {
         };
         let marks = base_marks(&config.roster, lens);
         let range_style = config.theme.range;
-        Self {
+        let app = Self {
             config,
             now,
             cursor: Cursor::Now,
@@ -195,12 +198,21 @@ impl App {
             style_flash: None,
             size: (0, 0),
             map_flipped: false,
+            camera: Camera {
+                lat: 0.0,
+                lon: 0.0,
+                zoom: 0,
+            },
             mouse: true,
             drag: None,
             text: None,
             disk: None,
             flush_at: None,
             last_click: None,
+        };
+        Self {
+            camera: framing(&app),
+            ..app
         }
     }
 
