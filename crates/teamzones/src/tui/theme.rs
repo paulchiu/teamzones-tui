@@ -54,27 +54,18 @@ impl Role {
 pub struct TerminalEnv {
     pub no_color: bool,
     pub truecolor: bool,
-    /// `TEAMZONES_DEBUG=1`, which turns on the debug keys.
-    pub debug: bool,
 }
 
 impl TerminalEnv {
-    /// Reads `NO_COLOR` (set and non-empty), `COLORTERM` (`truecolor` or `24bit`) and
-    /// `TEAMZONES_DEBUG`.
+    /// Reads `NO_COLOR` (set and non-empty) and `COLORTERM` (`truecolor` or `24bit`).
     pub fn from_env() -> Self {
         let set = |name: &str| std::env::var_os(name).is_some_and(|value| !value.is_empty());
         let colorterm = std::env::var("COLORTERM").unwrap_or_default();
         Self {
             no_color: set("NO_COLOR"),
             truecolor: matches!(colorterm.as_str(), "truecolor" | "24bit"),
-            debug: debug_from(std::env::var("TEAMZONES_DEBUG").ok().as_deref()),
         }
     }
-}
-
-/// Whether a `TEAMZONES_DEBUG` value turns on the debug keys: only exactly `1` does.
-pub fn debug_from(value: Option<&str>) -> bool {
-    value == Some("1")
 }
 
 /// A resolved theme: a scheme and its overrides, read per role, plus the selection style.
@@ -196,21 +187,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn only_teamzones_debug_set_to_1_turns_on_debug() {
-        assert!(debug_from(Some("1")));
-        for value in [
-            None,
-            Some(""),
-            Some("0"),
-            Some("true"),
-            Some("11"),
-            Some(" 1"),
-        ] {
-            assert!(!debug_from(value), "{value:?}");
-        }
-    }
-
-    #[test]
     fn no_color_forces_mono_over_the_configured_scheme_and_its_overrides() {
         let config = config::Theme {
             overrides: [("accent".to_owned(), "#123456".to_owned())].into(),
@@ -221,7 +197,6 @@ mod tests {
             TerminalEnv {
                 no_color: true,
                 truecolor: true,
-                debug: false,
             },
         );
         let roles = [Role::Accent, Role::Warn, Role::Work, Role::Night];
@@ -246,7 +221,6 @@ mod tests {
                 TerminalEnv {
                     no_color: false,
                     truecolor,
-                    debug: false,
                 },
             )
             .color(Role::Marker)

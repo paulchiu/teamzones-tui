@@ -1,28 +1,132 @@
-//! The say line: zone entries in copy order, plus the places' clause.
+//! The say line and the copy-as formats: zone entries in copy order, plus the places' clause.
 
 use chrono::{DateTime, NaiveDate, Offset, Timelike, Utc};
 use chrono_tz::Tz;
+use serde::Deserialize;
 
 use crate::clock::When;
-use crate::config::{Place, Roster, Rule};
+use crate::config::{PersonId, Place, Roster, Rule};
 use crate::question::{Marks, Row, place_state};
 use crate::schedule::Level;
 
-/// What happens to the places' clause.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+/// What a line does with the counted places: their states, their zones, or nothing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum Clause {
     #[default]
     States,
     Zones,
+    #[serde(rename = "none")]
     Drop,
 }
 
-/// How to shape a say line: `c d`, `c w` and one clause handling, which the CLI may combine.
+/// How to shape a say line: a date prefix, names and one clause handling, which the CLI may combine.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub struct Variant {
     pub date: bool,
     pub names: bool,
     pub clause: Clause,
+}
+
+/// Whose zones a format names: the marks, everyone (`0 all`), or the focused row before the axis.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Who {
+    #[default]
+    Marked,
+    All,
+    FocusedFirst,
+}
+
+/// One copy-as format: the dialog key that copies it, its description, and the line's shape.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Format {
+    pub key: char,
+    pub label: String,
+    pub who: Who,
+    pub variant: Variant,
+}
+
+/// The copy-as formats in dialog order, exactly one of which is the default.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Formats {
+    pub(crate) formats: Vec<Format>,
+    pub(crate) default: usize,
+}
+
+/// Keys the copy-as dialog keeps for itself (`?` help and `q` quit), so no format may use them.
+pub const DIALOG_KEYS: [char; 2] = ['?', 'q'];
+
+/// The built-in formats as `(key, label, who, date, names, clause)`, with `y` the default.
+const BUILTIN: [(char, &str, Who, bool, bool, Clause); 7] = [
+    ('y', "the times", Who::Marked, false, false, Clause::States),
+    (
+        'd',
+        "with the date",
+        Who::Marked,
+        true,
+        false,
+        Clause::States,
+    ),
+    ('w', "with names", Who::Marked, false, true, Clause::States),
+    (
+        't',
+        "the focused row's time first",
+        Who::FocusedFirst,
+        false,
+        false,
+        Clause::Drop,
+    ),
+    (
+        'z',
+        "with each place's time instead of its state",
+        Who::Marked,
+        false,
+        false,
+        Clause::Zones,
+    ),
+    ('s', "times only", Who::Marked, false, false, Clause::Drop),
+    ('a', "for everyone", Who::All, false, false, Clause::States),
+];
+
+impl Formats {
+    /// The formats a config without `[[copy]]` tables has.
+    pub fn builtin() -> Self {
+        let formats = BUILTIN
+            .iter()
+            .map(|&(key, label, who, date, names, clause)| Format {
+                key,
+                label: label.to_owned(),
+                who,
+                variant: Variant {
+                    date,
+                    names,
+                    clause,
+                },
+            })
+            .collect();
+        Self {
+            formats,
+            default: 0,
+        }
+    }
+
+    /// Every format, in dialog order.
+    pub fn all(&self) -> &[Format] {
+        &self.formats
+    }
+
+    /// The format that is the times box line, what `y` copies and what `say` prints.
+    pub fn default_format(&self) -> &Format {
+        self.formats
+            .get(self.default)
+            .or_else(|| self.formats.first())
+            .expect("a loaded config always has a default copy format")
+    }
+
+    pub fn get(&self, key: char) -> Option<&Format> {
+        self.formats.iter().find(|format| format.key == key)
+    }
 }
 
 /// A local time as `h[:mm]am|pm`, with minutes only when non-zero, so midnight is `12am`.
@@ -94,12 +198,34 @@ fn offset_seconds(tz: Tz, instant: DateTime<Utc>) -> i32 {
     instant.with_timezone(&tz).offset().fix().local_minus_utc()
 }
 
-/// The zones a line names, axis first, each with the names of whoever brought it.
-fn zone_sources(roster: &Roster, marks: &Marks, clause: Clause) -> Vec<(Tz, Vec<String>)> {
+/// A zone a line names, with the names of whoever brought it.
+type Source = (Tz, Vec<String>);
+
+/// The axis zone, carrying home's name whenever the marks ask who.
+fn axis_source(roster: &Roster, marks: &Marks) -> Source {
     let home = marks
         .asks_who()
-        .then(|| roster.person(crate::config::PersonId::HOME).name.clone());
-    let axis = (roster.axis(), home.into_iter().collect());
+        .then(|| roster.person(PersonId::HOME).name.clone());
+    (roster.axis(), home.into_iter().collect())
+}
+
+/// The counted places' zones, which only `Clause::Zones` names.
+fn place_sources(roster: &Roster, marks: &Marks, clause: Clause) -> Vec<Source> {
+    let places = match clause {
+        Clause::Zones => marks.counted_places(),
+        Clause::States | Clause::Drop => Vec::new(),
+    };
+    places
+        .into_iter()
+        .map(|id| {
+            let place = roster.place(id);
+            (place.location.tz, vec![place.name.clone()])
+        })
+        .collect()
+}
+
+/// The zones a say line names, axis first, then by descending offset at the start.
+fn zone_sources(roster: &Roster, marks: &Marks, when: When, clause: Clause) -> Vec<Source> {
     let people = marks.counted_people().into_iter().skip(1).map(|id| {
         let person = roster.person(id);
         (person.location.tz, vec![person.name.clone()])
@@ -108,18 +234,35 @@ fn zone_sources(roster: &Roster, marks: &Marks, clause: Clause) -> Vec<(Tz, Vec<
         .clocks
         .iter()
         .map(|clock| (clock.tz, vec![clock.name.clone()]));
-    let places = match clause {
-        Clause::Zones => marks.counted_places(),
-        Clause::States | Clause::Drop => Vec::new(),
-    };
-    let places = places.into_iter().map(|id| {
-        let place = roster.place(id);
-        (place.location.tz, vec![place.name.clone()])
-    });
-    std::iter::once(axis)
+    let mut sources: Vec<Source> = std::iter::once(axis_source(roster, marks))
         .chain(people)
         .chain(clocks)
-        .chain(places)
+        .chain(place_sources(roster, marks, clause))
+        .collect();
+    let start = when.start();
+    sources[1..].sort_by_key(|(tz, _)| -offset_seconds(*tz, start));
+    sources
+}
+
+/// Each source's entry in order, merging entries that render identically so no time repeats.
+fn entries(sources: Vec<Source>, when: When, axis_date: NaiveDate, names: bool) -> Vec<String> {
+    let mut merged: Vec<(String, Vec<String>)> = Vec::new();
+    for (tz, who) in sources {
+        let text = entry(when, tz, axis_date);
+        match merged.iter_mut().find(|(known, _)| *known == text) {
+            Some((_, more)) => more.extend(who),
+            None => merged.push((text, who)),
+        }
+    }
+    merged
+        .into_iter()
+        .map(|(text, who)| {
+            if names && !who.is_empty() {
+                format!("{text} ({})", who.join(", "))
+            } else {
+                text
+            }
+        })
         .collect()
 }
 
@@ -171,37 +314,10 @@ fn clause(roster: &Roster, marks: &Marks, when: When) -> Option<String> {
     (!parts.is_empty()).then(|| parts.join(", "))
 }
 
-/// The say line for the marks over `when`, shaped by `variant`.
-pub fn say_line(roster: &Roster, marks: &Marks, when: When, variant: Variant) -> String {
-    let Variant {
-        date,
-        names,
-        clause: clause_mode,
-    } = variant;
+/// The zone part of a line wrapped in the date prefix and the states clause `variant` asks for.
+fn wrapped(roster: &Roster, marks: &Marks, when: When, variant: Variant, zones: &str) -> String {
     let start = when.start();
-    let axis_date = start.with_timezone(&roster.axis()).date_naive();
-    let mut sources = zone_sources(roster, marks, clause_mode);
-    sources[1..].sort_by_key(|(tz, _)| -offset_seconds(*tz, start));
-    let mut entries: Vec<(String, Vec<String>)> = Vec::new();
-    for (tz, who) in sources {
-        let text = entry(when, tz, axis_date);
-        match entries.iter_mut().find(|(known, _)| *known == text) {
-            Some((_, merged)) => merged.extend(who),
-            None => entries.push((text, who)),
-        }
-    }
-    let zones = entries
-        .into_iter()
-        .map(|(text, who)| {
-            if names && !who.is_empty() {
-                format!("{text} ({})", who.join(", "))
-            } else {
-                text
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(" / ");
-    let prefix = if date {
+    let prefix = if variant.date {
         format!(
             "{}, ",
             start.with_timezone(&roster.axis()).format("%a %-d %b")
@@ -209,25 +325,63 @@ pub fn say_line(roster: &Roster, marks: &Marks, when: When, variant: Variant) ->
     } else {
         String::new()
     };
-    let states = match clause_mode {
+    let states = match variant.clause {
         Clause::States => clause(roster, marks, when).map(|states| format!(", {states}")),
         Clause::Zones | Clause::Drop => None,
     };
     format!("{prefix}{zones}{}", states.unwrap_or_default())
 }
 
-/// The `c t` line: the focused row's entry, then the axis entry in parentheses, with no clause.
-pub fn focus_line(roster: &Roster, row: Row, when: When) -> String {
-    let tz = match row {
-        Row::Person(id) => roster.person(id).location.tz,
-        Row::Place(id) => roster.place(id).location.tz,
+fn axis_date(roster: &Roster, when: When) -> NaiveDate {
+    when.start().with_timezone(&roster.axis()).date_naive()
+}
+
+/// The say line for the marks over `when`, shaped by `variant`.
+pub fn say_line(roster: &Roster, marks: &Marks, when: When, variant: Variant) -> String {
+    let sources = zone_sources(roster, marks, when, variant.clause);
+    let zones = entries(sources, when, axis_date(roster, when), variant.names).join(" / ");
+    wrapped(roster, marks, when, variant, &zones)
+}
+
+/// The focused row's entry, then the axis (and any place zones) in parentheses unless they
+/// render the same time; with names on, the rest follows after ` / ` so parentheses never nest.
+fn focused_first(roster: &Roster, marks: &Marks, row: Row, when: When, variant: Variant) -> String {
+    let focused = match row {
+        Row::Person(id) => {
+            let person = roster.person(id);
+            (person.location.tz, vec![person.name.clone()])
+        }
+        Row::Place(id) => {
+            let place = roster.place(id);
+            (place.location.tz, vec![place.name.clone()])
+        }
     };
-    let axis_date = when.start().with_timezone(&roster.axis()).date_naive();
-    format!(
-        "{} ({})",
-        entry(when, tz, axis_date),
-        entry(when, roster.axis(), axis_date)
-    )
+    let sources = [focused, axis_source(roster, marks)]
+        .into_iter()
+        .chain(place_sources(roster, marks, variant.clause))
+        .collect();
+    let zones = match entries(sources, when, axis_date(roster, when), variant.names).as_slice() {
+        [] => String::new(),
+        [only] => only.clone(),
+        [first, rest @ ..] if variant.names => format!("{first} / {}", rest.join(" / ")),
+        [first, rest @ ..] => format!("{first} ({})", rest.join(" / ")),
+    };
+    wrapped(roster, marks, when, variant, &zones)
+}
+
+/// The line `format` copies for the marks, with `focus` as the focused row.
+pub fn format_line(
+    roster: &Roster,
+    marks: &Marks,
+    focus: Row,
+    when: When,
+    format: &Format,
+) -> String {
+    match format.who {
+        Who::Marked => say_line(roster, marks, when, format.variant),
+        Who::All => say_line(roster, &Marks::all(roster), when, format.variant),
+        Who::FocusedFirst => focused_first(roster, marks, focus, when, format.variant),
+    }
 }
 
 #[cfg(test)]
@@ -277,6 +431,144 @@ mod tests {
         assert_eq!(
             line(&roster, "regions 2-4pm mon"),
             "2-4pm AEDT, open in AU and US, closed in UK"
+        );
+    }
+
+    #[test]
+    fn the_focus_line_for_a_row_in_the_axis_zone_names_the_time_once() {
+        let roster = Config::parse(FIXTURE).unwrap().roster;
+        let now: DateTime<Utc> = "2026-10-23T22:04:00Z".parse().unwrap();
+        let formats = Formats::builtin();
+        let t = formats.get('t').unwrap();
+        let marks = Marks::of_group(&roster.groups[0]);
+        let home = Row::Person(crate::config::PersonId::HOME);
+        let au = Row::Place(roster.place_named("AU").unwrap());
+        for row in [home, au] {
+            assert_eq!(
+                format_line(&roster, &marks, row, When::At(now), t),
+                "9:04am AEDT"
+            );
+        }
+    }
+
+    const COPY_SPEC: &str = include_str!("../../../docs/spec/copy.md");
+
+    /// The `who` and `places` words of one spec row, read by serde as config reads them.
+    #[derive(Deserialize)]
+    struct Words {
+        who: Who,
+        places: Clause,
+    }
+
+    /// The spec's `## Formats` table as formats, plus the key its `default` column marks.
+    fn spec_formats() -> (Vec<Format>, Vec<char>) {
+        let yes = |cell: &str| match cell {
+            "yes" => true,
+            "no" => false,
+            other => panic!("{other} is not yes or no"),
+        };
+        let rows: Vec<Vec<String>> = COPY_SPEC
+            .lines()
+            .skip_while(|line| *line != "## Formats")
+            .skip_while(|line| !line.starts_with("| Key |"))
+            .take_while(|line| line.starts_with('|'))
+            .skip(2)
+            .map(|line| {
+                line.trim_matches('|')
+                    .split(" | ")
+                    .map(|cell| cell.trim().trim_matches('`').to_owned())
+                    .collect()
+            })
+            .collect();
+        let formats = rows
+            .iter()
+            .map(|cells| {
+                let words: Words = toml::from_str(&format!(
+                    "who = \"{}\"\nplaces = \"{}\"",
+                    cells[2], cells[5]
+                ))
+                .unwrap();
+                Format {
+                    key: cells[0].chars().next().unwrap(),
+                    label: cells[1].clone(),
+                    who: words.who,
+                    variant: Variant {
+                        date: yes(&cells[3]),
+                        names: yes(&cells[4]),
+                        clause: words.places,
+                    },
+                }
+            })
+            .collect();
+        let defaults = rows
+            .iter()
+            .filter(|cells| yes(&cells[6]))
+            .map(|cells| cells[0].chars().next().unwrap())
+            .collect();
+        (formats, defaults)
+    }
+
+    #[test]
+    fn the_built_in_formats_are_the_spec_formats_table_row_for_row() {
+        let (formats, defaults) = spec_formats();
+        let builtin = Formats::builtin();
+        assert_eq!(builtin.all(), formats.as_slice());
+        assert_eq!(defaults, [builtin.default_format().key]);
+    }
+
+    #[test]
+    fn a_focused_first_format_composes_names_dates_and_states_like_any_other() {
+        let roster = Config::parse(FIXTURE).unwrap().roster;
+        let tokens = ["regions", "2-4pm", "mon"];
+        let now = "2026-10-23T22:04:00Z".parse().unwrap();
+        let expr = crate::expr::parse_expr(&tokens, &roster, now).unwrap();
+        let Moment::Fixed(when) = expr.moment else {
+            panic!("no fixed time");
+        };
+        let uk = Row::Place(roster.place_named("UK").unwrap());
+        let format = Format {
+            key: 'k',
+            label: "mine".to_owned(),
+            who: Who::FocusedFirst,
+            variant: Variant {
+                date: true,
+                names: true,
+                clause: Clause::States,
+            },
+        };
+        assert_eq!(
+            format_line(&roster, &expr.marks, uk, when, &format),
+            "Mon 26 Oct, 3-5am GMT (UK) / 2-4pm AEDT, open in AU and US, closed in UK"
+        );
+    }
+
+    #[test]
+    fn a_focused_first_format_with_names_never_nests_parentheses() {
+        let roster = Config::parse(FIXTURE).unwrap().roster;
+        let tokens = ["team", "5-6pm", "mon"];
+        let now = "2026-10-23T22:04:00Z".parse().unwrap();
+        let expr = crate::expr::parse_expr(&tokens, &roster, now).unwrap();
+        let Moment::Fixed(when) = expr.moment else {
+            panic!("no fixed time");
+        };
+        let thandi = roster
+            .people()
+            .find(|(_, person)| person.name == "Thandi")
+            .map(|(id, _)| Row::Person(id))
+            .unwrap();
+        let format = Format {
+            key: 'k',
+            label: "mine".to_owned(),
+            who: Who::FocusedFirst,
+            variant: Variant {
+                date: false,
+                names: true,
+                clause: Clause::Drop,
+            },
+        };
+        assert_eq!(
+            format_line(&roster, &expr.marks, thandi, when, &format),
+            "8-9am SAST (Thandi) / 5-6pm AEDT (Paul)"
         );
     }
 

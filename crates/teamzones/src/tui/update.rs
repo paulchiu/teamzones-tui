@@ -8,8 +8,10 @@ use teamzones_core::fit::{NoFit, blocker, next_run, previous_run};
 use teamzones_core::question::{Marks, Row, person_band, place_level};
 use teamzones_core::time::Moment;
 
-use super::app::{App, Cursor, Lanes, Lens, Mode, Undo, Visual, base_marks};
-use super::keys::{Action, Context, Key, action_for, debug_action_for};
+use super::app::{
+    App, Cursor, Lanes, Lens, Mode, Undo, Visual, base_marks, next_style, style_name,
+};
+use super::keys::{Action, Context, Key, action_for};
 use super::notice::{Notice, TIMEOUT};
 use super::prompt;
 use super::say::duration_text;
@@ -93,7 +95,13 @@ fn clamp_focus(before: &[Row], after: &[Row], focus: Row) -> Row {
 
 fn tick(app: App, now: DateTime<Utc>) -> App {
     let notice = app.notice.filter(|notice| notice.visible(now));
-    App { now, notice, ..app }
+    let style_flash = app.style_flash.filter(|flash| flash.visible(now));
+    App {
+        now,
+        notice,
+        style_flash,
+        ..app
+    }
 }
 
 fn with_notice(app: App, key: &str, text: &str, now: DateTime<Utc>) -> App {
@@ -104,8 +112,7 @@ fn with_notice(app: App, key: &str, text: &str, now: DateTime<Utc>) -> App {
 }
 
 fn on_key(app: App, key: Key) -> (App, Vec<Effect>) {
-    let debug = app.debug.then(|| debug_action_for(key)).flatten();
-    let Some(action) = debug.or_else(|| action_for(context(&app), key)) else {
+    let Some(action) = format_key(&app, key).or_else(|| action_for(context(&app), key)) else {
         return (app, Vec::new());
     };
     let app = App {
@@ -113,6 +120,13 @@ fn on_key(app: App, key: Key) -> (App, Vec<Effect>) {
         ..app
     };
     act(app, action, key)
+}
+
+/// In the copy-as dialog, a key that names one of the config's formats copies that format.
+fn format_key(app: &App, key: Key) -> Option<Action> {
+    let Key::Char(c) = key else { return None };
+    let in_dialog = context(app) == Context::CopyMenu;
+    (in_dialog && app.config.copy.get(c).is_some()).then_some(Action::CopyAs(c))
 }
 
 fn copy(key: &str, text: String) -> Vec<Effect> {
@@ -188,10 +202,10 @@ fn act(app: App, action: Action, key: Key) -> (App, Vec<Effect>) {
             mode: Mode::CopyMenu,
             ..app
         }),
-        Action::CopyAs(variant) => {
-            let text = app.copy_as(variant);
-            (normal(app), copy("c", text))
-        }
+        Action::CopyAs(format) => match app.copy_as(format) {
+            Some(text) => (normal(app), copy("c", text)),
+            None => only(app),
+        },
         Action::Lanes => only(App {
             lanes: match app.lanes {
                 Lanes::Hours => Lanes::Plain,
@@ -220,10 +234,18 @@ fn act(app: App, action: Action, key: Key) -> (App, Vec<Effect>) {
         Action::Type(c) => only(edit_prompt(app, Some(c))),
         Action::Erase => only(edit_prompt(app, None)),
         Action::Submit => only(submit(app)),
-        Action::CycleRangeStyle => only(App {
-            range_style: app.range_style.next(),
-            ..app
-        }),
+        Action::CycleRangeStyle => {
+            let range_style = next_style(app.range_style);
+            let text = format!("range style: {}", style_name(range_style));
+            only(App {
+                range_style,
+                style_flash: Some(Notice {
+                    text,
+                    raised_at: app.now,
+                }),
+                ..app
+            })
+        }
     }
 }
 
@@ -367,7 +389,6 @@ fn key_text(key: Key) -> String {
         | Key::Enter
         | Key::Esc
         | Key::Backspace
-        | Key::F(_)
         | Key::Other => String::new(),
     }
 }

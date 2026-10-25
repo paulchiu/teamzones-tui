@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;
-use teamzones_core::config::Config;
+use teamzones_core::config::{Config, RangeStyle};
 
 use super::app::App;
 use super::glyphs::Glyphs;
@@ -520,7 +520,6 @@ fn no_color_renders_mono() {
     let env = TerminalEnv {
         no_color: true,
         truecolor: true,
-        debug: false,
     };
     for app in [team_monday(), press(team_monday(), &chars("4"))] {
         let buf = render_with(&app, 120, 36, env);
@@ -608,10 +607,17 @@ fn each_modal_context_swallows_the_keys_it_does_not_advertise() {
     for opener in ["c", "s", "?"] {
         let open = press(fixture(), &chars(opener));
         let context = super::update::context(&open);
+        let formats = open
+            .config
+            .copy
+            .all()
+            .iter()
+            .map(|format| Key::Char(format.key));
         let own: Vec<Key> = super::keys::BINDINGS
             .iter()
             .filter(|b| b.context == context || b.context == super::keys::Context::Global)
             .flat_map(|b| b.chords.iter().map(|(key, _)| *key))
+            .chain(formats.filter(|_| context == super::keys::Context::CopyMenu))
             .collect();
         for key in main_keys().into_iter().filter(|key| !own.contains(key)) {
             let (after, effects) = press_all(open.clone(), &[key]);
@@ -993,19 +999,15 @@ fn c_opens_a_dialog_previewing_every_format_with_its_key_and_description() {
         rows,
         [
             "y  5-6pm AEDT / 4-5pm AEST / 8-9am SAST",
-            "marked, ttz format",
+            "the times",
             "d  Mon 26 Oct, 5-6pm AEDT / 4-5pm AEST / 8-9am SAST",
             "with the date",
             "w  5-6pm AEDT (Paul) / 4-5pm AEST (Priya, Sam) / 8-9am SAST (Thandi, Johan)",
             "with names",
             "t  8-9am SAST (5-6pm AEDT)",
-            "for Thandi, their time first",
-            "z  5-6pm AEDT / 4-5pm AEST / 8-9am SAST",
-            "with place zones",
-            "s  5-6pm AEDT / 4-5pm AEST / 8-9am SAST",
-            "without the clause",
+            "the focused row's time first (Thandi)",
             "a  5-6pm AEDT / 4-5pm AEST / 8-9am SAST / 6-7am GMT / 1-2am CDT, closed in UK and US, busy in AU",
-            "everyone",
+            "for everyone",
         ]
     );
     insta::assert_snapshot!("copy_as_120x36", text(&buf));
@@ -1026,6 +1028,100 @@ fn each_copy_as_key_copies_its_preview_and_closes_the_dialog() {
 }
 
 #[test]
+fn no_dialog_description_uses_an_internal_term() {
+    let app = press(
+        focus_on(copy_setup("deploy, Mon 26 Oct 5-5:30pm"), "UK"),
+        &chars("c"),
+    );
+    let rows = dialog_rows(&render(&app, 120, 36));
+    let descriptions: Vec<&String> = rows.iter().skip(1).step_by(2).collect();
+    assert_eq!(
+        descriptions.len(),
+        7,
+        "deploy has places, so every format differs"
+    );
+    for about in descriptions {
+        for term in ["ttz", "clause", "marked", "variant"] {
+            assert!(!about.contains(term), "{about:?} says {term}");
+        }
+    }
+}
+
+#[test]
+fn a_hidden_duplicate_row_s_key_still_copies_the_same_line() {
+    let app = press(team_monday(), &chars("c"));
+    let rows = dialog_rows(&render(&app, 120, 36));
+    assert!(
+        rows.iter()
+            .all(|row| !row.starts_with("z  ") && !row.starts_with("s  "))
+    );
+    for key in ["z", "s"] {
+        assert_eq!(
+            copied(&press_all(app.clone(), &chars(key)).1),
+            ["5-6pm AEDT / 4-5pm AEST / 8-9am SAST"],
+            "{key}"
+        );
+    }
+}
+
+#[test]
+fn t_with_home_focused_copies_the_time_once() {
+    let app = press(focus_on(team_monday(), "Paul"), &chars("c"));
+    let rows = dialog_rows(&render(&app, 120, 36));
+    assert!(rows.contains(&"t  5-6pm AEDT".to_owned()), "{rows:?}");
+    assert_eq!(copied(&press_all(app, &chars("t")).1), ["5-6pm AEDT"]);
+}
+
+/// The fixture with `tables` appended, opened on team at Mon 26 Oct 5-6pm.
+fn team_monday_with(tables: &str) -> App {
+    go_to(App::new(config(tables), now()), "26 oct 5-6pm")
+}
+
+#[test]
+fn a_copy_table_s_new_key_shows_its_label_and_preview_and_copies_it() {
+    let app = team_monday_with(
+        "\n[[copy]]\nkey = \"k\"\nlabel = \"dated, with names\"\ndate = true\nnames = true\n",
+    );
+    let open = press(app, &chars("c"));
+    let rows = dialog_rows(&render(&open, 120, 36));
+    let line =
+        "Mon 26 Oct, 5-6pm AEDT (Paul) / 4-5pm AEST (Priya, Sam) / 8-9am SAST (Thandi, Johan)";
+    assert_eq!(
+        rows[rows.len() - 2..],
+        [format!("k  {line}"), "dated, with names".to_owned()]
+    );
+    let (after, effects) = press_all(open, &chars("k"));
+    assert_eq!(copied(&effects), [line]);
+    assert_eq!(after.mode, super::app::Mode::Normal);
+}
+
+#[test]
+fn a_copy_table_replaces_a_built_in_and_hide_removes_one_from_the_dialog_and_its_key() {
+    let app = team_monday_with(
+        "\n[[copy]]\nkey = \"d\"\nlabel = \"the day and names\"\ndate = true\nnames = true\n\n[[copy]]\nkey = \"a\"\nhide = true\n",
+    );
+    let open = press(app, &chars("c"));
+    let rows = dialog_rows(&render(&open, 120, 36));
+    assert_eq!(rows[3], "the day and names");
+    assert!(rows.iter().all(|row| !row.starts_with("a  ")), "{rows:?}");
+    let (after, effects) = press_all(open.clone(), &chars("a"));
+    assert!(
+        effects.is_empty() && after == open,
+        "a hidden key is swallowed"
+    );
+}
+
+#[test]
+fn the_default_format_is_the_times_box_line_and_what_y_copies() {
+    let app = team_monday_with(
+        "\n[[copy]]\nkey = \"d\"\nlabel = \"with the date\"\ndate = true\ndefault = true\n",
+    );
+    let line = "Mon 26 Oct, 5-6pm AEDT / 4-5pm AEST / 8-9am SAST";
+    assert_eq!(say_line(&render(&app, 120, 36)), line);
+    assert_eq!(copied(&press_all(app, &chars("y")).1), [line]);
+}
+
+#[test]
 fn a_preview_too_wide_for_the_dialog_is_cut_with_a_mark_but_copies_whole() {
     let app = press(team_monday(), &chars("c"));
     let buf = render(&app, 80, 24);
@@ -1043,10 +1139,73 @@ fn a_preview_too_wide_for_the_dialog_is_cut_with_a_mark_but_copies_whole() {
     );
 }
 
-/// The app with the debug range-style toggle on, as `TEAMZONES_DEBUG=1` sets it.
-fn debugging(app: App) -> App {
-    App { debug: true, ..app }
+#[test]
+fn a_label_is_cut_with_a_mark_and_spelt_in_ascii_under_ascii_glyphs() {
+    let label = format!("flights \u{b7} {}", "and more ".repeat(20));
+    let text = FIXTURE.replacen(
+        "scheme = \"dark\"",
+        &format!("scheme = \"dark\"\nglyphs = \"ascii\"\n\n[[copy]]\nkey = \"k\"\nlabel = \"{label}\"\nwho = \"all\"\nnames = true"),
+        1,
+    );
+    let app = go_to(
+        App::new(Config::parse(&text).unwrap(), now()),
+        "26 oct 5-6pm",
+    );
+    let buf = render(&press(app, &chars("c")), 120, 36);
+    let line = row(&buf, y_of(&buf, "flights"));
+    let from = line.find("flights").unwrap();
+    let about = line[from..].split('|').next().unwrap().trim_end();
+    assert!(about.starts_with("flights . and more"), "{about}");
+    assert!(about.ends_with("..."), "{about}");
 }
+
+#[test]
+fn a_dialog_too_tall_for_two_rows_a_format_lists_every_key_on_one_row_each() {
+    let shapes = [
+        "who = \"all\"\ndate = true",
+        "who = \"all\"\nnames = true",
+        "who = \"all\"\nplaces = \"zones\"",
+        "who = \"all\"\ndate = true\nplaces = \"none\"",
+        "who = \"all\"\ndate = true\nnames = true",
+        "who = \"focused-first\"\ndate = true",
+        "who = \"focused-first\"\nnames = true",
+    ];
+    let tables = "befghij"
+        .chars()
+        .zip(shapes)
+        .map(|(key, shape)| {
+            format!("\n[[copy]]\nkey = \"{key}\"\nlabel = \"extra {key}\"\n{shape}\n")
+        })
+        .collect::<Vec<_>>()
+        .concat();
+    let open = press(focus_on(team_monday_with(&tables), "Thandi"), &chars("c"));
+    let shown: String = open.copy_menu().iter().map(|(key, _, _)| *key).collect();
+    assert_eq!(shown, "ydwtabefghij");
+    let tall = dialog_rows(&render(&open, 120, 36));
+    assert_eq!(tall.len(), shown.len() * 2, "{tall:?}");
+    let short = dialog_rows(&render(&open, 80, 24));
+    let keys: String = short
+        .iter()
+        .filter_map(|row| row.split_once("  ").map(|(key, _)| key.to_owned()))
+        .collect();
+    assert_eq!(keys, shown, "{short:?}");
+    assert_eq!(short.len(), shown.len());
+}
+
+/// The team frame at Mon 26 Oct 5-6pm, with `[theme] range` set to `style`.
+fn team_monday_styled(style: &str) -> App {
+    let text = FIXTURE.replacen(
+        "scheme = \"dark\"",
+        &format!("scheme = \"dark\"\nrange = \"{style}\""),
+        1,
+    );
+    go_to(
+        App::new(Config::parse(&text).unwrap(), now()),
+        "26 oct 5-6pm",
+    )
+}
+
+const STYLES: [&str; 5] = ["columns", "edges", "lines", "underline", "focus"];
 
 /// The slider through the where block as text, each row followed by a mask of how its cells are
 /// marked: `s` selection background or reverse, `u` underline, `d` dim, `.` plain.
@@ -1078,60 +1237,80 @@ fn styled_grid(buf: &Buffer) -> String {
 const NO_COLOR: TerminalEnv = TerminalEnv {
     no_color: true,
     truecolor: false,
-    debug: false,
 };
 
 #[test]
-fn f2_cycles_the_range_styles_only_in_debug_and_the_footer_names_the_style() {
+fn capital_r_cycles_the_range_style_for_the_session_and_the_footer_names_it_briefly() {
     let plain = team_monday();
-    assert_eq!(press(plain.clone(), &[Key::F(2)]), plain);
+    let footer = |app: &App| row(&render(app, 120, 36), 35);
+    assert!(
+        !footer(&plain).contains("range style"),
+        "{}",
+        footer(&plain)
+    );
     let names: Vec<String> = (0..6)
-        .scan(debugging(plain.clone()), |app, _| {
-            let buf = render(app, 120, 36);
-            let footer = row(&buf, 35);
-            *app = press(app.clone(), &[Key::F(2)]);
-            Some(footer.rsplit("  ").next().unwrap().to_owned())
+        .scan(plain.clone(), |app, _| {
+            *app = press(app.clone(), &chars("R"));
+            Some(footer(app).rsplit("  ").next().unwrap().to_owned())
         })
         .collect();
     assert_eq!(
         names,
         [
-            "range style 1/5: columns",
-            "range style 2/5: edges",
-            "range style 3/5: lines",
-            "range style 4/5: underline",
-            "range style 5/5: dim",
-            "range style 1/5: columns",
+            "range style: edges",
+            "range style: lines",
+            "range style: underline",
+            "range style: focus",
+            "range style: columns",
+            "range style: edges",
         ]
     );
-    for frame in [
-        render(&plain, 120, 36),
-        render(&press(plain.clone(), &chars("?")), 120, 36),
-    ] {
-        assert!(!text(&frame).contains("F2") && !text(&frame).contains("range style"));
+    let (cycled, effects) = press_all(plain, &chars("R"));
+    assert!(effects.is_empty(), "nothing is written: {effects:?}");
+    let later = update(cycled, Msg::Tick(now() + chrono::TimeDelta::seconds(10))).0;
+    assert!(
+        !footer(&later).contains("range style"),
+        "{}",
+        footer(&later)
+    );
+}
+
+#[test]
+fn each_style_s_footer_name_is_the_word_theme_range_takes() {
+    let styles = std::iter::successors(Some(RangeStyle::default()), |style| {
+        Some(super::app::next_style(*style)).filter(|next| *next != RangeStyle::default())
+    });
+    for style in styles {
+        let name = super::app::style_name(style);
+        let text = FIXTURE.replacen(
+            "scheme = \"dark\"",
+            &format!("scheme = \"dark\"\nrange = \"{name}\""),
+            1,
+        );
+        assert_eq!(Config::parse(&text).unwrap().theme.range, style, "{name}");
     }
-    let help = render(&press(debugging(plain), &chars("?")), 120, 36);
-    assert!(!text(&help).contains("F2"));
+}
+
+#[test]
+fn help_lists_capital_r() {
+    let help = text(&render(&press(team_monday(), &chars("?")), 120, 36));
+    assert!(help.contains("Cycle the range-marking style"), "{help}");
 }
 
 #[test]
 fn each_range_style_marks_the_range_its_own_way() {
-    let mut app = debugging(team_monday());
-    for number in 1..=5 {
-        let buf = render(&app, 120, 36);
+    for (number, style) in (1..).zip(STYLES) {
+        let buf = render(&team_monday_styled(style), 120, 36);
         insta::assert_snapshot!(format!("range_style_{number}"), styled_grid(&buf));
-        app = press(app, &[Key::F(2)]);
     }
 }
 
 #[test]
 fn under_no_color_the_styles_that_need_colour_fall_back_to_edge_lines() {
-    let mut app = debugging(team_monday());
-    let mut grids = Vec::new();
-    for _ in 1..=5 {
-        grids.push(styled_grid(&render_with(&app, 120, 36, NO_COLOR)));
-        app = press(app, &[Key::F(2)]);
-    }
+    let grids: Vec<String> = STYLES
+        .iter()
+        .map(|style| styled_grid(&render_with(&team_monday_styled(style), 120, 36, NO_COLOR)))
+        .collect();
     let lines = &grids[2];
     assert_eq!([&grids[0], &grids[1], &grids[4]], [lines, lines, lines]);
     assert_ne!(&grids[3], lines, "underline needs no colour");

@@ -72,8 +72,73 @@
 # here = "London"
 # until = 2026-11-01
 
-## scheme is "dark", "light" or "mono", and glyphs is "full" or "ascii". Any colour role can be
-## overridden by its name as #rrggbb, such as accent = "#0969da".
+## scheme is "dark", "light" or "mono", and glyphs is "full" or "ascii". range is how the range
+## is marked: "columns" (shaded), "edges", "lines", "underline" or "focus" (the rest dimmed), and R
+## cycles it for a session. Any colour role can be overridden by its name as #rrggbb, such as
+## accent = "#0969da".
 # [theme]
 # scheme = "dark"
 # glyphs = "full"
+# range = "columns"
+
+## Copy-as formats: the c dialog lists each one with its key, a preview and its label. These are
+## the built-ins. A [[copy]] with a built-in key replaces it, hide = true removes it, and a new key
+## adds a format. who is "marked", "all" or "focused-first" (the focused row's time, then yours),
+## and places is "states", "zones" or "none". The one default = true format is the line in the
+## times box, what y copies and what `teamzones say` prints, so it cannot be "focused-first".
+# [[copy]]
+# key = "y"
+# label = "the times"
+# who = "marked"
+# date = false
+# names = false
+# places = "states"
+# default = true
+
+# [[copy]]
+# key = "d"
+# label = "with the date"
+# who = "marked"
+# date = true
+# names = false
+# places = "states"
+
+# [[copy]]
+# key = "w"
+# label = "with names"
+# who = "marked"
+# date = false
+# names = true
+# places = "states"
+
+# [[copy]]
+# key = "t"
+# label = "the focused row's time first"
+# who = "focused-first"
+# date = false
+# names = false
+# places = "none"
+
+# [[copy]]
+# key = "z"
+# label = "with each place's time instead of its state"
+# who = "marked"
+# date = false
+# names = false
+# places = "zones"
+
+# [[copy]]
+# key = "s"
+# label = "times only"
+# who = "marked"
+# date = false
+# names = false
+# places = "none"
+
+# [[copy]]
+# key = "a"
+# label = "for everyone"
+# who = "all"
+# date = false
+# names = false
+# places = "states"

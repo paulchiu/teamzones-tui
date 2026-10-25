@@ -51,8 +51,11 @@ pub fn lines(context: Context, glyphs: &Glyphs) -> Vec<Line> {
             glyphs.range_end
         ),
     ];
-    std::iter::once(heading("keys here"))
-        .chain(keys_of(context, glyphs))
+    let here: Vec<Line> = keys_of(context, glyphs).collect();
+    let here_heading = (!here.is_empty()).then(|| heading("keys here"));
+    here_heading
+        .into_iter()
+        .chain(here)
         .chain(std::iter::once(heading("everywhere")))
         .chain(keys_of(Context::Global, glyphs))
         .chain(std::iter::once(heading("glyphs")))
@@ -67,6 +70,14 @@ pub fn lines(context: Context, glyphs: &Glyphs) -> Vec<Line> {
 mod tests {
     use super::*;
     use crate::tui::glyphs::FULL;
+
+    #[test]
+    fn help_from_the_copy_dialog_lists_only_the_global_keys() {
+        let from_dialog = lines(Context::CopyMenu, &FULL);
+        assert_eq!(from_dialog[0].text, "everywhere");
+        let globals = keys_of(Context::Global, &FULL).count();
+        assert_eq!(from_dialog[globals + 1].text, "glyphs");
+    }
 
     #[test]
     fn context_keys_come_first_then_global_keys_then_the_legend() {

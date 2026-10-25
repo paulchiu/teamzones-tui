@@ -8,10 +8,10 @@ use clap::{Args, CommandFactory, Parser, Subcommand};
 use teamzones_core::cities;
 use teamzones_core::clock::Clock;
 use teamzones_core::config::{Config, Group, PersonId, Roster, Rule};
-use teamzones_core::copy::{Clause, Variant, say_line};
+use teamzones_core::copy::{Clause, Format, Variant, format_line};
 use teamzones_core::expr::{ExprError, parse_expr};
 use teamzones_core::fit::resolve;
-use teamzones_core::question::{Marks, Question};
+use teamzones_core::question::{Marks, Question, Row};
 use teamzones_core::status::status_lines;
 use teamzones_core::time::Moment;
 use thiserror::Error;
@@ -49,6 +49,9 @@ enum Command {
     /// Show, set or clear a dated travel override.
     Here(HereArgs),
     /// Find, create, edit or validate the config file.
+    #[command(
+        after_help = "To have a coding agent write the config, point it at llms.txt: https://github.com/paulchiu/teamzones-tui/blob/main/llms.txt"
+    )]
     Config {
         #[command(subcommand)]
         action: ConfigAction,
@@ -265,17 +268,30 @@ fn say(args: &SayArgs, now: DateTime<Utc>, io: &mut Io) -> Result<(), Failure> {
     let dated = expr.moment == Moment::Next;
     let when = resolve(expr.moment, roster, &expr.marks, now)
         .map_err(|no_fit| Failure::Nothing(no_fit.to_string()))?;
+    let default = config.copy.default_format();
+    let variant = default.variant;
     let clause = match (zones, no_clause) {
         (true, _) => Clause::Zones,
         (false, true) => Clause::Drop,
-        (false, false) => Clause::States,
+        (false, false) => variant.clause,
     };
     let variant = Variant {
-        date: *date || dated,
-        names: *names,
+        date: variant.date || *date || dated,
+        names: variant.names || *names,
         clause,
     };
-    let line = say_line(roster, &expr.marks, when, variant);
+    let format = Format {
+        variant,
+        ..default.clone()
+    };
+    // say has no focused row, and config check keeps a focused-first format from being the default.
+    let line = format_line(
+        roster,
+        &expr.marks,
+        Row::Person(PersonId::HOME),
+        when,
+        &format,
+    );
     writeln!(io.out, "{line}").map_err(output)?;
     if *no_copy || !io.stdout_is_tty {
         return Ok(());

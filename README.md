@@ -6,6 +6,10 @@ Who's available and where it's busy, on one time axis. A Rust TUI.
 
 It is under construction and has no release yet.
 
+## Configure
+
+`teamzones config init` writes a commented template, and `teamzones config check` validates it. To have a coding agent write the config for you, point it at [llms.txt](llms.txt): it lists every table and field and tells the agent how to gather your colleagues' cities, zones and hours from tools such as Slack and your calendar.
+
 ## Build
 
 ```sh

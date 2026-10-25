@@ -168,6 +168,48 @@ mod tests {
         assert_eq!(config.theme, defaults.theme);
     }
 
+    /// The template's `[[copy]]` tables are read on their own, each re-keyed in upper case so it
+    /// joins the built-ins as a new format instead of overlaying one, which would hide a gap.
+    #[test]
+    fn the_uncommented_copy_tables_are_exactly_the_built_in_formats() {
+        let builtin = teamzones_core::copy::Formats::builtin();
+        let mut document: DocumentMut = uncommented().parse().unwrap();
+        let tables = document["copy"].as_array_of_tables_mut().unwrap();
+        let fields = |table: &Table| -> Vec<String> {
+            table.iter().map(|(field, _)| field.to_owned()).collect()
+        };
+        let shape = ["key", "label", "who", "date", "names", "places"];
+        for (table, format) in tables.iter_mut().zip(builtin.all()) {
+            let mut expected = shape.map(str::to_owned).to_vec();
+            if format.key == builtin.default_format().key {
+                expected.push("default".to_owned());
+            }
+            assert_eq!(fields(table), expected, "{}", format.key);
+            table["key"] = value(format.key.to_ascii_uppercase().to_string());
+        }
+        let keys: String = tables
+            .iter()
+            .filter_map(|table| table["key"].as_str())
+            .collect();
+        let builtin_keys: String = builtin.all().iter().map(|f| f.key).collect();
+        assert_eq!(keys, builtin_keys.to_ascii_uppercase());
+        let config = Config::parse(&document.to_string()).unwrap();
+        let (kept, read) = config.copy.all().split_at(builtin.all().len());
+        assert_eq!(kept, builtin.all());
+        let rekeyed: Vec<_> = read
+            .iter()
+            .map(|format| teamzones_core::copy::Format {
+                key: format.key.to_ascii_lowercase(),
+                ..format.clone()
+            })
+            .collect();
+        assert_eq!(rekeyed, builtin.all());
+        assert_eq!(
+            config.copy.default_format().key,
+            builtin.default_format().key.to_ascii_uppercase()
+        );
+    }
+
     #[test]
     fn the_uncommented_home_days_and_group_where_are_the_defaults_they_name() {
         let full = uncommented();

@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ## [Unreleased]
 
+### Added
+
+- `[[copy]]` tables in config add your own copy-as formats, replace a built-in one, or hide one with `hide = true`. The format marked `default = true` is the line in the times box, what `y` copies and what `teamzones say` prints.
+- `teamzones config init` lists every built-in copy-as format, commented out, ready to edit.
+- `[theme] range` sets how the range is marked (`columns`, `edges`, `lines`, `underline` or `focus`), and `R` cycles it for the session, naming the style in the footer.
+- `llms.txt` tells a coding agent how to write a teamzones config, including how to gather colleagues' details from Slack, calendars and directory tools.
+
+### Changed
+
+- The copy-as dialog describes each format in plain words, naming the focused row for `t`, and leaves out a row whose line repeats an earlier one (its key still copies). When the formats do not fit two rows each, it lists one row per format.
+- The copy-as dialog's footer shows only `? help` and `q quit`, since the dialog lists its own keys.
+
+### Fixed
+
+- `t` on a row in your own zone copies the time once, instead of repeating it in parentheses.
+
+### Removed
+
+- `TEAMZONES_DEBUG=1` and `F2`, replaced by `[theme] range` and `R`.
+
 ## [0.5.0] - 2026-10-24
 
 ### Added
