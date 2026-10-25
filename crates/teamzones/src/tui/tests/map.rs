@@ -1,6 +1,8 @@
 //! The map: its labels, the night side and the sun, and when it shows.
 
 use super::*;
+use crate::tui::layout::MapView;
+use ratatui::layout::Rect;
 
 /// Regions on Mon 26 Oct with a 2-4pm AEDT range, as the screen spec's second mockup draws it.
 fn regions_monday() -> App {
@@ -103,6 +105,78 @@ fn at_120_by_36_the_map_shows_and_m_hides_it_until_m_again() {
     let hidden = press(app, &chars("m"));
     assert!(!shows_map(&frame(&hidden)), "{}", text(&frame(&hidden)));
     assert!(shows_map(&frame(&press(hidden, &chars("m")))));
+}
+
+/// The first `n` rows of a frame.
+fn top_rows(buf: &Buffer, n: u16) -> Vec<String> {
+    (0..n).map(|y| row(buf, y)).collect()
+}
+
+#[test]
+fn with_the_map_off_the_blocks_sit_under_the_header_and_the_spare_rows_above_the_notice() {
+    let shown = sized(team_monday(), 120, 36);
+    let hidden = press(shown.clone(), &chars("m"));
+    let buf = frame(&hidden);
+    // 120x24 has no spare rows, so its header through times box is the layout with no gap.
+    let unmapped = render(&shown, 120, 24);
+    assert_eq!(
+        top_rows(&buf, 22),
+        top_rows(&unmapped, 22),
+        "{}",
+        text(&buf)
+    );
+    assert_eq!(y_of(&buf, "Mon 26 Oct AEDT"), 1);
+    let times_bottom = y_of(&buf, " times for ") + 2;
+    assert!(
+        (times_bottom + 1..34).all(|y| row(&buf, y).is_empty()),
+        "{}",
+        text(&buf)
+    );
+    assert!(row(&buf, 35).starts_with("h/l time"), "{}", text(&buf));
+    let back = frame(&press(hidden, &chars("m")));
+    assert_eq!(text(&back), text(&frame(&shown)));
+    assert_eq!(y_of(&back, "Mon 26 Oct AEDT"), 13);
+}
+
+#[test]
+fn a_map_shown_never_or_under_ascii_glyphs_leaves_no_gap_under_the_header() {
+    for setup in ["\n[map]\nshow = \"never\"\n", "glyphs = \"ascii\"\n"] {
+        let app = sized(
+            go_to(App::new(config(setup), now()), "26 oct 5-6pm"),
+            120,
+            36,
+        );
+        let buf = frame(&app);
+        assert_eq!(y_of(&buf, "Mon 26 Oct AEDT"), 1, "{setup}\n{}", text(&buf));
+        assert!(
+            row(&buf, 35).starts_with("h/l time"),
+            "{setup}\n{}",
+            text(&buf)
+        );
+    }
+}
+
+#[test]
+fn the_overlay_opens_over_the_blocks_without_moving_them() {
+    let closed = sized(team_monday(), 120, 30);
+    let open = press(closed.clone(), &chars("m"));
+    assert_eq!(open.map_view(), MapView::Overlay);
+    let size = Rect::new(0, 0, 120, 30);
+    assert_eq!(view::areas(&open, size), view::areas(&closed, size));
+    assert_eq!(y_of(&frame(&open), "Mon 26 Oct AEDT"), 1);
+}
+
+#[test]
+fn with_the_map_off_a_group_switch_never_moves_the_ruler_the_borders_or_the_times_box() {
+    let hidden = press(sized(team_monday(), 120, 36), &chars("m"));
+    let team = anchors(&frame(&hidden));
+    for keys in ["3", "4", "0"] {
+        assert_eq!(
+            anchors(&frame(&press(hidden.clone(), &chars(keys)))),
+            team,
+            "{keys}"
+        );
+    }
 }
 
 #[test]

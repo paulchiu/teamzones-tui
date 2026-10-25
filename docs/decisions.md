@@ -337,3 +337,11 @@ Decision: The map draws the terminator at Braille dot resolution: every dark dot
 Why: A cell background cannot go finer than a cell, so the shading alone drew a staircase, and Paul asked for the Clock app's smooth line. `dawn` already means twilight on the lanes, so no new theme key is needed, and showing only the line's dots in its cells keeps it one dot thick where it crosses a coast.
 
 Held by: `tui::map::tests::the_terminator_s_dots_sit_within_one_dot_of_the_computed_edge_of_night` and `tui::tests::map::the_terminator_draws_in_the_dawn_colour_and_keeps_its_shape_under_mono` in `teamzones`
+
+## D42: With the map off, the blocks move up and the spare rows sit above the notice row (2026-10-25)
+
+Decision: Whenever the map is not drawn in place (hidden by `m`, by `[map] show = "never"`, by the hiding rule, or under `glyphs = "ascii"`), the ruler starts on the row under the header and the rows the map would have taken sit together, blank, between the times box and the notice row. The notice row stays directly above the footer, and the footer stays on the last row. `m` bringing the map back pushes the blocks down again, and the overlay is drawn over the blocks without moving them. Spare rows exist only when every block fits whole, so no block is ever cut short while they show and there is no block to hand them to first. See the layout and Map hiding bullets in [screen](spec/screen.md).
+
+Why: Paul found the header sitting alone over a dozen blank rows when `m` hid the map at about 225x50, and expected the rest of the screen to fill the space. Keeping the notice row next to the footer keeps it where the 80x24 frames put it. Group switches still never move a block (D2), since the layout depends only on the size, the roster and the map's place.
+
+Held by: `tui::layout::tests::a_hidden_map_moves_the_blocks_up_and_leaves_its_rows_above_the_notice`, `tui::tests::map::with_the_map_off_the_blocks_sit_under_the_header_and_the_spare_rows_above_the_notice`, `a_map_shown_never_or_under_ascii_glyphs_leaves_no_gap_under_the_header`, `the_overlay_opens_over_the_blocks_without_moving_them`, `with_the_map_off_a_group_switch_never_moves_the_ruler_the_borders_or_the_times_box` and `tui::tests::mouse::with_the_map_off_a_click_on_a_label_lands_on_the_row_drawn_there` in `teamzones`

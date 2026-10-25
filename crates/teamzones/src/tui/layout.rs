@@ -153,7 +153,8 @@ fn shape(cols: u16, rows: u16, people: u16, places: u16) -> Columns {
 
 /// Lays out a `cols` by `rows` screen for `roster_len` people (home included) and `places_len` places.
 ///
-/// Block heights come from the whole roster, so switching groups never moves a row.
+/// Block heights come from the whole roster, so switching groups never moves a row. A shown map
+/// takes the spare rows under the header; otherwise they sit between the say panel and the notice.
 pub fn layout(cols: u16, rows: u16, roster_len: u16, places_len: u16, map: MapChoice) -> Areas {
     let columns = shape(cols, rows, roster_len, places_len);
     let lines = columns.lines();
@@ -170,14 +171,21 @@ pub fn layout(cols: u16, rows: u16, roster_len: u16, places_len: u16, map: MapCh
         area
     };
     let header = take(1);
-    let spare_area = take(spare);
+    let map = shows_map.then(|| take(spare));
+    let slider = take(2 * lines);
+    let who = take(1 + lines * (roster_len + 1));
+    let place = take(2 + lines * (places_len + 1));
+    let say = take(4);
+    if !shows_map {
+        take(spare);
+    }
     Areas {
         header,
-        map: shows_map.then_some(spare_area),
-        slider: take(2 * lines),
-        who: take(1 + lines * (roster_len + 1)),
-        place: take(2 + lines * (places_len + 1)),
-        say: take(4),
+        map,
+        slider,
+        who,
+        place,
+        say,
         notice: take(1),
         footer: take(1),
         columns,
@@ -298,9 +306,13 @@ mod tests {
     }
 
     #[test]
-    fn a_hidden_map_leaves_its_rows_blank_above_the_slider() {
+    fn a_hidden_map_moves_the_blocks_up_and_leaves_its_rows_above_the_notice() {
         let areas = layout(120, 36, 7, 3, MapChoice::Hidden);
-        assert_eq!((areas.map, areas.slider.y, areas.footer.y), (None, 13, 35));
+        assert_eq!(areas.map, None);
+        assert_eq!(
+            rows(&areas),
+            [(0, 1), (1, 2), (3, 9), (12, 6), (18, 4), (34, 1), (35, 1)]
+        );
     }
 
     #[test]
