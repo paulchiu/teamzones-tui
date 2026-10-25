@@ -520,7 +520,6 @@ fn no_color_renders_mono() {
     let env = TerminalEnv {
         no_color: true,
         truecolor: true,
-        debug: false,
     };
     for app in [team_monday(), press(team_monday(), &chars("4"))] {
         let buf = render_with(&app, 120, 36, env);
@@ -1133,10 +1132,20 @@ fn a_preview_too_wide_for_the_dialog_is_cut_with_a_mark_but_copies_whole() {
     );
 }
 
-/// The app with the debug range-style toggle on, as `TEAMZONES_DEBUG=1` sets it.
-fn debugging(app: App) -> App {
-    App { debug: true, ..app }
+/// The team frame at Mon 26 Oct 5-6pm, with `[theme] range` set to `style`.
+fn team_monday_styled(style: &str) -> App {
+    let text = FIXTURE.replacen(
+        "scheme = \"dark\"",
+        &format!("scheme = \"dark\"\nrange = \"{style}\""),
+        1,
+    );
+    go_to(
+        App::new(Config::parse(&text).unwrap(), now()),
+        "26 oct 5-6pm",
+    )
 }
+
+const STYLES: [&str; 5] = ["columns", "edges", "lines", "underline", "focus"];
 
 /// The slider through the where block as text, each row followed by a mask of how its cells are
 /// marked: `s` selection background or reverse, `u` underline, `d` dim, `.` plain.
@@ -1168,60 +1177,68 @@ fn styled_grid(buf: &Buffer) -> String {
 const NO_COLOR: TerminalEnv = TerminalEnv {
     no_color: true,
     truecolor: false,
-    debug: false,
 };
 
 #[test]
-fn f2_cycles_the_range_styles_only_in_debug_and_the_footer_names_the_style() {
+fn capital_r_cycles_the_range_style_for_the_session_and_the_footer_names_it_briefly() {
     let plain = team_monday();
-    assert_eq!(press(plain.clone(), &[Key::F(2)]), plain);
+    let footer = |app: &App| row(&render(app, 120, 36), 35);
+    assert!(
+        !footer(&plain).contains("range style"),
+        "{}",
+        footer(&plain)
+    );
     let names: Vec<String> = (0..6)
-        .scan(debugging(plain.clone()), |app, _| {
-            let buf = render(app, 120, 36);
-            let footer = row(&buf, 35);
-            *app = press(app.clone(), &[Key::F(2)]);
-            Some(footer.rsplit("  ").next().unwrap().to_owned())
+        .scan(plain.clone(), |app, _| {
+            *app = press(app.clone(), &chars("R"));
+            Some(footer(app).rsplit("  ").next().unwrap().to_owned())
         })
         .collect();
     assert_eq!(
         names,
         [
-            "range style 1/5: columns",
-            "range style 2/5: edges",
-            "range style 3/5: lines",
-            "range style 4/5: underline",
-            "range style 5/5: dim",
-            "range style 1/5: columns",
+            "range style: edges",
+            "range style: lines",
+            "range style: underline",
+            "range style: focus",
+            "range style: columns",
+            "range style: edges",
         ]
     );
-    for frame in [
-        render(&plain, 120, 36),
-        render(&press(plain.clone(), &chars("?")), 120, 36),
-    ] {
-        assert!(!text(&frame).contains("F2") && !text(&frame).contains("range style"));
-    }
-    let help = render(&press(debugging(plain), &chars("?")), 120, 36);
-    assert!(!text(&help).contains("F2"));
+    let cycled = press(plain, &chars("R"));
+    assert_eq!(
+        cycled.config,
+        team_monday().config,
+        "the config is untouched"
+    );
+    let later = update(cycled, Msg::Tick(now() + chrono::TimeDelta::seconds(10))).0;
+    assert!(
+        !footer(&later).contains("range style"),
+        "{}",
+        footer(&later)
+    );
+}
+
+#[test]
+fn help_lists_capital_r() {
+    let help = text(&render(&press(team_monday(), &chars("?")), 120, 36));
+    assert!(help.contains("Cycle the range-marking style"), "{help}");
 }
 
 #[test]
 fn each_range_style_marks_the_range_its_own_way() {
-    let mut app = debugging(team_monday());
-    for number in 1..=5 {
-        let buf = render(&app, 120, 36);
+    for (number, style) in (1..).zip(STYLES) {
+        let buf = render(&team_monday_styled(style), 120, 36);
         insta::assert_snapshot!(format!("range_style_{number}"), styled_grid(&buf));
-        app = press(app, &[Key::F(2)]);
     }
 }
 
 #[test]
 fn under_no_color_the_styles_that_need_colour_fall_back_to_edge_lines() {
-    let mut app = debugging(team_monday());
-    let mut grids = Vec::new();
-    for _ in 1..=5 {
-        grids.push(styled_grid(&render_with(&app, 120, 36, NO_COLOR)));
-        app = press(app, &[Key::F(2)]);
-    }
+    let grids: Vec<String> = STYLES
+        .iter()
+        .map(|style| styled_grid(&render_with(&team_monday_styled(style), 120, 36, NO_COLOR)))
+        .collect();
     let lines = &grids[2];
     assert_eq!([&grids[0], &grids[1], &grids[4]], [lines, lines, lines]);
     assert_ne!(&grids[3], lines, "underline needs no colour");

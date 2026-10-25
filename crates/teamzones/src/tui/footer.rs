@@ -41,8 +41,7 @@ pub fn badge(context: Context) -> Option<&'static str> {
         | Context::Prompt
         | Context::CopyMenu
         | Context::SortMenu
-        | Context::Help
-        | Context::Debug => None,
+        | Context::Help => None,
     }
 }
 

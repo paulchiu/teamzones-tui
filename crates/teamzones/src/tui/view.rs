@@ -14,13 +14,14 @@ use teamzones_core::fit::{day_start, slot_fits};
 use teamzones_core::question::{Row, evaluate, person_band};
 use teamzones_core::schedule::{Band, Level, band, is_day};
 
-use super::app::{App, Cursor, Lanes, Mode, RangeStyle};
+use super::app::{App, Cursor, Lanes, Mode, without_colour};
 use super::glyphs::Glyphs;
 use super::layout::{Areas, MapChoice, layout};
 use super::say::{detail, duration_text, local_text, summary};
 use super::theme::{Role, Theme};
 use super::update::context;
 use super::{footer, help, keys};
+use teamzones_core::config::RangeStyle;
 
 /// How the screen looks: the resolved theme and the glyph set.
 #[derive(Clone, Copy)]
@@ -113,7 +114,7 @@ impl Track {
                 }
                 Surface::Track => base,
             },
-            RangeStyle::Dim if !selected => match surface {
+            RangeStyle::Focus if !selected => match surface {
                 Surface::Lane | Surface::Answer => base.add_modifier(Modifier::DIM),
                 Surface::Ruler | Surface::Track => base,
             },
@@ -121,7 +122,7 @@ impl Track {
             | RangeStyle::Edges
             | RangeStyle::Lines
             | RangeStyle::Underline
-            | RangeStyle::Dim => base,
+            | RangeStyle::Focus => base,
         }
     }
 
@@ -137,7 +138,7 @@ impl Track {
                 Surface::Lane | Surface::Answer => Some((glyphs.edge_line, glyphs.edge_line)),
                 Surface::Ruler | Surface::Track => None,
             },
-            RangeStyle::Columns | RangeStyle::Underline | RangeStyle::Dim => None,
+            RangeStyle::Columns | RangeStyle::Underline | RangeStyle::Focus => None,
         };
         let Some((before, after)) = pair else { return };
         let mut selected = (0..self.cells).filter(|index| self.selected(*index));
@@ -206,7 +207,7 @@ pub fn draw(frame: &mut Frame, app: &App, look: Look) {
         minutes: areas.columns.minutes,
         start: day_start(app.day(), app.roster().axis()),
         when: app.when(),
-        marking: app.range_style.without_colour(look.theme.is_mono()),
+        marking: without_colour(app.range_style, look.theme.is_mono()),
     };
     let buf = frame.buffer_mut();
     header(buf, clip(areas.header), app, look);
@@ -1104,12 +1105,16 @@ fn footer_row(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
         range: main && app.range.is_some(),
         away: main && !app.at_now(),
     };
-    let debug = app.debug.then(|| app.range_style.label());
-    let room = debug.as_ref().map_or(area.width, |label| {
+    let flash = app
+        .style_flash
+        .as_ref()
+        .filter(|flash| flash.visible(app.now))
+        .map(|flash| flash.text.as_str());
+    let room = flash.map_or(area.width, |label| {
         area.width
             .saturating_sub(u16::try_from(label.len() + 2).unwrap_or(u16::MAX))
     });
-    if let Some(label) = &debug {
+    if let Some(label) = flash {
         let x = area
             .right()
             .saturating_sub(u16::try_from(label.len()).unwrap_or(0));

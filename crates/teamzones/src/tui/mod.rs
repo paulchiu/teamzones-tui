@@ -45,17 +45,19 @@ fn run_effect(effect: Effect, clipboard: &mut dyn Clipboard) -> Msg {
     }
 }
 
-/// How long until something on screen changes by itself: a notice expiring, or the minute
-/// rolling over while viewing now.
+/// How long until something on screen changes by itself: a notice or the footer's range style
+/// expiring, or the minute rolling over while viewing now.
 fn wake_after(app: &App, now: DateTime<Utc>) -> Duration {
-    let notice = app
-        .notice
-        .as_ref()
-        .filter(|notice| notice.visible(now))
-        .map(|notice| notice.raised_at + notice::TIMEOUT - now);
+    let shown = |notice: &Option<notice::Notice>| {
+        notice
+            .as_ref()
+            .filter(|notice| notice.visible(now))
+            .map(|notice| notice.raised_at + notice::TIMEOUT - now)
+    };
+    let (notice, flash) = (shown(&app.notice), shown(&app.style_flash));
     let minute = (app.cursor == Cursor::Now && app.range.is_none())
         .then(|| chrono::TimeDelta::seconds(i64::from(60 - now.second())));
-    [notice, minute]
+    [notice, flash, minute]
         .into_iter()
         .flatten()
         .filter_map(|delta| delta.to_std().ok())
@@ -80,10 +82,7 @@ pub fn run(
         glyphs: Glyphs::of(config.theme.glyphs),
     };
     let mut terminal = ratatui::try_init().inspect_err(|_| ratatui::restore())?;
-    let mut app = App {
-        debug: env.debug,
-        ..App::new(config, clock.now())
-    };
+    let mut app = App::new(config, clock.now());
     let result = loop {
         if let Err(error) = terminal.draw(|frame| view::draw(frame, &app, look)) {
             break Err(error);

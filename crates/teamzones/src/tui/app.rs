@@ -2,7 +2,7 @@
 
 use chrono::{DateTime, NaiveDate, Offset, Utc};
 use teamzones_core::clock::{Range, Slot, When};
-use teamzones_core::config::{Config, PersonId, Roster};
+use teamzones_core::config::{Config, PersonId, RangeStyle, Roster};
 use teamzones_core::copy::{Format, format_line};
 use teamzones_core::question::{Marks, Row};
 
@@ -60,59 +60,38 @@ pub enum Lanes {
     Plain,
 }
 
-/// How the range is marked across the grid, cycled with `F2` under `TEAMZONES_DEBUG=1` until
-/// one is picked.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum RangeStyle {
-    /// The selection background on every in-range cell.
-    Columns,
-    /// The selection background on the ruler (the time axis row) only, and edge bars on every lane.
-    Edges,
-    /// Edge lines through every lane and answer row, with no fill.
-    Lines,
-    /// In-range cells underlined.
-    Underline,
-    /// Cells outside the range dimmed.
-    Dim,
+/// The style after `style` in the `R` cycle.
+pub fn next_style(style: RangeStyle) -> RangeStyle {
+    match style {
+        RangeStyle::Columns => RangeStyle::Edges,
+        RangeStyle::Edges => RangeStyle::Lines,
+        RangeStyle::Lines => RangeStyle::Underline,
+        RangeStyle::Underline => RangeStyle::Focus,
+        RangeStyle::Focus => RangeStyle::Columns,
+    }
 }
 
-impl RangeStyle {
-    const COUNT: usize = 5;
-
-    /// The style's 1-based place in the `F2` cycle and its footer name.
-    fn position(self) -> (usize, &'static str) {
-        match self {
-            Self::Columns => (1, "columns"),
-            Self::Edges => (2, "edges"),
-            Self::Lines => (3, "lines"),
-            Self::Underline => (4, "underline"),
-            Self::Dim => (5, "dim"),
-        }
+/// The style's name, as `[theme] range` spells it and the footer shows it.
+pub fn style_name(style: RangeStyle) -> &'static str {
+    match style {
+        RangeStyle::Columns => "columns",
+        RangeStyle::Edges => "edges",
+        RangeStyle::Lines => "lines",
+        RangeStyle::Underline => "underline",
+        RangeStyle::Focus => "focus",
     }
+}
 
-    pub fn next(self) -> Self {
-        match self {
-            Self::Columns => Self::Edges,
-            Self::Edges => Self::Lines,
-            Self::Lines => Self::Underline,
-            Self::Underline => Self::Dim,
-            Self::Dim => Self::Columns,
-        }
-    }
-
-    /// The footer's name for it, such as `range style 2/5: edges`.
-    pub fn label(self) -> String {
-        let (index, name) = self.position();
-        format!("range style {index}/{}: {name}", Self::COUNT)
-    }
-
-    /// The style to draw when the theme has no colour: those that need a background or a dim
-    /// foreground fall back to edge lines.
-    pub fn without_colour(self, mono: bool) -> Self {
-        match self {
-            Self::Columns | Self::Edges | Self::Dim if mono => Self::Lines,
-            Self::Columns | Self::Edges | Self::Lines | Self::Underline | Self::Dim => self,
-        }
+/// The style to draw when the theme has no colour: those that need a background or a dim
+/// foreground fall back to edge lines.
+pub fn without_colour(style: RangeStyle, mono: bool) -> RangeStyle {
+    match style {
+        RangeStyle::Columns | RangeStyle::Edges | RangeStyle::Focus if mono => RangeStyle::Lines,
+        RangeStyle::Columns
+        | RangeStyle::Edges
+        | RangeStyle::Lines
+        | RangeStyle::Underline
+        | RangeStyle::Focus => style,
     }
 }
 
@@ -154,9 +133,10 @@ pub struct App {
     pub lanes: Lanes,
     pub sort: Sort,
     pub running: bool,
-    /// Whether `TEAMZONES_DEBUG=1` turned on the debug keys.
-    pub debug: bool,
+    /// How the range is marked: `[theme] range` at start, then whatever `R` cycled to.
     pub range_style: RangeStyle,
+    /// The footer's note naming the range style, raised when `R` changes it.
+    pub style_flash: Option<Notice>,
 }
 
 impl App {
@@ -168,6 +148,7 @@ impl App {
             Lens::Group(0)
         };
         let marks = base_marks(&config.roster, lens);
+        let range_style = config.theme.range;
         Self {
             config,
             now,
@@ -183,8 +164,8 @@ impl App {
             lanes: Lanes::Hours,
             sort: Sort::Offset,
             running: true,
-            debug: false,
-            range_style: RangeStyle::Columns,
+            range_style,
+            style_flash: None,
         }
     }
 

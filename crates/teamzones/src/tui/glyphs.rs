@@ -28,7 +28,7 @@ pub struct Glyphs {
     pub cursor: char,
     pub range_start: char,
     pub range_end: char,
-    /// The debug range styles' marks just outside the range: bars that hug it, or lines.
+    /// The edges and lines range styles' marks just outside the range: bars that hug it, or lines.
     pub edge_before: char,
     pub edge_after: char,
     pub edge_line: char,

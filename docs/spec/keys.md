@@ -2,7 +2,7 @@
 
 Seeded from the shared contract of the teamzones build spec (2026-10-24). Where a mockup and the text disagree, the text wins.
 
-One binding table generates the footer and the `?` overlay (context first, then global, then a glyph legend). No hint is a literal string, and unbuilt keys are never advertised.
+One binding table generates the footer and the `?` overlay (context first, then global, then a glyph legend). No hint is a literal string, and unbuilt keys are never advertised. FB2 marks a key from the second hands-on feedback round after M3.
 
 | Key | Action | Mouse | Milestone |
 | --- | --- | --- | --- |
@@ -25,6 +25,7 @@ One binding table generates the footer and the `?` overlay (context first, then 
 | y | Copy the say line | Click `y copy` | M3 / M4 |
 | c | Copy as: `y d w t z s a` (letters local to the menu), previewing each line | Click a variant | M3 |
 | b | People lanes: hours, or plain day and night (view only) | Click the who legend | M3 / M4 |
+| R | Cycle the range-marking style for this session (`[theme] range` sets the one it opens with) | none | FB2 |
 | s | Sort menu within each block: `o` offset, `n` name | Click a block title | M3 / M4 |
 | m | Flip the map's automatic choice (overlay when there is no room) | none | M4 |
 | M | Release or recapture the mouse | none | M4 |

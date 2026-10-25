@@ -302,11 +302,30 @@ pub enum Glyphs {
     Ascii,
 }
 
-/// The `[theme]` table: a scheme, a glyph set and per-role colour overrides as `#rrggbb`.
+/// How the TUI marks the range across the grid.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum RangeStyle {
+    /// The selection background on every in-range cell.
+    #[default]
+    Columns,
+    /// The selection background on the ruler only, and edge bars on every lane.
+    Edges,
+    /// Edge lines through every lane and answer row, with no fill.
+    Lines,
+    /// In-range cells underlined.
+    Underline,
+    /// Cells outside the range dimmed, so the range stands out.
+    Focus,
+}
+
+/// The `[theme]` table: a scheme, a glyph set, a range style and per-role colour overrides as
+/// `#rrggbb`.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct Theme {
     pub scheme: Scheme,
     pub glyphs: Glyphs,
+    pub range: RangeStyle,
     pub overrides: BTreeMap<String, String>,
 }
 
@@ -459,6 +478,7 @@ struct RawTravel {
 struct RawTheme {
     scheme: Option<Scheme>,
     glyphs: Option<Glyphs>,
+    range: Option<RangeStyle>,
     text: Option<Spanned<String>>,
     dim: Option<Spanned<String>>,
     accent: Option<Spanned<String>>,
@@ -1272,6 +1292,7 @@ fn resolve_theme(raw: RawTheme, lines: &Lines) -> Result<Theme, ConfigError> {
     let RawTheme {
         scheme,
         glyphs,
+        range,
         text,
         dim,
         accent,
@@ -1322,6 +1343,7 @@ fn resolve_theme(raw: RawTheme, lines: &Lines) -> Result<Theme, ConfigError> {
     Ok(Theme {
         scheme: scheme.unwrap_or_default(),
         glyphs: glyphs.unwrap_or_default(),
+        range: range.unwrap_or_default(),
         overrides,
     })
 }
@@ -1954,6 +1976,34 @@ mod tests {
                 .reason
                 .to_string()
                 .contains("\"k\" is already a copy key on line"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn theme_range_picks_the_range_style_and_defaults_to_columns() {
+        assert_eq!(
+            Config::parse(FIXTURE).unwrap().theme.range,
+            RangeStyle::Columns
+        );
+        for (word, style) in [
+            ("columns", RangeStyle::Columns),
+            ("edges", RangeStyle::Edges),
+            ("lines", RangeStyle::Lines),
+            ("underline", RangeStyle::Underline),
+            ("focus", RangeStyle::Focus),
+        ] {
+            let text = edited(
+                "scheme = \"dark\"",
+                &format!("scheme = \"dark\"\nrange = \"{word}\""),
+            );
+            assert_eq!(Config::parse(&text).unwrap().theme.range, style, "{word}");
+        }
+        let text = edited("scheme = \"dark\"", "scheme = \"dark\"\nrange = \"dim\"");
+        let error = rejection(&text);
+        assert_eq!(error.line, line_of(&text, "range ="));
+        assert!(
+            error.reason.to_string().contains("unknown variant `dim`"),
             "{error}"
         );
     }

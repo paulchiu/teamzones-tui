@@ -72,11 +72,14 @@
 # here = "London"
 # until = 2026-11-01
 
-## scheme is "dark", "light" or "mono", and glyphs is "full" or "ascii". Any colour role can be
-## overridden by its name as #rrggbb, such as accent = "#0969da".
+## scheme is "dark", "light" or "mono", and glyphs is "full" or "ascii". range is how the range
+## is marked: "columns" (shaded), "edges", "lines", "underline" or "focus" (the rest dimmed), and R
+## cycles it for a session. Any colour role can be overridden by its name as #rrggbb, such as
+## accent = "#0969da".
 # [theme]
 # scheme = "dark"
 # glyphs = "full"
+# range = "columns"
 
 ## Copy-as formats: the c dialog lists each one with its key, a preview and its label. These are
 ## the built-ins. A [[copy]] with a built-in key replaces it, hide = true removes it, and a new key

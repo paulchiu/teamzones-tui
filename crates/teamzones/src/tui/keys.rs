@@ -14,7 +14,6 @@ pub enum Key {
     Enter,
     Esc,
     Backspace,
-    F(u8),
     Other,
 }
 
@@ -35,7 +34,6 @@ impl Key {
             KeyCode::Enter => Self::Enter,
             KeyCode::Esc => Self::Esc,
             KeyCode::Backspace => Self::Backspace,
-            KeyCode::F(n) => Self::F(n),
             _ => Self::Other,
         }
     }
@@ -52,8 +50,6 @@ pub enum Context {
     CopyMenu,
     SortMenu,
     Help,
-    /// Keys that exist only under `TEAMZONES_DEBUG=1`, never hinted or listed in help.
-    Debug,
 }
 
 /// How rows are ordered within each block.
@@ -389,6 +385,15 @@ pub const BINDINGS: &[Binding] = &[
         )
     },
     Binding {
+        chords: &[(Key::Char('R'), Action::CycleRangeStyle)],
+        ..row(
+            "R",
+            "Cycle the range-marking style for this session (`[theme] range` sets the one it opens with)",
+            "FB2",
+            Context::Main,
+        )
+    },
+    Binding {
         chords: &[(Key::Char('s'), Action::SortMenu)],
         ..row(
             "s",
@@ -491,10 +496,6 @@ pub const BINDINGS: &[Binding] = &[
         ..row("?", "Help", "", Context::Range)
     },
     Binding {
-        chords: &[(Key::F(2), Action::CycleRangeStyle)],
-        ..row("F2", "Cycle the range-marking styles", "", Context::Debug)
-    },
-    Binding {
         hints: &[hint("enter", "go")],
         priority: PINNED,
         chords: &[(Key::Enter, Action::Submit)],
@@ -552,7 +553,7 @@ fn fallbacks(context: Context) -> &'static [Context] {
             &[Context::Global]
         }
         Context::Range => &[Context::Main, Context::Global],
-        Context::Prompt | Context::Debug => &[],
+        Context::Prompt => &[],
     }
 }
 
@@ -562,7 +563,7 @@ fn hints_global(context: Context) -> bool {
         Context::Main | Context::Global | Context::CopyMenu | Context::SortMenu | Context::Help => {
             true
         }
-        Context::Range | Context::Prompt | Context::Debug => false,
+        Context::Range | Context::Prompt => false,
     }
 }
 
@@ -604,14 +605,8 @@ fn unbound(context: Context, key: Key) -> Option<Action> {
         | Context::Global
         | Context::CopyMenu
         | Context::SortMenu
-        | Context::Help
-        | Context::Debug => None,
+        | Context::Help => None,
     }
-}
-
-/// What `key` does among the debug keys, which only a debug run reads.
-pub fn debug_action_for(key: Key) -> Option<Action> {
-    chord_in(Context::Debug, key)
 }
 
 /// The hints a context's footer may show, in display order, each with its priority.
@@ -670,12 +665,15 @@ mod tests {
         assert_eq!(compiled, spec_rows());
     }
 
+    /// The milestones built so far: M3 and the hands-on feedback rounds after it.
+    const BUILT: [&str; 2] = ["M3", "FB2"];
+
     #[test]
-    fn a_row_dispatches_only_when_its_milestone_names_m3() {
+    fn a_row_dispatches_only_when_its_milestone_is_built() {
         for binding in spec_bindings() {
             assert_eq!(
                 !binding.chords.is_empty(),
-                binding.milestone.contains("M3"),
+                BUILT.iter().any(|built| binding.milestone.contains(built)),
                 "{}",
                 binding.keys
             );
@@ -703,6 +701,20 @@ mod tests {
             hinted,
             ["h/l", ".", "v", "n", "space", "y", "c", "esc", "?", "q"]
         );
+    }
+
+    #[test]
+    fn the_keys_copy_formats_may_not_use_are_the_global_keys_the_dialog_keeps() {
+        let global: Vec<char> = BINDINGS
+            .iter()
+            .filter(|b| b.context == Context::Global)
+            .flat_map(|b| b.chords.iter())
+            .filter_map(|(key, _)| match key {
+                Key::Char(c) => Some(*c),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(global, teamzones_core::copy::DIALOG_KEYS);
     }
 
     #[test]
