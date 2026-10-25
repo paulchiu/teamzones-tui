@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-25
+
 ### Changed
 
 - When the map is off (hidden with `m`, by `[map] show = "never"`, for lack of room or under ascii glyphs), the rest of the screen moves up to sit under the header, and any spare rows gather above the footer. Pressing `m` again brings the map back above the blocks.
