@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ### Added
 
+- Marks you leave unsaved on a group, or on `0 all`, are kept in the state file when you quit and come back the next time you open that group.
 - `places = "both"` in a `[[copy]]` table names each counted place's clock and its state, and is now the default.
 
 ### Changed

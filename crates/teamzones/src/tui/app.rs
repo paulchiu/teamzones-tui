@@ -17,6 +17,7 @@ use super::mouse::Drag;
 use super::notice::Notice;
 use super::picker::Picker;
 use super::undo::Undo;
+use crate::state::LensMarks;
 
 /// Where the cursor sits: on exact now, or on a grid slot once anything moves it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -175,6 +176,9 @@ pub struct App {
     /// Whether the TUI was started with no config file and the last read still found none, so
     /// the footer offers `E` to create one.
     pub first_run: bool,
+    /// The marks the state file kept for lenses other than the active one, by name, which a
+    /// switch to that lens puts back.
+    pub kept: Vec<LensMarks>,
 }
 
 impl App {
@@ -219,6 +223,7 @@ impl App {
             flush_at: None,
             last_click: None,
             first_run: false,
+            kept: Vec::new(),
         };
         Self {
             camera: framing(&app),
@@ -242,34 +247,70 @@ impl App {
         }
     }
 
-    /// The app opened on the group named `last` (or `all`), as the state file saved it; a name
-    /// no longer in the config keeps the first group.
-    pub fn on_group(self, last: Option<&str>) -> Self {
-        let groups = &self.roster().groups;
-        let lens = last.and_then(|name| {
-            if name.eq_ignore_ascii_case("all") {
-                Some(Lens::All)
-            } else {
-                groups
-                    .iter()
-                    .position(|group| group.name.eq_ignore_ascii_case(name))
-                    .map(Lens::Group)
-            }
-        });
-        match lens {
-            Some(lens) => {
-                let app = Self {
-                    marks: base_marks(self.roster(), lens),
-                    lens,
-                    ..self
-                };
-                Self {
-                    camera: framing(&app),
-                    ..app
-                }
-            }
-            None => self,
+    /// The app opened on the group named `last` (or `all`), as the state file saved it, with the
+    /// marks `stored` kept for each lens still in the config; a name no longer in the config
+    /// keeps the first group.
+    pub fn on_group(self, last: Option<&str>, stored: &[LensMarks]) -> Self {
+        let kept = stored
+            .iter()
+            .filter(|entry| self.lens_named(&entry.lens).is_some())
+            .cloned()
+            .collect();
+        let lens = last
+            .and_then(|name| self.lens_named(name))
+            .unwrap_or(self.lens);
+        let app = Self { kept, lens, ..self }.entered();
+        Self {
+            camera: framing(&app),
+            ..app
         }
+    }
+
+    /// The lens named `name`: `all`, or a configured group, matched case-insensitively.
+    fn lens_named(&self, name: &str) -> Option<Lens> {
+        if name.eq_ignore_ascii_case("all") {
+            return Some(Lens::All);
+        }
+        self.roster()
+            .groups
+            .iter()
+            .position(|group| group.name.eq_ignore_ascii_case(name))
+            .map(Lens::Group)
+    }
+
+    /// The app with the marks kept for its lens taken back out of `kept`, or its lens's config
+    /// marks when none are kept.
+    pub fn entered(self) -> Self {
+        let name = self.lens_name();
+        let (taken, kept): (Vec<LensMarks>, Vec<LensMarks>) = self
+            .kept
+            .iter()
+            .cloned()
+            .partition(|entry| entry.lens.eq_ignore_ascii_case(&name));
+        let base = base_marks(self.roster(), self.lens);
+        let marks = match taken.first() {
+            Some(entry) => resolve(self.roster(), entry, base),
+            None => base,
+        };
+        Self {
+            marks,
+            kept,
+            ..self
+        }
+    }
+
+    /// The marks to keep for each lens on quit: those still kept, plus the active lens's when
+    /// they differ from its config.
+    pub fn remembered(&self) -> Vec<LensMarks> {
+        let base = base_marks(self.roster(), self.lens);
+        let active = (base.people != self.marks.people || base.places != self.marks.places)
+            .then(|| names_of(self.roster(), &self.lens_name(), &self.marks));
+        self.kept
+            .iter()
+            .filter(|entry| self.lens_named(&entry.lens).is_some())
+            .cloned()
+            .chain(active)
+            .collect()
     }
 
     /// Where the map goes on a `cols` by `rows` screen; the ascii glyph set never draws it.
@@ -606,6 +647,42 @@ impl App {
         who.into_iter().chain(place).find(|entry| {
             matches!(entry, Entry::More(_)) && entry.rows().first() == Some(&self.focus)
         })
+    }
+}
+
+/// The marks `entry` names, by name in `roster`, over `base`'s rule; names the roster no
+/// longer has are dropped.
+fn resolve(roster: &Roster, entry: &LensMarks, base: Marks) -> Marks {
+    let named = |names: &[String], name: &str| names.iter().any(|n| n.eq_ignore_ascii_case(name));
+    Marks {
+        people: roster
+            .people()
+            .filter(|(_, person)| named(&entry.people, &person.name))
+            .map(|(id, _)| id)
+            .collect(),
+        places: roster
+            .places()
+            .filter(|(_, place)| named(&entry.places, &place.name))
+            .map(|(id, _)| id)
+            .collect(),
+        ..base
+    }
+}
+
+/// `marks` by name in `roster`, in config order, as the state file keeps them for `lens`.
+fn names_of(roster: &Roster, lens: &str, marks: &Marks) -> LensMarks {
+    LensMarks {
+        lens: lens.to_owned(),
+        people: roster
+            .people()
+            .filter(|(id, _)| marks.people.contains(id))
+            .map(|(_, person)| person.name.clone())
+            .collect(),
+        places: roster
+            .places()
+            .filter(|(id, _)| marks.places.contains(id))
+            .map(|(_, place)| place.name.clone())
+            .collect(),
     }
 }
 

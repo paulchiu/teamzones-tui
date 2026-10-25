@@ -345,6 +345,28 @@ fn the_tui_opens_on_the_group_the_state_file_names_and_saves_the_one_it_quits_on
 }
 
 #[test]
+fn marks_made_on_all_are_kept_on_quit_and_come_back_on_the_next_run() {
+    let dir = scratch("marks");
+    let state = dir.join("teamzones").join("state.toml");
+    let mut session = Session::start(FIXTURE, &dir, &[]);
+    session.read_until("team", |out| contains(out, "3 zones for 5 people"));
+    // All, cleared to home, then Ellie (sixth row) and UK (just above the last row).
+    session.send(b"0Xgjjjjj Gk ");
+    session.quit();
+    assert_eq!(
+        std::fs::read_to_string(&state).expect("read the state back"),
+        "last_group = \"all\"\n\n[marks.all]\npeople = [\"Paul\", \"Ellie\"]\nplaces = [\"UK\"]\n"
+    );
+    let mut reopened = Session::start(FIXTURE, &dir, &[]);
+    reopened.read_until("the kept marks", |out| {
+        contains(out, "9:04am AEDT / Fri 11:04pm BST, closed in UK")
+            && contains(out, "2 zones for 2 people, 1 place")
+    });
+    reopened.quit();
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
 #[cfg_attr(
     not(debug_assertions),
     ignore = "the panic hook trigger is debug-only (D48)"

@@ -5,9 +5,10 @@ use teamzones_core::config::Config;
 use teamzones_core::question::{Marks, Row};
 
 use super::app::{App, Lens};
+use crate::state::LensMarks;
 
 /// What an undo puts back: the config and the text it came from, any write still pending with
-/// what the file held while it waited, and the lens, marks and focus on screen.
+/// what the file held while it waited, and the lens, marks, kept marks and focus on screen.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Snapshot {
     pub config: Config,
@@ -17,6 +18,7 @@ pub struct Snapshot {
     pub lens: Lens,
     pub marks: Marks,
     pub focus: Row,
+    pub kept: Vec<LensMarks>,
 }
 
 impl Snapshot {
@@ -29,6 +31,7 @@ impl Snapshot {
             lens: app.lens,
             marks: app.marks.clone(),
             focus: app.focus,
+            kept: app.kept.clone(),
         }
     }
 
@@ -42,6 +45,7 @@ impl Snapshot {
             lens,
             marks,
             focus,
+            kept,
         } = self;
         App {
             config,
@@ -50,6 +54,7 @@ impl Snapshot {
             lens,
             marks,
             focus,
+            kept,
             ..app
         }
     }

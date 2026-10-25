@@ -1727,15 +1727,15 @@ fn the_screen_opens_on_the_saved_last_group_and_on_the_first_without_one() {
         let buf = render(app, 120, 36);
         row(&buf, y_of(&buf, " times for "))
     };
-    assert!(title(&fixture().on_group(Some("deploy"))).starts_with("╭ times for deploy "));
-    assert!(title(&fixture().on_group(Some("ALL"))).starts_with("╭ times for all "));
+    assert!(title(&fixture().on_group(Some("deploy"), &[])).starts_with("╭ times for deploy "));
+    assert!(title(&fixture().on_group(Some("ALL"), &[])).starts_with("╭ times for all "));
     for last in [None, Some("gone")] {
         assert!(
-            title(&fixture().on_group(last)).starts_with("╭ times for team "),
+            title(&fixture().on_group(last, &[])).starts_with("╭ times for team "),
             "{last:?}"
         );
     }
-    let deploy = fixture().on_group(Some("deploy"));
+    let deploy = fixture().on_group(Some("deploy"), &[]);
     assert_eq!(deploy.marks, press(fixture(), &chars("4")).marks);
 }
 
@@ -1815,4 +1815,88 @@ fn the_times_box_shows_what_say_prints_for_every_fixed_time_golden_row() {
         };
         assert_eq!(say_line(&render(&shown, 160, 36)), stdout, "say {command}");
     }
+}
+
+fn kept(lens: &str, people: &[&str], places: &[&str]) -> crate::state::LensMarks {
+    let names = |names: &[&str]| names.iter().map(|name| (*name).to_owned()).collect();
+    crate::state::LensMarks {
+        lens: lens.to_owned(),
+        people: names(people),
+        places: names(places),
+    }
+}
+
+#[test]
+fn marks_a_person_and_a_place_on_all_and_keeps_them_for_the_next_run() {
+    let marked = press(
+        focus_on(
+            press(
+                focus_on(press(fixture(), &chars("0X")), "Ellie"),
+                &chars(" "),
+            ),
+            "UK",
+        ),
+        &chars(" "),
+    );
+    let remembered = marked.remembered();
+    assert_eq!(remembered, [kept("all", &["Paul", "Ellie"], &["UK"])]);
+    let reopened = go_to(fixture().on_group(Some("all"), &remembered), "26 oct 5-6pm");
+    assert_eq!(reopened.marks, go_to(marked, "26 oct 5-6pm").marks);
+    let buf = render(&reopened, 120, 36);
+    assert!(row(&buf, y_of(&buf, " times for ")).contains("times for all "));
+    assert_eq!(say_line(&buf), "5-6pm AEDT / 6-7am GMT, closed in UK");
+}
+
+#[test]
+fn a_switch_to_a_lens_with_kept_marks_puts_them_back_and_u_keeps_them_kept() {
+    let stored = [kept("deploy", &["Priya", "Sam"], &["US"])];
+    let app = fixture().on_group(Some("team"), &stored);
+    assert_eq!(app.drift(), Vec::<String>::new());
+    let deploy = press(app.clone(), &chars("4"));
+    assert_eq!(deploy.expression(), "deploy +Sam -Thandi -@AU -@UK +@US");
+    assert_eq!(deploy.remembered(), stored);
+    let back = press(press(app.clone(), &chars("4")), &chars("1"));
+    assert_eq!(
+        back.remembered(),
+        Vec::new(),
+        "the switch away dropped deploy's drift"
+    );
+    let drifted = press(focus_on(app, "UK"), &chars(" "));
+    let undone = press(press(drifted, &chars("4")), &chars("u"));
+    assert_eq!(undone.expression(), "team +@UK");
+    assert_eq!(
+        undone.remembered(),
+        [
+            stored[0].clone(),
+            kept("team", &["Priya", "Sam", "Thandi", "Johan"], &["UK"])
+        ]
+    );
+}
+
+#[test]
+fn names_and_lenses_the_config_no_longer_has_are_dropped_and_marks_matching_config_keep_nothing() {
+    let stored = [
+        kept("gone", &["Priya"], &[]),
+        kept(
+            "team",
+            &["Priya", "Sam", "Thandi", "Johan", "Nobody"],
+            &["Nowhere"],
+        ),
+    ];
+    let app = fixture().on_group(Some("team"), &stored);
+    assert_eq!(app.drift(), Vec::<String>::new());
+    assert_eq!(app.remembered(), Vec::new());
+}
+
+#[test]
+fn w_saving_the_marks_into_their_group_clears_its_kept_marks() {
+    let stored = [kept("team", &["Priya"], &["UK"])];
+    let app = fixture()
+        .with_source(Some(FIXTURE.to_owned()))
+        .on_group(Some("team"), &stored);
+    assert_eq!(app.expression(), "team -Sam -Thandi -Johan +@UK");
+    assert_eq!(app.remembered(), stored);
+    let saved = press(app, &chars("w"));
+    assert_eq!(saved.drift(), Vec::<String>::new());
+    assert_eq!(saved.remembered(), Vec::new());
 }
