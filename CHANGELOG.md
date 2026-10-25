@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-25
+
 ### Added
 
 - `w` saves the marks into the active group, `+` saves them as a new group (offering a name such as `team_uk`), `=` cycles a group's `where`, and `x` closes the active group. Every change is written to `config.toml` keeping your comments and layout, and `u` within 10 seconds undoes it.
