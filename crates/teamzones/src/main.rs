@@ -25,7 +25,8 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    let mut clipboard = clipboard::Fallback(clipboard::System, clipboard::Terminal);
+    let mut clipboard =
+        clipboard::for_os(std::env::consts::OS, clipboard::System, clipboard::Terminal);
     if parsed.opens_tui() && std::io::stdin().is_terminal() && std::io::stdout().is_terminal() {
         return open_tui(&parsed, &config_path, &mut clipboard);
     }

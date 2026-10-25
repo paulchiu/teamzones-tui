@@ -72,6 +72,8 @@ Held by: `tui::tests::mouse::capital_m_releases_the_mouse_and_says_so_until_m_ag
 
 ## D9: Clipboard falls back from arboard to OSC 52 to the notice row (2026-10-24)
 
+Superseded by D46 on Linux only, where OSC 52 is written as well as arboard; macOS keeps this order.
+
 Decision: Copying tries `arboard` first, then OSC 52. If both fail, the notice row shows the text. See the notice row in [screen](spec/screen.md).
 
 Why: mossmd already uses arboard, and OSC 52 reaches the local machine over SSH.
@@ -371,3 +373,11 @@ Decision: The times box, the notice row and the footer keep to the bottom of the
 Why: Paul found the times box jammed against the grid with the free rows under it, between the box and the footer, and asked for room to breathe. Anchoring the box to the bottom puts the space where it reads as a margin. Group switches still never move a block (D2), since the layout depends only on the size, the roster and the map's place.
 
 Held by: `tui::layout::tests::wherever_the_blocks_fit_whole_the_times_box_keeps_to_the_bottom_under_a_blank_row`, `a_hidden_map_moves_the_blocks_up_and_leaves_its_rows_above_the_times_box` and `at_120_by_36_the_map_takes_eleven_of_the_twelve_spare_rows_and_one_sits_over_the_times_box`, and `tui::tests::map::with_the_map_off_the_blocks_sit_under_the_header_and_the_spare_rows_above_the_times_box`, `at_145_by_30_the_spare_rows_collect_over_the_times_box_and_the_footer_takes_the_last_row` and `with_the_map_off_a_group_switch_never_moves_the_ruler_the_borders_or_the_times_box` in `teamzones`
+
+## D46: On Linux a copy goes to arboard and to OSC 52 both (2026-10-25)
+
+Decision: On Linux, `y` and `teamzones say` give the line to arboard and also write it as OSC 52 to `/dev/tty`, and report `copied` when either takes it. Elsewhere the D9 order stands: arboard, then OSC 52 only if arboard fails. The notice row still shows the text when both fail.
+
+Why: On Linux the X11 and Wayland selection belongs to the process that set it, so arboard can report success and the clipboard empties when `teamzones say` exits unless a clipboard manager takes it over. Writing OSC 52 as well lets a terminal that supports it keep the line. Keeping the selection alive with a detached helper (arboard's `SetExtLinux::wait`) needs a forked process this binary cannot make without `unsafe`, and dropping `copied` would leave the common clipboard-manager case reporting nothing. Paul has no Linux machine, so CI's Linux runner is what proves the choice: no test there shows the line surviving on a real desktop.
+
+Held by: `clipboard::tests::on_linux_the_terminal_gets_the_text_even_when_the_system_clipboard_takes_it`, `the_running_platform_writes_osc_52_as_well_exactly_when_it_is_linux` (which checks the running OS, so the Linux CI job holds the Linux branch) and `both_succeeds_when_either_takes_the_text_and_fails_with_both_reasons` in `teamzones`
