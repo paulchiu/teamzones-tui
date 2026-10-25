@@ -139,7 +139,7 @@ fn the_team_frame_at_120_by_36_sits_on_the_row_budget() {
 fn anchors(buf: &Buffer) -> [u16; 5] {
     let say = y_of(buf, " times for ");
     [
-        y_of(buf, " AEDT    "),
+        y_of(buf, "Mon 26 Oct AEDT"),
         y_of(buf, " who "),
         y_of(buf, " where "),
         say - 1,
@@ -152,9 +152,12 @@ fn switching_groups_never_moves_the_ruler_the_borders_or_the_say_panel() {
     let team = team_monday();
     let regions = press(team.clone(), &chars("3"));
     let deploy = press(regions.clone(), &chars("4"));
-    let [team, regions, deploy] = [&team, &regions, &deploy].map(|app| render(app, 120, 36));
-    assert_eq!(anchors(&team), anchors(&regions));
-    assert_eq!(anchors(&regions), anchors(&deploy));
+    for (cols, rows) in [(120, 36), (60, 40)] {
+        let [team, regions, deploy] = [&team, &regions, &deploy].map(|app| render(app, cols, rows));
+        assert_eq!(anchors(&team), anchors(&regions), "{cols}x{rows}");
+        assert_eq!(anchors(&regions), anchors(&deploy), "{cols}x{rows}");
+    }
+    let [regions, deploy] = [&regions, &deploy].map(|app| render(app, 120, 36));
     assert_eq!(
         say_line(&regions),
         "5-6pm AEDT, closed in UK and US, busy in AU"
@@ -702,6 +705,90 @@ fn the_update_layer_names_no_io_crate() {
         })
         .collect();
     assert!(named.is_empty(), "the update layer names {named:?}");
+}
+
+/// The columns at or right of `from` on row `y` drawn with the selection (a background or
+/// reverse video).
+fn shaded(buf: &Buffer, y: u16, from: u16) -> Vec<u16> {
+    use ratatui::style::{Color, Modifier};
+    (from..buf.area.width)
+        .filter(|x| {
+            let cell = &buf[(*x, y)];
+            cell.bg != Color::Reset || cell.modifier.contains(Modifier::REVERSED)
+        })
+        .collect()
+}
+
+#[test]
+fn at_250_columns_every_grid_row_marks_the_range_on_the_same_columns() {
+    let buf = render(&team_monday(), 250, 36);
+    // 168 track columns, seven an hour after the 82 label columns: 5pm is column 82 + 17 * 7.
+    let range: Vec<u16> = (201..=207).collect();
+    let track = y_of(&buf, "▸ 5-6pm AEDT 1h");
+    assert_eq!(
+        (buf[(201, track)].symbol(), buf[(207, track)].symbol()),
+        ("┣", "┫")
+    );
+    let ruler = y_of(&buf, "Mon 26 Oct AEDT");
+    let lanes = [
+        "⌂ Paul",
+        "● Priya",
+        "● Thandi",
+        "≡ in hours",
+        "○ Ellie",
+        "◇ AU",
+    ];
+    for y in std::iter::once(ruler).chain(lanes.map(|label| y_of(&buf, label))) {
+        assert_eq!(shaded(&buf, y, 82), range, "{}", row(&buf, y));
+    }
+    assert_eq!(buf[(201, y_of(&buf, "≡ in hours"))].symbol(), "━");
+}
+
+#[test]
+fn at_250_columns_the_cursor_and_fit_marks_sit_on_their_instants() {
+    let now = render(&fixture(), 250, 36);
+    // 9:04am falls in the column starting 9am: 82 + 9 * 7.
+    let track = y_of(&now, "▸ 9:04am AEDT now");
+    assert_eq!(now[(145, track)].symbol(), "┃", "{}", row(&now, track));
+    // Regions fit until 3:30am Monday; the column holding that edge fits only in part.
+    let regions = render(&go_to(press(fixture(), &chars("3")), "mon 2-4pm"), 250, 36);
+    let track = y_of(&regions, "▸ 2-4pm AEDT 2h");
+    let edge: Vec<&str> = (105..=107).map(|x| regions[(x, track)].symbol()).collect();
+    assert_eq!(edge, ["═", "╌", "─"], "{}", row(&regions, track));
+}
+
+/// The ruler's hour labels with the column each starts at.
+fn ruler_labels(buf: &Buffer) -> Vec<(u16, String)> {
+    let y = y_of(buf, "Mon 26 Oct AEDT");
+    let mut labels = Vec::new();
+    let mut x = u16::try_from(row(buf, y).find("AEDT").unwrap() + "AEDT".len()).unwrap();
+    while x < buf.area.width {
+        let symbol = buf[(x, y)].symbol();
+        if symbol.chars().all(|c| c.is_ascii_digit()) && !symbol.trim().is_empty() {
+            let label: String = (x..buf.area.width)
+                .map(|x| buf[(x, y)].symbol().to_owned())
+                .take_while(|s| s != " " && s != "·")
+                .collect();
+            labels.push((x, label.clone()));
+            x += u16::try_from(label.len()).unwrap();
+        } else {
+            x += 1;
+        }
+    }
+    labels
+}
+
+#[test]
+fn ruler_labels_space_out_with_the_cell_size() {
+    // Two hours apart once an hour gets at least five columns, so labels sit ten or more apart.
+    let wide = ruler_labels(&render(&team_monday(), 250, 36));
+    assert_eq!(
+        &wide[..3],
+        &[(82, "12a".into()), (96, "2a".into()), (110, "4a".into())]
+    );
+    assert_eq!(wide.len(), 12);
+    let narrow = ruler_labels(&render(&team_monday(), 120, 36));
+    assert_eq!(&narrow[..2], &[(24, "12a".into()), (36, "3a".into())]);
 }
 
 #[test]
@@ -1316,4 +1403,47 @@ fn under_no_color_the_styles_that_need_colour_fall_back_to_edge_lines() {
     assert_ne!(&grids[3], lines, "underline needs no colour");
     assert!(grids[3].contains('u'));
     insta::assert_snapshot!("range_style_no_color", lines);
+}
+
+#[test]
+fn below_80_columns_each_row_stacks_its_label_over_a_full_width_lane() {
+    let buf = render(&team_monday(), 60, 40);
+    let below = |label: &str| y_of(&buf, label) + 1;
+    assert!(row(&buf, below("Mon 26 Oct AEDT")).starts_with("12a"));
+    // Sixty columns of 24 minutes each: 5-6pm covers columns 42 to 44.
+    let track = below("▸ 5-6pm AEDT 1h");
+    assert_eq!(
+        (buf[(42, track)].symbol(), buf[(44, track)].symbol()),
+        ("┣", "┫")
+    );
+    let range: Vec<u16> = (42..=44).collect();
+    for label in ["⌂ Paul", "● Priya", "≡ in hours", "○ Ellie"] {
+        let y = below(label);
+        assert_eq!(shaded(&buf, y, 0), range, "{}", row(&buf, y));
+    }
+    assert!(row(&buf, y_of(&buf, "≡ in hours")).ends_with("5/5"));
+    assert!(row(&buf, y_of(&buf, "⌂ Paul")).ends_with("5-6pm AEDT"));
+    assert_eq!(say_line(&buf), "5-6pm AEDT / 4-5pm AEST / 8-9am SAST");
+}
+
+#[test]
+fn from_60_to_79_columns_without_the_height_to_stack_lanes_sit_beside_the_labels() {
+    for cols in [60, 79] {
+        let buf = render(&team_monday(), cols, 24);
+        let paul = row(&buf, y_of(&buf, "⌂ Paul"));
+        assert!(paul.contains('▓'), "{cols} columns: {paul}");
+        let track = row(&buf, y_of(&buf, "▸ 5-6pm AEDT 1h"));
+        assert!(track.contains(['┣', '┃']), "{cols} columns: {track}");
+        assert_eq!(say_line(&buf), "5-6pm AEDT / 4-5pm AEST / 8-9am SAST");
+    }
+}
+
+#[test]
+fn below_60_columns_without_the_height_to_stack_the_screen_is_a_plain_list() {
+    let buf = render(&team_monday(), 59, 24);
+    let frame = text(&buf);
+    assert!(!frame.contains('▓') && !frame.contains('┣'), "{frame}");
+    assert!(row(&buf, y_of(&buf, "⌂ Paul")).ends_with("5-6pm AEDT"));
+    assert!(row(&buf, y_of(&buf, "≡ in hours")).ends_with("5/5"));
+    assert_eq!(say_line(&buf), "5-6pm AEDT / 4-5pm AEST / 8-9am SAST");
 }

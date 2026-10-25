@@ -9,12 +9,51 @@ pub enum MapChoice {
     Hidden,
 }
 
-/// The label and track widths and the minutes each track cell covers.
+/// How each grid row splits into its label and its track; the track's columns split the viewed
+/// day evenly.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Columns {
-    pub label: u16,
-    pub track: u16,
-    pub minutes: u16,
+pub enum Columns {
+    /// The label, then the track on the same line.
+    Beside { label: u16, track: u16 },
+    /// The label on a line of its own, over a full-width track.
+    Stacked { width: u16 },
+    /// The label alone, with no track.
+    List { width: u16 },
+}
+
+impl Columns {
+    /// The label's width.
+    pub fn label(self) -> u16 {
+        match self {
+            Self::Beside { label, .. } => label,
+            Self::Stacked { width } | Self::List { width } => width,
+        }
+    }
+
+    /// The track's width: its number of columns.
+    pub fn track(self) -> u16 {
+        match self {
+            Self::Beside { track, .. } => track,
+            Self::Stacked { width } => width,
+            Self::List { .. } => 0,
+        }
+    }
+
+    /// The column the track starts at.
+    pub fn track_x(self) -> u16 {
+        match self {
+            Self::Beside { label, .. } => label,
+            Self::Stacked { .. } | Self::List { .. } => 0,
+        }
+    }
+
+    /// The screen lines one grid row takes: its label line, plus a lane line when stacked.
+    pub fn lines(self) -> u16 {
+        match self {
+            Self::Stacked { .. } => 2,
+            Self::Beside { .. } | Self::List { .. } => 1,
+        }
+    }
 }
 
 /// Every area of the screen, top to bottom; `map` is `None` while the map is hidden.
@@ -31,26 +70,50 @@ pub struct Areas {
     pub columns: Columns,
 }
 
-/// The header, slider, block borders, answer rows, say panel, notice and footer: everything but
-/// the people and places themselves.
-const FIXED_ROWS: u16 = 1 + 2 + 2 + 3 + 4 + 1 + 1;
+/// The header, the block borders, the say panel, the notice and the footer: the rows that never
+/// stack.
+const FLAT_ROWS: u16 = 1 + 1 + 2 + 4 + 1 + 1;
+/// Below this width rows stack when the height allows.
+const STACK_BELOW: u16 = 80;
+/// Below this width, rows too many to stack become the plain list.
+const LIST_BELOW: u16 = 60;
 /// The map needs this many columns, and this many rows left after the fixed rows.
 const MAP_MIN_COLS: u16 = 100;
 const MAP_MIN_ROWS: u16 = 12;
-/// The track never takes the first 20 columns, which hold the labels.
+/// The labels keep at least this many columns beside the track.
 const LABEL_MIN: u16 = 20;
 
-/// The smallest of 15, 30 or 60 minutes a cell for which a whole day fits beside the labels.
-fn columns(cols: u16) -> Columns {
-    let minutes = [15, 30, 60]
-        .into_iter()
-        .find(|minutes| 1440 / minutes <= cols.saturating_sub(LABEL_MIN))
-        .unwrap_or(60);
-    let track = (1440 / minutes).min(cols);
-    Columns {
-        label: cols - track,
-        track,
-        minutes,
+/// The label beside a track of the fewest whole columns per hour that make it at least twice
+/// the label, cut back while the label would drop under its minimum; `None` when even one an
+/// hour leaves the label too narrow.
+fn beside(cols: u16) -> Option<Columns> {
+    (1..=cols.div_ceil(36))
+        .rev()
+        .find(|per_hour| cols.saturating_sub(24 * per_hour) >= LABEL_MIN)
+        .map(|per_hour| Columns::Beside {
+            label: cols - 24 * per_hour,
+            track: 24 * per_hour,
+        })
+}
+
+/// The rows a screen needs with `lines` lines per grid row: the slider's two, each block's
+/// answer row, and every person and place.
+fn rows_needed(lines: u16, people: u16, places: u16) -> u16 {
+    FLAT_ROWS + lines * (2 + 2 + people + places)
+}
+
+/// The columns for a `cols` by `rows` screen: side by side from 80 columns, stacked below that
+/// when the height allows, side by side again from 60 columns, and otherwise the plain list.
+fn shape(cols: u16, rows: u16, people: u16, places: u16) -> Columns {
+    let list = Columns::List { width: cols };
+    if cols >= STACK_BELOW {
+        beside(cols).unwrap_or(list)
+    } else if rows >= rows_needed(2, people, places) {
+        Columns::Stacked { width: cols }
+    } else if cols >= LIST_BELOW {
+        beside(cols).unwrap_or(list)
+    } else {
+        list
     }
 }
 
@@ -58,8 +121,9 @@ fn columns(cols: u16) -> Columns {
 ///
 /// Block heights come from the whole roster, so switching groups never moves a row.
 pub fn layout(cols: u16, rows: u16, roster_len: u16, places_len: u16, map: MapChoice) -> Areas {
-    let fixed = FIXED_ROWS + roster_len + places_len;
-    let spare = rows.saturating_sub(fixed);
+    let columns = shape(cols, rows, roster_len, places_len);
+    let lines = columns.lines();
+    let spare = rows.saturating_sub(rows_needed(lines, roster_len, places_len));
     let shows_map = match map {
         MapChoice::Auto => cols >= MAP_MIN_COLS && spare >= MAP_MIN_ROWS,
         MapChoice::Hidden => false,
@@ -75,13 +139,13 @@ pub fn layout(cols: u16, rows: u16, roster_len: u16, places_len: u16, map: MapCh
     Areas {
         header,
         map: shows_map.then_some(spare_area),
-        slider: take(2),
-        who: take(roster_len + 2),
-        place: take(places_len + 3),
+        slider: take(2 * lines),
+        who: take(1 + lines * (roster_len + 1)),
+        place: take(2 + lines * (places_len + 1)),
         say: take(4),
         notice: take(1),
         footer: take(1),
-        columns: columns(cols),
+        columns,
     }
 }
 
@@ -115,10 +179,9 @@ mod tests {
         );
         assert_eq!(
             areas.columns,
-            Columns {
+            Columns::Beside {
                 label: 24,
-                track: 96,
-                minutes: 15
+                track: 96
             }
         );
     }
@@ -139,13 +202,59 @@ mod tests {
         assert_eq!(areas.map, None);
         assert_eq!(
             areas.columns,
-            Columns {
+            Columns::Beside {
                 label: 32,
-                track: 48,
-                minutes: 30
+                track: 48
             }
         );
         assert_eq!(areas.footer, Rect::new(0, 23, 80, 1));
+    }
+
+    #[test]
+    fn from_80_columns_the_label_never_outgrows_the_track_and_from_120_stays_within_half() {
+        for cols in 80..=400 {
+            let columns = layout(cols, 60, 7, 3, MapChoice::Auto).columns;
+            let (label, track) = (columns.label(), columns.track());
+            assert_eq!(label + track, cols, "{cols} columns");
+            assert!(
+                label <= track,
+                "{cols} columns: label {label}, track {track}"
+            );
+            if cols >= 120 {
+                assert!(
+                    2 * label <= track,
+                    "{cols} columns: label {label}, track {track}"
+                );
+            }
+        }
+    }
+
+    const SCREEN_SPEC: &str = include_str!("../../../../docs/spec/screen.md");
+
+    /// The `N columns: L + T` examples in the screen spec's Columns bullet.
+    fn spec_splits() -> Vec<(u16, u16, u16)> {
+        let bullet = SCREEN_SPEC
+            .lines()
+            .find(|line| line.starts_with("* **Columns**"))
+            .expect("the screen spec has a Columns bullet");
+        bullet
+            .split('`')
+            .filter_map(|code| {
+                let (cols, split) = code.split_once(" columns: ")?;
+                let (label, track) = split.split_once(" + ")?;
+                Some((cols.parse().ok()?, label.parse().ok()?, track.parse().ok()?))
+            })
+            .collect()
+    }
+
+    #[test]
+    fn the_split_matches_every_example_in_the_screen_spec() {
+        let splits = spec_splits();
+        assert!(splits.len() >= 6, "{splits:?}");
+        for (cols, label, track) in splits {
+            let columns = layout(cols, 60, 7, 3, MapChoice::Auto).columns;
+            assert_eq!(columns, Columns::Beside { label, track }, "{cols} columns");
+        }
     }
 
     #[test]

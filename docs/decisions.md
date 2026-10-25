@@ -233,3 +233,11 @@ Decision: A keymap row whose milestone names a feedback round (`FB2`) is built, 
 Why: Feedback rounds add keys between the numbered milestones, and the keymap test must accept them without marking the unbuilt M4 to M6 rows as built.
 
 Held by: `tui::keys::tests::a_row_dispatches_only_when_its_milestone_is_built` in `teamzones`
+
+## D29: The label stays in proportion to the track, and narrow rows stack (2026-10-25)
+
+Decision: From 80 columns the label is never wider than the track, and from 120 columns it is at most half of it. Column i is the same instant in every row, the ruler and the track. Below 80 columns each row stacks its label over a full-width lane when the height allows; when it does not, the label sits beside the track while it still fits, and the plain list appears only when neither does. See the Columns, Ruler and Folding bullets in [screen](spec/screen.md).
+
+Why: A fixed 96-column track handed every extra column to the label, which outgrew the track on wide terminals, and the side-by-side split left too little room below 80 columns. Paul asked for a label to track ratio of about 1:2 and a stacked layout when narrow. Whole columns per hour keep hours evenly spaced on the ruler. Stacking doubles the grid's rows and folding (M6) is not built yet, so a short narrow terminal keeps its lanes beside the labels, as it did before, rather than losing them to the list.
+
+Held by: `tui::layout::tests::from_80_columns_the_label_never_outgrows_the_track_and_from_120_stays_within_half` and `the_split_matches_every_example_in_the_screen_spec`, and `tui::tests::at_250_columns_every_grid_row_marks_the_range_on_the_same_columns`, `at_250_columns_the_cursor_and_fit_marks_sit_on_their_instants`, `ruler_labels_space_out_with_the_cell_size`, `below_80_columns_each_row_stacks_its_label_over_a_full_width_lane`, `from_60_to_79_columns_without_the_height_to_stack_lanes_sit_beside_the_labels` and `below_60_columns_without_the_height_to_stack_the_screen_is_a_plain_list` in `teamzones`
