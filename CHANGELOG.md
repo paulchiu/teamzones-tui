@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ## [Unreleased]
 
+### Added
+
+- While `[travel]` is set, home moves to the travel city: the header, the axis, typed times and the start of every copied line use its zone, and your row there is marked `✈`, keeps your hours on its clock and still counts.
+- While travelling, a dim `⌂` row keeps your home city's clock on screen. It never counts, but its zone is still copied, as in `3pm GMT / Tue 2am AEDT / Tue 1am AEST / 5pm SAST`.
+- Travel ends by itself once `until` is over in the travel city, with nothing written to the config.
+- On a terminal too short for every row, the blocks fold, the where block first, and the last row of a folded block reads `+N more`, saying how many of those rows are counted. The answer rows and the times box always show.
+- `enter` on a `+N more` row, or a click on it, lists the rows it folds away, and `enter` or `esc` closes the list.
+- Below 40 columns or 10 rows the screen says `terminal too small`, and `q` still quits.
+- Releases for macOS (Apple silicon and Intel) and Linux x86_64 on GitHub, and `brew install paulchiu/tap/teamzones`.
+- A quick start in the README, and user docs for the config, the CLI, the screen and releasing under `docs/`.
+
 ## [0.11.0] - 2026-10-25
 
 ### Changed
