@@ -98,14 +98,17 @@ pub struct Areas {
     pub slider: Rect,
     pub who: Rect,
     pub place: Rect,
+    /// The focused row's detail line.
+    pub detail: Rect,
+    /// The times box: the copy line in its border.
     pub say: Rect,
     pub notice: Rect,
     pub footer: Rect,
     pub columns: Columns,
 }
 
-/// The header, the block borders, the say panel, the notice and the footer: the rows that never
-/// stack.
+/// The header, the block borders, the detail line, the times box, the notice and the footer: the
+/// rows that never stack.
 const FLAT_ROWS: u16 = 1 + 1 + 2 + 4 + 1 + 1;
 /// Below this width rows stack when the height allows.
 const STACK_BELOW: u16 = 80;
@@ -175,8 +178,9 @@ fn shown(rows: u16, lines: u16, people: u16, places: u16) -> (u16, u16) {
 /// Lays out a `cols` by `rows` screen for `roster_len` people (home included) and `places_len` places.
 ///
 /// Block heights come from the whole roster and the size, so switching groups never moves a row.
-/// A shown map takes the spare rows under the header; otherwise they sit between the say panel
-/// and the notice. Short of rows, the blocks fold.
+/// The times box, notice and footer keep to the bottom, and the spare rows sit over the times box:
+/// all of them, or one when a shown map under the header takes the rest. Short of rows, the
+/// blocks fold.
 pub fn layout(cols: u16, rows: u16, roster_len: u16, places_len: u16, map: MapChoice) -> Areas {
     let columns = shape(cols, rows, roster_len, places_len);
     let lines = columns.lines();
@@ -184,9 +188,10 @@ pub fn layout(cols: u16, rows: u16, roster_len: u16, places_len: u16, map: MapCh
     let (people_shown, places_shown) = shown(rows, lines, roster_len, places_len);
     let shows_map = match map {
         MapChoice::Auto => cols >= MAP_MIN_COLS && spare >= MAP_MIN_ROWS,
-        MapChoice::Always => spare > 0,
+        MapChoice::Always => spare > 1,
         MapChoice::Hidden => false,
     };
+    let gap = if shows_map { 1 } else { spare };
     let mut y = 0;
     let mut take = |height: u16| {
         let area = Rect::new(0, y, cols, height);
@@ -194,20 +199,20 @@ pub fn layout(cols: u16, rows: u16, roster_len: u16, places_len: u16, map: MapCh
         area
     };
     let header = take(1);
-    let map = shows_map.then(|| take(spare));
+    let map = shows_map.then(|| take(spare - gap));
     let slider = take(2 * lines);
     let who = take(1 + lines * (people_shown + 1));
     let place = take(2 + lines * (places_shown + 1));
-    let say = take(4);
-    if !shows_map {
-        take(spare);
-    }
+    let detail = take(1);
+    take(gap);
+    let say = take(3);
     Areas {
         header,
         map,
         slider,
         who,
         place,
+        detail,
         say,
         notice: take(1),
         footer: take(1),
@@ -226,6 +231,7 @@ mod tests {
             areas.slider,
             areas.who,
             areas.place,
+            areas.detail,
             areas.say,
             areas.notice,
             areas.footer,
@@ -236,12 +242,22 @@ mod tests {
     }
 
     #[test]
-    fn at_120_by_36_the_map_takes_the_twelve_spare_rows() {
+    fn at_120_by_36_the_map_takes_eleven_of_the_twelve_spare_rows_and_one_sits_over_the_times_box()
+    {
         let areas = layout(120, 36, 7, 3, MapChoice::Auto);
-        assert_eq!(areas.map, Some(Rect::new(0, 1, 120, 12)));
+        assert_eq!(areas.map, Some(Rect::new(0, 1, 120, 11)));
         assert_eq!(
             rows(&areas),
-            [(0, 1), (13, 2), (15, 9), (24, 6), (30, 4), (34, 1), (35, 1)]
+            [
+                (0, 1),
+                (12, 2),
+                (14, 9),
+                (23, 6),
+                (29, 1),
+                (31, 3),
+                (34, 1),
+                (35, 1)
+            ]
         );
         assert_eq!(
             areas.columns,
@@ -258,7 +274,16 @@ mod tests {
         assert_eq!(areas.map, None);
         assert_eq!(
             rows(&areas),
-            [(0, 1), (1, 2), (3, 9), (12, 6), (18, 4), (22, 1), (23, 1)]
+            [
+                (0, 1),
+                (1, 2),
+                (3, 9),
+                (12, 6),
+                (18, 1),
+                (19, 3),
+                (22, 1),
+                (23, 1)
+            ]
         );
     }
 
@@ -329,13 +354,44 @@ mod tests {
     }
 
     #[test]
-    fn a_hidden_map_moves_the_blocks_up_and_leaves_its_rows_above_the_notice() {
+    fn a_hidden_map_moves_the_blocks_up_and_leaves_its_rows_above_the_times_box() {
         let areas = layout(120, 36, 7, 3, MapChoice::Hidden);
         assert_eq!(areas.map, None);
         assert_eq!(
             rows(&areas),
-            [(0, 1), (1, 2), (3, 9), (12, 6), (18, 4), (34, 1), (35, 1)]
+            [
+                (0, 1),
+                (1, 2),
+                (3, 9),
+                (12, 6),
+                (18, 1),
+                (31, 3),
+                (34, 1),
+                (35, 1)
+            ]
         );
+    }
+
+    #[test]
+    fn wherever_the_blocks_fit_whole_the_times_box_keeps_to_the_bottom_under_a_blank_row() {
+        for (cols, rows, choice) in (60..=240).step_by(5).flat_map(|cols| {
+            (10..=60).flat_map(move |rows| {
+                [MapChoice::Auto, MapChoice::Always, MapChoice::Hidden]
+                    .map(|choice| (cols, rows, choice))
+            })
+        }) {
+            let areas = layout(cols, rows, 7, 3, choice);
+            let needed = rows_needed(areas.columns.lines(), 7, 3);
+            if rows < needed {
+                continue;
+            }
+            let spare = rows - needed;
+            let at = format!("{cols}x{rows} {choice:?}");
+            let bottom = [areas.say.y, areas.notice.y, areas.footer.y];
+            assert_eq!(bottom, [rows - 5, rows - 2, rows - 1], "{at}");
+            let gap = areas.say.y - areas.detail.bottom();
+            assert_eq!(gap > 0, spare > 0, "{at}: {gap} blank rows, {spare} spare");
+        }
     }
 
     #[test]
@@ -345,10 +401,18 @@ mod tests {
         assert_eq!(view(120, 36, MapChoice::Auto, true), MapView::Hidden);
         assert_eq!(view(120, 24, MapChoice::Auto, true), MapView::Overlay);
         assert_eq!(view(120, 36, MapChoice::Hidden, true), MapView::InPlace);
-        // `always` takes any spare rows, so 30 rows leave it 6 even under the 12 auto needs.
+        // `always` needs only two spare rows, so 30 rows leave it 6 even under the 12 auto needs.
         assert_eq!(view(120, 30, MapChoice::Auto, false), MapView::Hidden);
         assert_eq!(view(120, 30, MapChoice::Always, false), MapView::InPlace);
         assert_eq!(view(120, 30, MapChoice::Always, true), MapView::Hidden);
+    }
+
+    #[test]
+    fn always_shows_no_map_with_one_spare_row_and_leaves_it_blank_over_the_times_box() {
+        let areas = layout(120, 25, 7, 3, MapChoice::Always);
+        assert_eq!(areas.map, None);
+        assert_eq!(areas.say.y - areas.detail.bottom(), 1);
+        assert!(layout(120, 26, 7, 3, MapChoice::Always).map.is_some());
     }
 
     #[test]
@@ -357,7 +421,16 @@ mod tests {
         // The who block keeps its border, home, two more rows and the answer row.
         assert_eq!(
             rows(&areas),
-            [(0, 1), (1, 2), (3, 5), (8, 6), (14, 4), (18, 1), (19, 1)]
+            [
+                (0, 1),
+                (1, 2),
+                (3, 5),
+                (8, 6),
+                (14, 1),
+                (15, 3),
+                (18, 1),
+                (19, 1)
+            ]
         );
     }
 

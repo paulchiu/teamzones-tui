@@ -3,6 +3,7 @@
 mod cli;
 mod clipboard;
 mod paths;
+mod state;
 mod tui;
 mod write;
 
@@ -25,7 +26,7 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    let mut clipboard = clipboard::Fallback(clipboard::System, clipboard::Terminal);
+    let mut clipboard = clipboard::system_chain();
     if parsed.opens_tui() && std::io::stdin().is_terminal() && std::io::stdout().is_terminal() {
         return open_tui(&parsed, &config_path, &mut clipboard);
     }
@@ -50,7 +51,8 @@ fn main() -> ExitCode {
     ExitCode::from(code)
 }
 
-/// Loads config and runs the TUI, exiting 2 on a config error and 1 on a terminal error.
+/// Loads config and state and runs the TUI, exiting 2 on a config or state error and 1 on a
+/// terminal error.
 fn open_tui(
     parsed: &cli::Cli,
     config_path: &std::path::Path,
@@ -67,6 +69,13 @@ fn open_tui(
             return ExitCode::from(2);
         }
     };
+    let (state_path, state) = match state::path().and_then(|path| Ok((state::load(&path)?, path))) {
+        Ok((state, path)) => (path, state),
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::from(2);
+        }
+    };
     let file = tui::File {
         path: config_path,
         text,
@@ -75,14 +84,28 @@ fn open_tui(
     match tui::run(
         config,
         file,
+        state.last_group.as_deref(),
         parsed.clock(),
         clipboard,
         tui::TerminalEnv::from_env(),
     ) {
-        Ok(()) => ExitCode::SUCCESS,
+        Ok(group) => {
+            remember(&state_path, state.text.as_deref(), &group);
+            ExitCode::SUCCESS
+        }
         Err(error) => {
             eprintln!("terminal error: {error}");
             ExitCode::from(1)
         }
+    }
+}
+
+/// Saves `group` as the last group in the state file, warning on stderr when that fails.
+fn remember(path: &std::path::Path, text: Option<&str>, group: &str) {
+    let written = state::with_last_group(text, group)
+        .map_err(|error| error.to_string())
+        .and_then(|text| state::write(path, &text).map_err(|error| error.to_string()));
+    if let Err(error) = written {
+        eprintln!("{}: {error}", path.display());
     }
 }

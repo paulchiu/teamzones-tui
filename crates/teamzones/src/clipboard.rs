@@ -1,4 +1,4 @@
-//! Copying the say line: the system clipboard first, then OSC 52 to the terminal.
+//! Copying the say line: the system clipboard, then OSC 52 to the terminal (on Linux, both).
 
 /// Somewhere a line can be copied to.
 pub trait Clipboard {
@@ -48,6 +48,50 @@ impl<A: Clipboard, B: Clipboard> Clipboard for Fallback<A, B> {
                 .map_err(|second| format!("{first}; {second}"))
         })
     }
+}
+
+/// Gives `text` to both, failing only when both do.
+pub struct Both<A, B>(pub A, pub B);
+
+impl<A: Clipboard, B: Clipboard> Clipboard for Both<A, B> {
+    fn copy(&mut self, text: &str) -> Result<(), String> {
+        let Self(first, second) = self;
+        match (first.copy(text), second.copy(text)) {
+            (Err(first), Err(second)) => Err(format!("{first}; {second}")),
+            (Ok(()), _) | (_, Ok(())) => Ok(()),
+        }
+    }
+}
+
+/// How the system clipboard and the terminal combine on one operating system.
+pub enum Chain<A, B> {
+    Fallback(Fallback<A, B>),
+    Both(Both<A, B>),
+}
+
+impl<A: Clipboard, B: Clipboard> Clipboard for Chain<A, B> {
+    fn copy(&mut self, text: &str) -> Result<(), String> {
+        match self {
+            Self::Fallback(chain) => chain.copy(text),
+            Self::Both(chain) => chain.copy(text),
+        }
+    }
+}
+
+/// The chain for `os` (as `std::env::consts::OS` names it): both on Linux, where the system
+/// clipboard's contents can leave with the process that set them, else the terminal as a fallback.
+pub fn for_os<A, B>(os: &str, system: A, terminal: B) -> Chain<A, B> {
+    if os == "linux" {
+        Chain::Both(Both(system, terminal))
+    } else {
+        Chain::Fallback(Fallback(system, terminal))
+    }
+}
+
+/// The chain the binary copies through: the system clipboard and the terminal, combined for the
+/// operating system it runs on.
+pub fn system_chain() -> Chain<System, Terminal> {
+    for_os(std::env::consts::OS, System, Terminal)
 }
 
 /// The OSC 52 sequence that sets the terminal's clipboard to `text`.
@@ -111,6 +155,39 @@ mod tests {
     fn both_failing_reports_both_reasons() {
         assert_eq!(
             Fallback(Refuses, Refuses).copy("x"),
+            Err("no display; no display".to_owned())
+        );
+    }
+
+    /// Whether `os`'s chain gives the terminal the text even after the system clipboard took it.
+    fn writes_both(os: &str) -> bool {
+        let mut chain = for_os(os, Records::default(), Records::default());
+        chain.copy("5-6pm AEDT").unwrap();
+        let (Chain::Fallback(Fallback(_, terminal)) | Chain::Both(Both(_, terminal))) = &chain;
+        terminal.0 == ["5-6pm AEDT"]
+    }
+
+    #[test]
+    fn on_linux_the_terminal_gets_the_text_even_when_the_system_clipboard_takes_it() {
+        assert!(writes_both("linux"));
+        assert!(!writes_both("macos"));
+    }
+
+    #[test]
+    fn the_chain_the_binary_copies_through_writes_both_exactly_when_built_for_linux() {
+        let both = matches!(system_chain(), Chain::Both(_));
+        assert_eq!(both, cfg!(target_os = "linux"));
+    }
+
+    #[test]
+    fn both_succeeds_when_either_takes_the_text_and_fails_with_both_reasons() {
+        let mut first_only = Both(Records::default(), Refuses);
+        assert_eq!(first_only.copy("x"), Ok(()));
+        let mut second_only = Both(Refuses, Records::default());
+        assert_eq!(second_only.copy("x"), Ok(()));
+        assert_eq!(second_only.1.0, ["x"]);
+        assert_eq!(
+            Both(Refuses, Refuses).copy("x"),
             Err("no display; no display".to_owned())
         );
     }

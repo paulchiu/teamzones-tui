@@ -72,6 +72,8 @@ Held by: `tui::tests::mouse::capital_m_releases_the_mouse_and_says_so_until_m_ag
 
 ## D9: Clipboard falls back from arboard to OSC 52 to the notice row (2026-10-24)
 
+Superseded by D46 on Linux only, where OSC 52 is written as well as arboard; macOS keeps this order.
+
 Decision: Copying tries `arboard` first, then OSC 52. If both fail, the notice row shows the text. See the notice row in [screen](spec/screen.md).
 
 Why: mossmd already uses arboard, and OSC 52 reaches the local machine over SSH.
@@ -151,6 +153,8 @@ Why: A fixed 9-column cap cut `Johannesburg` to `Johannes.` on wide terminals wi
 Held by: `tui::tests::the_city_column_shows_the_whole_city_when_the_label_has_room` and `the_city_column_cuts_with_a_mark_only_when_the_times_need_the_room` in `teamzones`
 
 ## D19: The copy box holds only what y copies (2026-10-25)
+
+Superseded in part by D45: the detail line sits directly above the box only when there are no spare rows.
 
 Decision: The box at the bottom is titled `times for <group>` and contains only the say line. The focused row's detail sits on its own dim line directly above it, and the summary sits in the box's bottom border, so nothing inside the box is left out of the copy. See the say panel in [screen](spec/screen.md).
 
@@ -244,6 +248,8 @@ Held by: `tui::layout::tests::from_80_columns_the_label_never_outgrows_the_track
 
 ## D30: m flips the map until the next resize, and the overlay is not a modal (2026-10-25)
 
+Superseded in part by D45: `[map] show = "always"` needs two spare rows, since one always sits over the times box.
+
 Decision: `m` flips the map's automatic choice only until the terminal is resized, when the choice is worked out afresh. The overlay `m` opens without room is drawn over the grid while every main key still works under it, so scrubbing moves the night side; `esc` closes it before unwinding anything else. A configured `[map] show = "always"` takes any spare rows, and `never` makes `m` show the map where the hiding rule finds room. See Map hiding in [screen](spec/screen.md).
 
 Why: Keeping a flip across a resize would turn a map hidden at 120x36 into an overlay at 120x24, which nobody asked for. A modal overlay would add a context whose only key is `esc`, and scrubbing under the map is the point of opening it.
@@ -320,7 +326,7 @@ Decision: A Braille dot spans the same degrees of longitude and latitude, so the
 
 Why: On wide terminals the stretched map flattened the continents, and Paul asked for the macOS Clock app's zoom-to-fill. The issue also asked for the band to be centred on the counted markers and for a group switch never to move the map (D2); a band recomputed every frame would satisfy the first and break the second, so the band is framed on the markers counted when the view is set and then held. This supersedes M4's check that the UK, US, AU and Melbourne labels all show at 120x36: that band now crops the UK and Melbourne, so the four-label check runs at 120x48, where the whole map fits.
 
-Held by: `tui::map::tests::a_degree_of_longitude_and_of_latitude_take_the_same_distance_at_every_size`, `the_band_never_shows_beyond_the_map_s_latitudes` and `an_area_taller_than_the_map_centres_it_with_blank_rows_above_and_below`, and `tui::tests::map::the_band_is_centred_on_home_and_the_counted_markers_within_the_map_s_bounds`, `a_group_switch_never_moves_the_map`, `the_map_labels_home_and_each_counted_place_with_its_state_over_the_range` (at 120x48) and the `regions_map_120x36` snapshot in `teamzones`
+Held by: `tui::map::tests::a_degree_of_longitude_and_of_latitude_take_the_same_distance_at_every_size`, `the_band_never_shows_beyond_the_map_s_latitudes` and `an_area_taller_than_the_map_centres_it_with_blank_rows_above_and_below`, and `tui::tests::map::the_band_is_centred_on_home_and_the_counted_markers_within_the_map_s_bounds`, `a_group_switch_never_moves_the_map`, `the_map_labels_home_and_each_counted_place_with_its_state_over_the_range` (at 120x48) and the `regions_map_120x37` snapshot in `teamzones`
 
 ## D40: Map mode is a modal with its own keys, entered with `z` (2026-10-25)
 
@@ -339,6 +345,8 @@ Why: A cell background cannot go finer than a cell, so the shading alone drew a 
 Held by: `tui::map::tests::the_terminator_s_dots_sit_within_one_dot_of_the_computed_edge_of_night` and `tui::tests::map::the_terminator_draws_in_the_dawn_colour_and_keeps_its_shape_under_mono` in `teamzones`
 
 ## D42: With the map off, the blocks move up and the spare rows sit above the notice row (2026-10-25)
+
+Superseded by D45, which keeps the blocks under the header and moves the spare rows to sit over the times box.
 
 Decision: Whenever the map is not drawn in place (hidden by `m`, by `[map] show = "never"`, by the hiding rule, or under `glyphs = "ascii"`), the ruler starts on the row under the header and the rows the map would have taken sit together, blank, between the times box and the notice row. The notice row stays directly above the footer, and the footer stays on the last row. `m` bringing the map back pushes the blocks down again, and the overlay is drawn over the blocks without moving them. Spare rows exist only when every block fits whole, so no block is ever cut short while they show and there is no block to hand them to first. See the layout and Map hiding bullets in [screen](spec/screen.md).
 
@@ -361,3 +369,35 @@ Decision: Folding keeps each block's lines in their usual order and turns the la
 Why: The spec says what folds and in what order, and that `enter` lists the folded rows, but not how focus reaches a row that is not a person or a place, nor how the list closes. Standing for a real row keeps focus a `Row` everywhere, and an overlay keeps `enter`'s keymap row the only binding it needs.
 
 Held by: the `tui::fold::tests` and `tui::layout::tests::at_80_by_20_the_who_block_folds_to_fit_and_everything_else_keeps_its_rows`, `short_of_rows_the_where_block_folds_first_down_to_three_places` and `the_who_block_never_folds_below_home_one_more_row_and_its_answer`, and the `tui::tests::fold` tests (`row_keys_on_the_fold_row_leave_the_roster_and_the_marks_alone` for the row keys) and the `enter` case of `tui::tests::mouse::every_built_mouse_equivalent_in_the_keymap_sends_what_its_key_does` in `teamzones`
+
+## D45: The times box keeps to the bottom, and the spare rows sit over it (2026-10-25)
+
+Decision: The times box, the notice row and the footer keep to the bottom of the screen, with the footer on the last row. The spare rows sit together, blank, between the detail line and the times box. A map drawn in place takes all of them but one, so a blank row separates the detail line from the times box whenever there is any spare row; `[map] show = "always"` therefore needs two. With no spare rows nothing changes: the detail line sits directly over the times box, and folding still decides who gives up rows. The rest of D42 holds: with the map off the ruler starts under the header. This refines D19, whose detail line now sits directly over the box only when there are no spare rows. See the layout and Map hiding bullets in [screen](spec/screen.md).
+
+Why: Paul found the times box jammed against the grid with the free rows under it, between the box and the footer, and asked for room to breathe. Anchoring the box to the bottom puts the space where it reads as a margin. Group switches still never move a block (D2), since the layout depends only on the size, the roster and the map's place.
+
+Held by: `tui::layout::tests::wherever_the_blocks_fit_whole_the_times_box_keeps_to_the_bottom_under_a_blank_row`, `a_hidden_map_moves_the_blocks_up_and_leaves_its_rows_above_the_times_box`, `always_shows_no_map_with_one_spare_row_and_leaves_it_blank_over_the_times_box` and `at_120_by_36_the_map_takes_eleven_of_the_twelve_spare_rows_and_one_sits_over_the_times_box`, and `tui::tests::map::with_the_map_off_the_blocks_sit_under_the_header_and_the_spare_rows_above_the_times_box`, `at_145_by_30_the_spare_rows_collect_over_the_times_box_and_the_footer_takes_the_last_row` and `with_the_map_off_a_group_switch_never_moves_the_ruler_the_borders_or_the_times_box` in `teamzones`
+
+## D46: On Linux a copy goes to arboard and to OSC 52 both (2026-10-25)
+
+Decision: On Linux, `y` and `teamzones say` give the line to arboard and also write it as OSC 52 to `/dev/tty`, and report `copied` when either takes it. Elsewhere the D9 order stands: arboard, then OSC 52 only if arboard fails. The notice row still shows the text when both fail.
+
+Why: On Linux the X11 and Wayland selection belongs to the process that set it, so arboard can report success and the clipboard empties when `teamzones say` exits unless a clipboard manager takes it over. Writing OSC 52 as well lets a terminal that supports it keep the line. Keeping the selection alive with a detached helper (arboard's `SetExtLinux::wait`) needs a forked process this binary cannot make without `unsafe`, and dropping `copied` would leave the common clipboard-manager case reporting nothing. Paul has no Linux machine, so CI's Linux runner is what proves the choice: no test there shows the line surviving on a real desktop.
+
+Held by: `clipboard::tests::on_linux_the_terminal_gets_the_text_even_when_the_system_clipboard_takes_it`, `the_chain_the_binary_copies_through_writes_both_exactly_when_built_for_linux` (which checks the chain `main` builds, so the Linux CI job holds the Linux wiring) and `both_succeeds_when_either_takes_the_text_and_fails_with_both_reasons` in `teamzones`
+
+## D47: The state file keeps the last group, and the TUI writes it only on a clean quit (2026-10-25)
+
+Decision: `state.toml` lives under the XDG state directory (`$XDG_STATE_HOME`, else `~/.local/state`) on every platform, as config does. The TUI reads `last_group` before it takes the terminal and opens on that group, matched case-insensitively, or on `0 all` for `all`; a name the config no longer has opens the first group. It writes `last_group` through `toml_edit` when the user quits, keeping every other key and comment, atomically. A state file that exists but cannot be read, does not parse or holds a non-string `last_group` is an error naming the path, exit 2, and since the TUI never starts nothing is written over it. The map override and mouse capture setting the spec also lists are not kept yet. A failed write on quit is reported on stderr and does not change the exit code.
+
+Why: The spec names the file and says the TUI opens on the last used group but not when it is saved or what a stale name does. Saving on quit keeps the write out of the event loop, and a stale name falling back to the first group matches what a closed group does in the session. Absent is not unreadable, so a broken file is never treated as empty.
+
+Held by: the `state::tests` and `tui::tests::the_screen_opens_on_the_saved_last_group_and_on_the_first_without_one` in `teamzones`, and `the_tui_opens_on_the_group_the_state_file_names_and_saves_the_one_it_quits_on` in `crates/teamzones/tests/terminal_restoration.rs`
+
+## D48: Debug builds panic on request so the pty test can hold the panic hook (2026-10-25)
+
+Decision: With `TEAMZONES_TEST_PANIC` set, a debug build panics right after its first frame. Release builds compile the check out entirely. The pty test sets it and asserts that the output releases mouse capture and leaves the alternate screen before the panic message, and that the pty is back in canonical mode.
+
+Why: The panic hook restores the terminal only on a panic, and nothing in the app panics on purpose. A debug-only hook is the smallest way to make the real binary exercise it without shipping a way to crash a release build.
+
+Held by: `a_panic_releases_mouse_capture_raw_mode_and_the_alternate_screen` in `crates/teamzones/tests/terminal_restoration.rs`

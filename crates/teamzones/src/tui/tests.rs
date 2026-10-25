@@ -297,17 +297,22 @@ fn the_team_frame_at_120_by_36_sits_on_the_row_budget() {
     );
     let braille = |y: u16| row(&buf, y).chars().any(|c| ('⠁'..='⣿').contains(&c));
     assert!(
-        (1..13).all(braille),
-        "the map takes the twelve rows under the header"
+        (1..12).all(braille),
+        "the map takes eleven of the twelve spare rows under the header"
     );
-    assert!(row(&buf, 13).starts_with("Mon 26 Oct AEDT"));
-    assert!(row(&buf, 14).starts_with("▸ 5-6pm AEDT 1h"));
-    assert!(row(&buf, 15).starts_with(" who "));
-    assert!(row(&buf, 16).starts_with("⌂ Paul       5-6pm AEDT"));
-    assert!(row(&buf, 21).starts_with("≡ in hours          5/5"));
-    assert!(row(&buf, 24).starts_with(" where  not asked"));
-    assert!(row(&buf, 25).starts_with("≡ where              --  not asked: team has no places"));
-    assert!(row(&buf, 30).starts_with("▶ Paul"));
+    assert!(row(&buf, 12).starts_with("Mon 26 Oct AEDT"));
+    assert!(row(&buf, 13).starts_with("▸ 5-6pm AEDT 1h"));
+    assert!(row(&buf, 14).starts_with(" who "));
+    assert!(row(&buf, 15).starts_with("⌂ Paul       5-6pm AEDT"));
+    assert!(row(&buf, 20).starts_with("≡ in hours          5/5"));
+    assert!(row(&buf, 23).starts_with(" where  not asked"));
+    assert!(row(&buf, 24).starts_with("≡ where              --  not asked: team has no places"));
+    assert!(row(&buf, 29).starts_with("▶ Paul"));
+    assert_eq!(
+        row(&buf, 30),
+        "",
+        "the spare row the map leaves sits over the times box"
+    );
     assert!(row(&buf, 31).starts_with("╭ times for team "));
     assert_eq!(say_line(&buf), "5-6pm AEDT / 4-5pm AEST / 8-9am SAST");
     assert_eq!(row(&buf, 34), "");
@@ -315,16 +320,15 @@ fn the_team_frame_at_120_by_36_sits_on_the_row_budget() {
     insta::assert_snapshot!(text(&buf));
 }
 
-/// The rows that must hold still: the ruler, both blocks' top borders, the where block's bottom
-/// border and the say panel's top border.
+/// The rows that must hold still: the ruler, both blocks' top borders, the detail line and the
+/// times box's top border.
 fn anchors(buf: &Buffer) -> [u16; 5] {
-    let say = y_of(buf, " times for ");
     [
         y_of(buf, "Mon 26 Oct AEDT"),
         y_of(buf, " who "),
         y_of(buf, " where "),
-        say - 1,
-        say,
+        y_of(buf, "▶ "),
+        y_of(buf, " times for "),
     ]
 }
 
@@ -369,9 +373,9 @@ fn n_from_saturday_on_deploy_lands_on_monday_and_shortens_the_range() {
         .collect();
     assert_eq!(fits, ["5-5:30pm"]);
     // 5pm is cell 68 of the 96, after the 24 label columns.
-    let track: Vec<String> = (92..94).map(|x| buf[(x, 14)].symbol().to_owned()).collect();
+    let track: Vec<String> = (92..94).map(|x| buf[(x, 13)].symbol().to_owned()).collect();
     assert_eq!(track, ["┣", "┫"]);
-    assert!(row(&buf, 14).starts_with("▸ 5-5:30pm AEDT 30m"));
+    assert!(row(&buf, 13).starts_with("▸ 5-5:30pm AEDT 30m"));
 }
 
 #[test]
@@ -1226,12 +1230,13 @@ fn the_city_column_cuts_with_a_mark_only_when_the_times_need_the_room() {
 #[test]
 fn the_copy_box_holds_only_the_line_y_copies_and_the_detail_sits_above_it() {
     let app = focus_on(team_monday(), "Priya");
-    for (cols, rows) in [(120, 36), (80, 24)] {
+    // 120x36 leaves one spare row over the times box; 80x24 has none.
+    for (cols, rows, gap) in [(120, 36, 1), (80, 24, 0)] {
         let buf = render(&app, cols, rows);
         let top = y_of(&buf, " times for team ");
         assert!(row(&buf, top).ends_with(" y copy ╮"), "{}", row(&buf, top));
         assert!(
-            row(&buf, top - 1).starts_with("▶ Priya  Brisbane"),
+            row(&buf, top - 1 - gap).starts_with("▶ Priya  Brisbane"),
             "{cols}"
         );
         let inside: Vec<String> = (top + 1..)
@@ -1249,7 +1254,7 @@ fn the_copy_box_holds_only_the_line_y_copies_and_the_detail_sits_above_it() {
         );
         assert!(!row(&buf, rows - 1).is_empty(), "the footer still fits");
     }
-    let detail_style = render(&app, 120, 36)[(2, 30)].fg;
+    let detail_style = render(&app, 120, 36)[(2, 29)].fg;
     assert_eq!(detail_style, ratatui::style::Color::DarkGray);
 }
 
@@ -1525,7 +1530,7 @@ const STYLES: [&str; 5] = ["columns", "edges", "lines", "underline", "focus"];
 /// marked: `s` selection background or reverse, `u` underline, `d` dim, `.` plain.
 fn styled_grid(buf: &Buffer) -> String {
     use ratatui::style::{Color, Modifier};
-    let (from, to) = (y_of(buf, " AEDT    "), y_of(buf, "times for") - 2);
+    let (from, to) = (y_of(buf, " AEDT    "), y_of(buf, "▶ ") - 1);
     (from..=to)
         .flat_map(|y| {
             let mask: String = (0..buf.area.width)
@@ -1680,3 +1685,53 @@ mod fold;
 mod map;
 mod mouse;
 mod travel;
+
+#[test]
+fn with_no_config_file_the_notice_says_e_creates_one_and_the_footer_offers_e() {
+    let config = Config::load(None, chrono_tz::Australia::Melbourne).unwrap();
+    let app = App::new(config, now()).with_source(None);
+    let buf = render(&app, 120, 24);
+    assert_eq!(row(&buf, 22), "no config: E creates one", "{}", text(&buf));
+    assert!(row(&buf, 23).contains("E config"), "{}", row(&buf, 23));
+    let buf = render(&fixture(), 120, 24);
+    assert!(!row(&buf, 23).contains("E config"), "{}", row(&buf, 23));
+}
+
+#[test]
+fn a_reload_that_finds_a_config_file_takes_e_config_out_of_the_footer() {
+    let config = Config::load(None, chrono_tz::Australia::Melbourne).unwrap();
+    let app = App::new(config, now()).with_source(None);
+    assert!(row(&render(&app, 120, 24), 23).contains("E config"));
+    let loaded = super::editor::Loaded {
+        config: Config::parse(FIXTURE).unwrap(),
+        text: Some(FIXTURE.to_owned()),
+    };
+    let reloaded = update(
+        app,
+        Msg::Reloaded {
+            key: "r".to_owned(),
+            result: Ok(Box::new(loaded)),
+        },
+    )
+    .0;
+    let footer = row(&render(&reloaded, 120, 24), 23);
+    assert!(!footer.contains("E config"), "{footer}");
+}
+
+#[test]
+fn the_screen_opens_on_the_saved_last_group_and_on_the_first_without_one() {
+    let title = |app: &App| {
+        let buf = render(app, 120, 36);
+        row(&buf, y_of(&buf, " times for "))
+    };
+    assert!(title(&fixture().on_group(Some("deploy"))).starts_with("╭ times for deploy "));
+    assert!(title(&fixture().on_group(Some("ALL"))).starts_with("╭ times for all "));
+    for last in [None, Some("gone")] {
+        assert!(
+            title(&fixture().on_group(last)).starts_with("╭ times for team "),
+            "{last:?}"
+        );
+    }
+    let deploy = fixture().on_group(Some("deploy"));
+    assert_eq!(deploy.marks, press(fixture(), &chars("4")).marks);
+}

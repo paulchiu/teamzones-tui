@@ -172,6 +172,9 @@ pub struct App {
     /// The cell of the last left-button press and when it came on the loop's monotonic clock,
     /// for spotting a double click.
     pub last_click: Option<(u16, u16, chrono::TimeDelta)>,
+    /// Whether the TUI was started with no config file and the last read still found none, so
+    /// the footer offers `E` to create one.
+    pub first_run: bool,
 }
 
 impl App {
@@ -215,6 +218,7 @@ impl App {
             disk: None,
             flush_at: None,
             last_click: None,
+            first_run: false,
         };
         Self {
             camera: framing(&app),
@@ -230,10 +234,41 @@ impl App {
             raised_at: self.now,
         });
         Self {
+            first_run: text.is_none(),
             disk: text.clone(),
             text,
             notice,
             ..self
+        }
+    }
+
+    /// The app opened on the group named `last` (or `all`), as the state file saved it; a name
+    /// no longer in the config keeps the first group.
+    pub fn on_group(self, last: Option<&str>) -> Self {
+        let groups = &self.roster().groups;
+        let lens = last.and_then(|name| {
+            if name.eq_ignore_ascii_case("all") {
+                Some(Lens::All)
+            } else {
+                groups
+                    .iter()
+                    .position(|group| group.name.eq_ignore_ascii_case(name))
+                    .map(Lens::Group)
+            }
+        });
+        match lens {
+            Some(lens) => {
+                let app = Self {
+                    marks: base_marks(self.roster(), lens),
+                    lens,
+                    ..self
+                };
+                Self {
+                    camera: framing(&app),
+                    ..app
+                }
+            }
+            None => self,
         }
     }
 

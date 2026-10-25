@@ -11,9 +11,12 @@ From the top:
 - **The ruler and track** cover one day in home's zone from midnight to midnight. `┃` is the cursor, `┣ ┫` the ends of a range, and `═` marks the times where the group's question is answered (`╌` where it is for part of a cell).
 - **The who block** lists home, then the people the group counts (`●`), then a `≡` answer row, then everyone else dimmed (`○`). Each lane reads `▓` working, `▚` morning or evening, `▒` day, `░` night and `╌` a day off. The answer row's `5/5` counts who qualifies over the range, and its braille cells fill as more of them do.
 - **The where block** does the same for places (`◆` counted, `◇` not), with lanes of `▁` closed, `▄` open and `█` busy.
-- **The times box** holds exactly the line `y` copies, titled with the group, and the dim `▶` line above it describes the focused row.
+- **The `▶` line**, dim, describes the focused row.
+- **The times box** holds exactly the line `y` copies, titled with the group. It sits at the bottom with the notice row and the footer, and any spare rows on a tall terminal collect above it.
 - **The notice row** says what the last key did, such as `y  copied` or `n  next fit for deploy: ...`, and clears on the next key or after ten seconds.
 - **The footer** lists the keys that matter right now, dropping the least useful first when it runs out of room.
+
+`teamzones` opens on the group you last quit on, kept in `~/.local/state/teamzones/state.toml` (or under `$XDG_STATE_HOME`), and on the first group when that group is gone or there is no state yet. With no config file the notice row says `no config: E creates one` and the footer offers `E config`.
 
 Switching groups never moves anything: the blocks are sized by everyone in the config, not by the group, so the ruler, the borders and the times box stay put.
 

@@ -226,6 +226,7 @@ where
         if !app.running {
             return Ok(app);
         }
+        panic_when_asked();
         let input = if io.events.poll(wake_after(&app, clock.now()))? {
             let at =
                 chrono::TimeDelta::from_std(started.elapsed()).unwrap_or(chrono::TimeDelta::MAX);
@@ -249,7 +250,8 @@ pub struct File<'a> {
     pub system_zone: Tz,
 }
 
-/// Opens the TUI on `config` until the user quits, restoring the terminal on the way out.
+/// Opens the TUI on `config` until the user quits, restoring the terminal on the way out; starts
+/// on the group named `last_group` when there is one, and returns the group to remember.
 ///
 /// # Errors
 ///
@@ -257,14 +259,17 @@ pub struct File<'a> {
 pub fn run(
     config: Config,
     file: File,
+    last_group: Option<&str>,
     clock: Clock,
     clipboard: &mut dyn Clipboard,
     env: TerminalEnv,
-) -> std::io::Result<()> {
+) -> std::io::Result<String> {
     let mut terminal = ratatui::try_init().inspect_err(|_| restore())?;
     hook_restore_on_panic();
     let mut modes = Stdout;
-    let app = App::new(config, clock.now()).with_source(file.text);
+    let app = App::new(config, clock.now())
+        .with_source(file.text)
+        .on_group(last_group);
     if let Err(error) = modes.capture_mouse(app.mouse) {
         drop(terminal);
         restore();
@@ -284,7 +289,7 @@ pub fn run(
         editors: (std::env::var("VISUAL").ok(), std::env::var("EDITOR").ok()),
         repaint: false,
     };
-    let result = event_loop(&mut terminal, app, &clock, env, &mut io).map(drop);
+    let result = event_loop(&mut terminal, app, &clock, env, &mut io).map(|app| app.lens_name());
     drop(terminal);
     restore();
     result
@@ -344,6 +349,19 @@ impl Opener for Foreground {
             .map(|status| status.success())
     }
 }
+
+/// Panics once the screen is up when `TEAMZONES_TEST_PANIC` is set, so the pty test can watch the
+/// panic hook restore the terminal; debug builds only, so a release binary never reads it.
+#[cfg(debug_assertions)]
+fn panic_when_asked() {
+    #[expect(clippy::panic, reason = "the panic is the test hook's whole purpose")]
+    if std::env::var_os("TEAMZONES_TEST_PANIC").is_some() {
+        panic!("TEAMZONES_TEST_PANIC is set");
+    }
+}
+
+#[cfg(not(debug_assertions))]
+fn panic_when_asked() {}
 
 /// Releases everything the TUI enables: mouse capture, then raw mode and the alternate screen.
 fn restore() {

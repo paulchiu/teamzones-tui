@@ -30,7 +30,7 @@ Config is optional. Without one, home is the system zone (the binary resolves it
 ## Files, state and lifecycle
 
 * Config: `$XDG_CONFIG_HOME/teamzones/config.toml`, falling back to `~/.config/teamzones/config.toml` (use `etcetera`, as blubat does). `TEAMZONES_CONFIG` overrides it.
-* State: `~/.local/state/teamzones/state.toml`, holding the last group, the map override and the mouse capture setting. It is written atomically (temp file plus rename).
+* State: `~/.local/state/teamzones/state.toml` (under `$XDG_STATE_HOME` when that is set), holding the last group, the map override and the mouse capture setting. It is written atomically (temp file plus rename). So far only `last_group` is read and written: the TUI opens on it (`all` for `0 all`) and saves the group it quits on, keeping any other key and comment. A state file that exists but cannot be read or parsed stops the TUI with an error naming the path.
 * Write-back: `toml_edit` rewrites only `[[group]]`, `[travel]` and the `[[person]]`/`[[place]]` entries the app adds or edits. Every write re-parses the result before replacing the file and is atomic. Model it on blubat's `save_dashboard` ([GitHub](https://github.com/paulchiu/blubat/blob/8b4b0d5f32dcff25193abb8c8ba0a5234b914253/blubat/src/config.rs#L67-L130)).
 * Terminal: restore every enabled mode (raw mode, alternate screen, mouse capture) on quit, on editor handoff and in the panic hook. `ratatui::run()` installs a restore hook in 0.30.
 * Redraw only on input, resize, a notice timeout, or the minute rolling over while viewing now. There is no animation.

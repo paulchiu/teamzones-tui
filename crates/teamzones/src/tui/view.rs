@@ -318,6 +318,7 @@ pub fn draw(frame: &mut Frame, app: &App, look: Look) {
     let (who_entries, where_entries) = app.entries_at(size.width, size.height);
     who(buf, clip(areas.who), app, look, &track, &who_entries);
     places(buf, clip(areas.place), app, look, &track, &where_entries);
+    detail_line(buf, clip(areas.detail), app, look);
     say_panel(buf, clip(areas.say), app, look);
     notice(buf, clip(areas.notice), app, look);
     let map_key = app.map_key_at(size.width, size.height);
@@ -1426,15 +1427,9 @@ fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track, en
     }
 }
 
-/// The copy box and the dim detail line above it: the box holds only the line `y` copies.
+/// The times box: it holds only the line `y` copies.
 fn say_panel(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
     let theme = look.theme;
-    detail_line(buf, Rect { height: 1, ..area }, app, look);
-    let area = Rect {
-        y: area.y + 1,
-        height: area.height.saturating_sub(1),
-        ..area
-    };
     let drift = app.drift();
     let mut title = vec![
         Span::styled(
@@ -1536,6 +1531,7 @@ fn footer_row(buf: &mut Buffer, area: Rect, app: &App, look: Look, map: footer::
         range: main && app.range.is_some(),
         away: main && !app.at_now(),
         map,
+        config: !app.first_run,
     };
     let flash = app
         .style_flash
