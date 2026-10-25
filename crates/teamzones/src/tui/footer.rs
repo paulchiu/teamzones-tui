@@ -47,6 +47,7 @@ impl Footer {
 pub fn badge(context: Context) -> Option<&'static str> {
     match context {
         Context::Range => Some("range"),
+        Context::Map => Some("map"),
         Context::Main
         | Context::Global
         | Context::Prompt

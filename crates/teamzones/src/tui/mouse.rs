@@ -146,6 +146,7 @@ pub fn msgs(app: &App, pointer: Pointer) -> Vec<Msg> {
             }
         }
         Mode::Normal => main(app, look, size, pointer),
+        Mode::Map => map_wheel(app, size, pointer),
         Mode::Matrix(matrix) => super::matrix::pointer(app, matrix, size, pointer),
         Mode::Picker(picker) if outside(super::picker::area(size, picker)) => {
             vec![Msg::Key(Key::Esc)]
@@ -171,6 +172,21 @@ pub fn msgs(app: &App, pointer: Pointer) -> Vec<Msg> {
         | Mode::AddMenu(_)
         | Mode::Picker(_) => Vec::new(),
     }
+}
+
+/// In map mode, a wheel notch over the map pans it as its key does: up and down pan north and
+/// south, and sideways or with shift they pan west and east. Nothing else acts.
+fn map_wheel(app: &App, size: Rect, pointer: Pointer) -> Vec<Msg> {
+    let over = view::map_area(app, size)
+        .is_some_and(|area| area.contains(Position::new(pointer.x, pointer.y)));
+    let pan = match (pointer.kind, pointer.shift) {
+        (Kind::ScrollUp, false) => Some('k'),
+        (Kind::ScrollDown, false) => Some('j'),
+        (Kind::ScrollUp, true) | (Kind::ScrollLeft, _) => Some('h'),
+        (Kind::ScrollDown, true) | (Kind::ScrollRight, _) => Some('l'),
+        (Kind::Down | Kind::Drag | Kind::Up | Kind::Right | Kind::Middle | Kind::Other, _) => None,
+    };
+    pan.filter(|_| over).map(key).into_iter().collect()
 }
 
 /// The screen lines of the slider: the ruler's lane, the track's label and the track's lane.

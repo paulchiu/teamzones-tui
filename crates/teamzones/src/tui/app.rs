@@ -70,6 +70,8 @@ pub enum Mode {
     Picker(Box<Picker>),
     /// The drift tag's menu: save the drift, or revert it.
     DriftMenu,
+    /// Map mode: the map's keys pan and zoom it.
+    Map,
 }
 
 /// How people lanes are drawn: by band, or plain day and night.

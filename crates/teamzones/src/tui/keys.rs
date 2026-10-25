@@ -58,6 +58,8 @@ pub enum Context {
     AddMenu,
     /// The drift tag's menu.
     DriftMenu,
+    /// Map mode: the map's own pan, zoom and reset keys.
+    Map,
 }
 
 /// How rows are ordered within each block.
@@ -114,6 +116,14 @@ pub enum Action {
     Submit,
     CycleRangeStyle,
     FlipMap,
+    /// `z`: enter map mode, while the map is drawn.
+    MapMode,
+    /// Pan the map this many steps east and south.
+    Pan(i8, i8),
+    /// Zoom the map this many steps in.
+    Zoom(i8),
+    /// Put the map back on its default view.
+    ResetMap,
     ToggleMouse,
     /// `tab`: open the membership matrix.
     Matrix,
@@ -183,7 +193,7 @@ pub struct Binding {
 
 /// The milestones built so far: M3 to M5 and the hands-on feedback rounds after M3.
 #[cfg(test)]
-pub const BUILT: [&str; 4] = ["M3", "M4", "M5", "FB2"];
+pub const BUILT: [&str; 5] = ["M3", "M4", "M5", "FB2", "FB4"];
 
 /// A footer priority that never drops.
 pub const PINNED: u8 = u8::MAX;
@@ -484,6 +494,15 @@ pub const BINDINGS: &[Binding] = &[
         )
     },
     Binding {
+        chords: &[(Key::Char('z'), Action::MapMode)],
+        ..row(
+            "z",
+            "Map mode, while the map is drawn: pan, zoom and reset its view",
+            "FB4",
+            Context::Main,
+        )
+    },
+    Binding {
         chords: &[(Key::Char('M'), Action::ToggleMouse)],
         ..row("M", "Release or recapture the mouse", "M4", Context::Main)
     },
@@ -585,6 +604,64 @@ pub const BINDINGS: &[Binding] = &[
         priority: PINNED,
         chords: &[(Key::Char('?'), Action::Help)],
         ..row("?", "Help", "", Context::Range)
+    },
+    Binding {
+        hints: &[hint("h/j/k/l", "pan")],
+        priority: MODE + 4,
+        chords: &[
+            (Key::Char('h'), Action::Pan(-1, 0)),
+            (Key::Char('l'), Action::Pan(1, 0)),
+            (Key::Char('k'), Action::Pan(0, -1)),
+            (Key::Char('j'), Action::Pan(0, 1)),
+            (Key::Left, Action::Pan(-1, 0)),
+            (Key::Right, Action::Pan(1, 0)),
+            (Key::Up, Action::Pan(0, -1)),
+            (Key::Down, Action::Pan(0, 1)),
+        ],
+        ..row(
+            "h j k l, arrows",
+            "Pan the map west, south, north or east; longitude wraps",
+            "",
+            Context::Map,
+        )
+    },
+    Binding {
+        hints: &[hint("+/-", "zoom")],
+        priority: MODE + 3,
+        chords: &[
+            (Key::Char('+'), Action::Zoom(1)),
+            (Key::Char('='), Action::Zoom(1)),
+            (Key::Char('-'), Action::Zoom(-1)),
+        ],
+        ..row(
+            "+ =, -",
+            "Zoom in; zoom out, as far as the whole map",
+            "",
+            Context::Map,
+        )
+    },
+    Binding {
+        hints: &[hint("0", "reset")],
+        priority: MODE + 2,
+        chords: &[(Key::Char('0'), Action::ResetMap)],
+        ..row(
+            "0",
+            "Back to the default view: the whole width, on home and the counted rows",
+            "",
+            Context::Map,
+        )
+    },
+    Binding {
+        hints: &[hint("esc", "done")],
+        priority: MODE + 1,
+        chords: &[(Key::Esc, Action::Unwind)],
+        ..row("esc", "Leave map mode, keeping the view", "", Context::Map)
+    },
+    Binding {
+        hints: &[hint("?", "help")],
+        priority: PINNED,
+        chords: &[(Key::Char('?'), Action::Help)],
+        ..row("?", "Help", "", Context::Map)
     },
     Binding {
         hints: &[hint("enter", "go")],
@@ -741,7 +818,8 @@ fn fallbacks(context: Context) -> &'static [Context] {
         | Context::Help
         | Context::Matrix
         | Context::AddMenu
-        | Context::DriftMenu => &[Context::Global],
+        | Context::DriftMenu
+        | Context::Map => &[Context::Global],
         Context::Range => &[Context::Main, Context::Global],
         Context::Prompt => &[],
     }
@@ -757,7 +835,7 @@ fn hints_global(context: Context) -> bool {
         | Context::Help
         | Context::AddMenu
         | Context::DriftMenu => true,
-        Context::Range | Context::Prompt | Context::Matrix => false,
+        Context::Range | Context::Prompt | Context::Matrix | Context::Map => false,
     }
 }
 
@@ -802,7 +880,8 @@ fn unbound(context: Context, key: Key) -> Option<Action> {
         | Context::Help
         | Context::Matrix
         | Context::AddMenu
-        | Context::DriftMenu => None,
+        | Context::DriftMenu
+        | Context::Map => None,
     }
 }
 

@@ -70,6 +70,66 @@ pub fn framing(app: &App) -> Camera {
     }
 }
 
+/// The furthest map mode zooms in: four times the area's width.
+const MAX_ZOOM: i8 = 4;
+
+/// The area the map is drawn in at the terminal's last size, if it is drawn.
+fn drawn_area(app: &App) -> Option<Rect> {
+    super::view::map_area(app, Rect::new(0, 0, app.size.0, app.size.1))
+}
+
+/// Whether the map is drawn, in place or as the overlay, at the terminal's last size.
+pub fn is_drawn(app: &App) -> bool {
+    drawn_area(app).is_some()
+}
+
+/// The app's camera after a pan of `steps`, or as it is while the map is not drawn.
+pub fn panned(app: &App, steps: (i8, i8)) -> Camera {
+    drawn_area(app).map_or(app.camera, |area| pan(area, app.camera, steps))
+}
+
+/// The app's camera zoomed `by` steps, or as it is while the map is not drawn.
+pub fn zoomed(app: &App, by: i8) -> Camera {
+    drawn_area(app).map_or(app.camera, |area| zoom(area, app.camera, by))
+}
+
+/// The camera after a pan of `across` and `down` steps (east and south positive): a step is an
+/// eighth of the drawn columns or a quarter of the drawn rows, and longitude wraps.
+fn pan(area: Rect, camera: Camera, (across, down): (i8, i8)) -> Camera {
+    let view = Projection::new(area, camera);
+    let step = |cells: u16, parts: u16, by: i8| f64::from((cells / parts).max(1)) * f64::from(by);
+    let east = step(view.columns.len, 8, across) * 2.0 * view.dot;
+    let south = step(view.rows.len, 4, down) * 4.0 * view.dot;
+    settled(
+        area,
+        Camera {
+            lat: camera.lat - south,
+            lon: (camera.lon + east + 180.0).rem_euclid(360.0) - 180.0,
+            ..camera
+        },
+    )
+}
+
+/// The camera zoomed `by` steps, out no further than the whole map showing and in no further
+/// than [`MAX_ZOOM`].
+fn zoom(area: Rect, camera: Camera, by: i8) -> Camera {
+    let fits = |zoom: i8| Projection::new(area, Camera { zoom, ..camera }).fits();
+    let widest = (-12..=0).rev().find(|zoom| fits(*zoom)).unwrap_or(-12);
+    let zoom = camera.zoom.saturating_add(by).clamp(widest, MAX_ZOOM);
+    settled(area, Camera { zoom, ..camera })
+}
+
+/// The camera on the latitude the view is centred on once held inside the map's bounds, so a
+/// pan past an edge does not wind up.
+fn settled(area: Rect, camera: Camera) -> Camera {
+    let view = Projection::new(area, camera);
+    let middle = f64::from(view.rows.first) + f64::from(view.rows.len) / 2.0;
+    Camera {
+        lat: NORTH - middle * 4.0 * view.dot,
+        ..camera
+    }
+}
+
 /// Where the world lands in one map area for one camera. A Braille dot is square, so a degree
 /// takes the same distance both ways, and the world's columns wrap around.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -124,6 +184,11 @@ impl Projection {
             columns,
             rows,
         }
+    }
+
+    /// Whether every latitude of the map shows.
+    fn fits(&self) -> bool {
+        self.rows.len == self.world.1
     }
 
     /// The cell holding a point; `None` off the map or outside the view.

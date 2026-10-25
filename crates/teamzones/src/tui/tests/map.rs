@@ -247,3 +247,176 @@ fn a_group_switch_never_moves_the_map() {
         .collect();
     assert!(moved.is_empty(), "{moved:?}");
 }
+
+/// The map rows of `app`'s frame at the size it last reported, from the header to the ruler.
+fn map_of(app: &App) -> String {
+    let buf = frame(app);
+    (1..y_of(&buf, " AEDT    ").min(y_of(&buf, "Mon 26 Oct AEDT")))
+        .map(|y| row(&buf, y))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[test]
+fn z_opens_map_mode_while_the_map_is_drawn_and_its_footer_names_its_keys_until_esc() {
+    let shown = sized(team_monday(), 120, 36);
+    let mapping = press(shown.clone(), &chars("z"));
+    assert_eq!(
+        footer_of(&mapping),
+        "map  h/j/k/l pan  +/- zoom  0 reset  esc done  ? help"
+    );
+    let left = press(mapping, &[Key::Esc]);
+    assert_eq!(footer_of(&left), footer_of(&shown));
+    let hidden = sized(team_monday(), 120, 24);
+    assert_eq!(frame(&press(hidden.clone(), &chars("z"))), frame(&hidden));
+}
+
+#[test]
+fn map_mode_works_on_the_overlay_and_esc_leaves_it_before_closing_the_overlay() {
+    let overlay = press(sized(team_monday(), 120, 24), &chars("mz"));
+    assert!(
+        footer_of(&overlay).starts_with("map  "),
+        "{}",
+        footer_of(&overlay)
+    );
+    let left = press(overlay, &[Key::Esc]);
+    assert!(shows_map(&frame(&left)), "the overlay is still open");
+    assert!(!footer_of(&left).starts_with("map  "));
+    assert!(!shows_map(&frame(&press(left, &[Key::Esc]))));
+}
+
+#[test]
+fn h_and_l_pan_across_and_eight_steps_go_round_the_world() {
+    let mapping = press(sized(team_monday(), 120, 36), &chars("z"));
+    let start = map_of(&mapping);
+    let east = press(mapping.clone(), &chars("l"));
+    assert_ne!(map_of(&east), start);
+    assert_eq!(map_of(&press(east, &chars("h"))), start);
+    // A step is an eighth of the 120 columns, so eight of them wrap the world round once.
+    assert_eq!(map_of(&press(mapping, &chars("llllllll"))), start);
+}
+
+#[test]
+fn k_pans_north_until_the_map_s_edge_and_holds_there() {
+    let regions = press(sized(regions_monday(), 120, 36), &chars("z"));
+    assert!(!map_of(&regions).contains("UK closed"));
+    let north = press(regions.clone(), &chars("k"));
+    assert!(map_of(&north).contains("UK closed"), "{}", map_of(&north));
+    let edge = press(regions, &chars("kkkkkkkkkk"));
+    assert_eq!(map_of(&press(edge.clone(), &chars("kkk"))), map_of(&edge));
+    assert_ne!(
+        map_of(&press(edge.clone(), &chars("j"))),
+        map_of(&edge),
+        "held, not wound up"
+    );
+}
+
+#[test]
+fn minus_zooms_out_until_the_whole_map_shows_and_plus_zooms_back_in() {
+    let mapping = press(sized(regions_monday(), 120, 36), &chars("z"));
+    let start = map_of(&mapping);
+    let out = press(mapping.clone(), &chars("----------"));
+    for label in ["UK closed", "Melbourne", "US open", "AU open"] {
+        assert!(
+            map_of(&out).contains(label),
+            "no {label:?} in\n{}",
+            map_of(&out)
+        );
+    }
+    let closer = press(mapping, &chars("+"));
+    assert_ne!(map_of(&closer), start);
+    assert_eq!(map_of(&press(closer, &chars("-"))), start);
+}
+
+#[test]
+fn zero_resets_the_view_which_otherwise_stays_after_esc_until_a_resize() {
+    let mapping = press(sized(team_monday(), 120, 36), &chars("z"));
+    let start = map_of(&mapping);
+    let moved = press(mapping, &chars("l+k"));
+    let left = press(moved.clone(), &[Key::Esc]);
+    assert_eq!(map_of(&left), map_of(&moved), "the view stays after esc");
+    assert_eq!(map_of(&press(moved, &chars("0"))), start);
+    assert_eq!(
+        map_of(&sized(left, 120, 36)),
+        start,
+        "a resize resets the view"
+    );
+}
+
+#[test]
+fn a_resize_that_hides_the_map_leaves_map_mode() {
+    let mapping = press(sized(team_monday(), 120, 36), &chars("z"));
+    let shrunk = sized(mapping, 120, 24);
+    assert!(
+        !footer_of(&shrunk).starts_with("map  "),
+        "{}",
+        footer_of(&shrunk)
+    );
+    assert!(
+        footer_of(&shrunk).contains("h/l time"),
+        "{}",
+        footer_of(&shrunk)
+    );
+}
+
+#[test]
+fn help_from_map_mode_lists_its_keys_and_closing_it_returns_to_map_mode() {
+    let mapping = press(sized(team_monday(), 120, 36), &chars("z"));
+    let help = press(mapping.clone(), &chars("?"));
+    let shown = text(&frame(&help));
+    for line in [
+        "Pan the map",
+        "Zoom in",
+        "Back to the default view",
+        "Leave map mode",
+    ] {
+        assert!(shown.contains(line), "no {line:?} in\n{shown}");
+    }
+    assert_eq!(press(help, &[Key::Esc]).mode, mapping.mode);
+}
+
+/// The cell showing `glyph` on the map rows of `app`'s frame.
+fn cell_with(app: &App, glyph: &str, rows: std::ops::Range<u16>) -> Option<(u16, u16)> {
+    let buf = frame(app);
+    rows.flat_map(|y| (0..buf.area.width).map(move |x| (x, y)))
+        .find(|cell| buf[*cell].symbol() == glyph)
+}
+
+#[test]
+fn the_sun_and_the_markers_move_with_the_view_and_leave_it_when_it_moves_away() {
+    let mapping = press(sized(team_monday(), 120, 36), &chars("z"));
+    let east = press(mapping.clone(), &chars("l"));
+    for glyph in ["☼", "⌂"] {
+        let (x, y) = cell_with(&mapping, glyph, 1..13).unwrap();
+        // A step east is 15 of the 120 columns, so everything on the map shifts 15 west.
+        assert_eq!(cell_with(&east, glyph, 1..13), Some((x - 15, y)), "{glyph}");
+    }
+    // Zoomed four steps in on 0E, the view spans 90 degrees and Melbourne (145E) is outside it.
+    let close = press(mapping, &chars("++++"));
+    assert_eq!(cell_with(&close, "⌂", 1..13), None);
+    assert!(!map_of(&close).contains("Melbourne"), "{}", map_of(&close));
+}
+
+#[test]
+fn a_label_never_draws_past_the_overlay_s_border_wherever_the_view_pans() {
+    let mut app = press(sized(team_monday(), 120, 24), &chars("mz"));
+    for _ in 0..16 {
+        app = press(app, &chars("l"));
+        let buf = frame(&app);
+        let border = buf
+            .content
+            .iter()
+            .position(|cell| cell.symbol() == "╮")
+            .map(|i| i as u16 % buf.area.width)
+            .unwrap();
+        let top = (0..buf.area.height)
+            .find(|y| buf[(border, *y)].symbol() == "╮")
+            .unwrap();
+        let bottom = (top..buf.area.height)
+            .find(|y| buf[(border, *y)].symbol() == "╯")
+            .unwrap();
+        for y in top + 1..bottom {
+            assert_eq!(buf[(border, y)].symbol(), "│", "row {y}\n{}", text(&buf));
+        }
+    }
+}

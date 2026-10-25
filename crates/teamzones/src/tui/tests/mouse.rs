@@ -388,8 +388,49 @@ const CASES: &[(&str, fn())] = &[
     ("c", copy_as),
     ("b", lanes),
     ("s", sort),
+    ("z", map_mode_wheel),
     ("a e d", a_e_d),
 ];
+
+fn map_mode_wheel() {
+    let mapping = press(team(), &chars("z"));
+    let (over_map, over_grid) = ((30, 6), (60, 20));
+    let wheel = |kind, at, modifiers| keys_of(msgs(&mapping, event(kind, at, modifiers)));
+    let none = KeyModifiers::NONE;
+    assert_eq!(wheel(MouseEventKind::ScrollUp, over_map, none), [key('k')]);
+    assert_eq!(
+        wheel(MouseEventKind::ScrollDown, over_map, none),
+        [key('j')]
+    );
+    assert_eq!(
+        wheel(MouseEventKind::ScrollLeft, over_map, none),
+        [key('h')]
+    );
+    assert_eq!(
+        wheel(MouseEventKind::ScrollRight, over_map, none),
+        [key('l')]
+    );
+    let shift = KeyModifiers::SHIFT;
+    assert_eq!(wheel(MouseEventKind::ScrollUp, over_map, shift), [key('h')]);
+    assert_eq!(
+        wheel(MouseEventKind::ScrollDown, over_map, shift),
+        [key('l')]
+    );
+    assert!(wheel(MouseEventKind::ScrollDown, over_grid, none).is_empty());
+    let scrolled = send(
+        mapping.clone(),
+        &[event(MouseEventKind::ScrollDown, over_map, none)],
+    );
+    assert_eq!(scrolled, press(mapping, &chars("j")));
+    assert!(
+        keys_of(msgs(
+            &team(),
+            event(MouseEventKind::ScrollDown, over_map, none)
+        ))
+        .is_empty(),
+        "outside map mode the wheel over the map does what it did"
+    );
+}
 
 const KEYS_SPEC: &str = include_str!("../../../../../docs/spec/keys.md");
 
