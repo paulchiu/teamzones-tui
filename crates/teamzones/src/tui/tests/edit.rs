@@ -273,7 +273,9 @@ fn matrix_changes_are_written_together_on_esc_and_the_old_name_still_says() {
     assert!(after[0].contains("# the people I tell first\n[[group]]\nname   = \"team\""));
     assert_eq!(
         say_on(&after[0], &["deploy", "next"]).as_deref(),
-        Ok("Mon 26 Oct, 5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST, open in AU, closed in UK\n"),
+        Ok(
+            "Mon 26 Oct, 5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST / 6-6:30am GMT, open in AU, closed in UK\n"
+        ),
         "Sam works Priya's hours in her zone, so deploy's next fit reads the same"
     );
     assert_eq!(notice_text(&closed), "tab  groups saved  u undo");

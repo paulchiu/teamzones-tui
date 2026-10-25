@@ -1,6 +1,6 @@
 # teamzones
 
-> teamzones is a terminal tool (a TUI plus a headless CLI) that shows the people you tell by their availability and the regions you operate in by their trading load, on one home-time axis, and copies a line such as `5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST, open in AU, closed in UK`. This file tells a coding agent how to write its config for a user: where the file lives, every table and field, how to gather colleagues' details from real sources, and how to check the result.
+> teamzones is a terminal tool (a TUI plus a headless CLI) that shows the people you tell by their availability and the regions you operate in by their trading load, on one home-time axis, and copies a line such as `5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST / 6-6:30am GMT, open in AU, closed in UK`. This file tells a coding agent how to write its config for a user: where the file lives, every table and field, how to gather colleagues' details from real sources, and how to check the result.
 
 ## Where the config lives
 
@@ -144,7 +144,7 @@ accent = "#0969da"
 
 ### [[copy]]
 
-A copy-as format in the `c` dialog. The built-ins are `y d w t z s a`. A `[[copy]]` with a built-in key replaces it, `hide = true` removes it, and a new key adds a format. `who` is `"marked"`, `"all"` or `"focused-first"`, and `places` is `"states"`, `"zones"` or `"none"`. Exactly one format is the default (`y` unless one sets `default = true`): its line is the times box, what `y` copies and what `teamzones say` prints. `key` is one character other than `?` or `q`, and a table with `hide = true` has only `key`.
+A copy-as format in the `c` dialog. The built-ins are `y d w t z s a`. A `[[copy]]` with a built-in key replaces it, `hide = true` removes it, and a new key adds a format. `who` is `"marked"`, `"all"` or `"focused-first"`, and `places` is `"both"` (each counted place's clock and its state, the default), `"states"`, `"zones"` or `"none"`. Exactly one format is the default (`y` unless one sets `default = true`): its line is the times box, what `y` copies and what `teamzones say` prints. `key` is one character other than `?` or `q`, and a table with `hide = true` has only `key`.
 
 ```toml
 [[copy]]
@@ -153,7 +153,7 @@ label   = "dated, with names"
 who     = "marked"
 date    = true
 names   = true
-places  = "states"
+places  = "both"
 default = false
 
 [[copy]]

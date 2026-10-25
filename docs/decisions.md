@@ -6,6 +6,8 @@ Each entry has three lines. `Held by` names the test, lint or `just` recipe that
 
 ## D1: A region is a load, not a clock (2026-10-24)
 
+Superseded by D49, which adds each counted place's clock to the line and keeps its state.
+
 Decision: a place adds a trading state to the say line, never a zone, and `--zones` (and `c z`) gives the old `ttz` shape. The `say apps 3pm` row of the [CLI golden table](spec/cli.md#cli-golden-table) shows it.
 
 Why: Paul picked concept V3-B, which makes this the deciding call.
@@ -356,6 +358,8 @@ Held by: `tui::layout::tests::a_hidden_map_moves_the_blocks_up_and_leaves_its_ro
 
 ## D43: Travel follows the clock, and home's own city is a reference row that is copied but never counted (2026-10-25)
 
+Superseded in part by D49: a places-only line now names its places' zones after the axis.
+
 Decision: Whether `[travel]` holds is decided by now, never by the time on screen, so scrubbing past `until` never moves the axis, while a running screen comes home once the clock passes it. While it holds, the roster has home in the travel city with its own hours, and home's own city as a reference: a dim `⌂` row directly under home, never focusable or counted, drawn with plain day and night. Its zone joins every line whose marks ask who, after the axis in offset order like any other zone, with no name under `c w` (it is where home is not). A places-only line names the axis alone, as before. The map marks home `✈` in the travel city and draws nothing at home's own city. See [config](spec/config.md#data-model-and-config).
 
 Why: The milestone card fixed the shape (`3pm GMT / Tue 2am AEDT / Tue 1am AEST / 5pm SAST`, counted home, an uncounted reference) but not where the reference row sits, whether names cover it or what the time on screen does to travel. An axis that changed while scrubbing would redraw the track under the cursor.
@@ -401,3 +405,11 @@ Decision: With `TEAMZONES_TEST_PANIC` set, a debug build panics right after its 
 Why: The panic hook restores the terminal only on a panic, and nothing in the app panics on purpose. A debug-only hook is the smallest way to make the real binary exercise it without shipping a way to crash a release build.
 
 Held by: `a_panic_releases_mouse_capture_raw_mode_and_the_alternate_screen` in `crates/teamzones/tests/terminal_restoration.rs`
+
+## D49: A counted place adds its clock to the line, and keeps its state after the comma (2026-10-25)
+
+Decision: Every counted place, with a trading profile or without, adds its zone to the default line (the `times for` box, `y` and `teamzones say`), sorted among the people's zones by offset and merged with any that render the same time, and a place with a trading profile still adds its state to the clause. This is `places = "both"`, the built-in `y`, `d`, `w` and `a` formats and the default for a `[[copy]]` table that leaves `places` out. `places = "states"` keeps the old clause-only line for anyone who wants it. `--zones` (`c z`) keeps the places' zones and drops the clause, and `--no-clause` (`c s`) drops the places altogether, leaving the people's times. The times box summary counts the zones the line names, places' included (`4 zones for 5 people, 1 place`, `3 zones for 3 places`). See [copy](spec/copy.md).
+
+Why: Paul marked UK, a place with no trading profile, and nothing changed in the line he copies, because D1 let a place contribute only its state. He expects a place he adds to show up in `times for`. Keeping the clause keeps the answer, and keeping `states` as a value keeps D1's line one `[[copy]]` table away. `--no-clause` could have become the same line as `--zones`; dropping the places with it keeps the two flags distinct and keeps `c s` "times only".
+
+Held by: the copy and CLI golden tables, `copy::tests::a_counting_place_is_named_by_its_real_state_not_the_question` and `while_travelling_a_places_only_line_names_the_axis_then_the_places_clocks` in `teamzones-core`, `tui::tests::marking_a_place_without_trading_adds_its_clock_to_the_times_box_and_the_summary_counts_it`, `a_places_only_summary_counts_the_zones_its_places_add` and `the_times_box_shows_what_say_prints_for_every_fixed_time_golden_row` in `teamzones`, and `say_with_a_place_group_prints_each_place_s_clock_and_the_flags_keep_or_drop_them` in `crates/teamzones/tests/cli.rs`

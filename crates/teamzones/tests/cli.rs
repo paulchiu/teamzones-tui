@@ -525,7 +525,7 @@ fn say_and_status_use_a_profile_s_labels() {
         .args(["say", "regions", "-@us", "5:30pm", "mon", "--no-copy"])
         .assert()
         .success()
-        .stdout("5:30pm AEDT, closed in UK, rush in AU\n");
+        .stdout("5:30pm AEDT / 6:30am GMT, closed in UK, rush in AU\n");
     let status = teamzones_on(&path)
         .args(["status", "regions"])
         .assert()
@@ -587,4 +587,35 @@ fn config_help_points_agents_at_llms_txt() {
     let assert = teamzones().args(["config", "--help"]).assert().success();
     let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
     assert!(stdout.contains("llms.txt"), "{stdout}");
+}
+
+#[test]
+fn say_with_a_place_group_prints_each_place_s_clock_and_the_flags_keep_or_drop_them() {
+    let (path, original) = fixture_copy("say-place-clocks");
+    let clock_only = original.replacen(
+        "tz      = \"Europe/London\"\ntrading = \"venue\"\n",
+        "tz      = \"Europe/London\"\n",
+        1,
+    );
+    std::fs::write(&path, clock_only).unwrap();
+    let say = |flags: &[&str]| {
+        let output = teamzones_on(&path)
+            .args(["say", "deploy", "5-5:30pm", "mon", "--no-copy"])
+            .args(flags)
+            .assert()
+            .success();
+        String::from_utf8(output.get_output().stdout.clone()).unwrap()
+    };
+    assert_eq!(
+        say(&[]),
+        "5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST / 6-6:30am GMT, open in AU\n"
+    );
+    assert_eq!(
+        say(&["--zones"]),
+        "5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST / 6-6:30am GMT\n"
+    );
+    assert_eq!(
+        say(&["--no-clause"]),
+        "5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST\n"
+    );
 }

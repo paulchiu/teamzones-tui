@@ -9,11 +9,13 @@ use crate::config::{PersonId, Place, Roster, Rule};
 use crate::question::{Marks, Row, place_state};
 use crate::schedule::Level;
 
-/// What a line does with the counted places: their states, their zones, or nothing.
+/// What a line does with the counted places: their zones and states, their states, their zones,
+/// or nothing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Clause {
     #[default]
+    Both,
     States,
     Zones,
     #[serde(rename = "none")]
@@ -59,16 +61,9 @@ pub const DIALOG_KEYS: [char; 2] = ['?', 'q'];
 
 /// The built-in formats as `(key, label, who, date, names, clause)`, with `y` the default.
 const BUILTIN: [(char, &str, Who, bool, bool, Clause); 7] = [
-    ('y', "the times", Who::Marked, false, false, Clause::States),
-    (
-        'd',
-        "with the date",
-        Who::Marked,
-        true,
-        false,
-        Clause::States,
-    ),
-    ('w', "with names", Who::Marked, false, true, Clause::States),
+    ('y', "the times", Who::Marked, false, false, Clause::Both),
+    ('d', "with the date", Who::Marked, true, false, Clause::Both),
+    ('w', "with names", Who::Marked, false, true, Clause::Both),
     (
         't',
         "the focused row's time first",
@@ -86,7 +81,7 @@ const BUILTIN: [(char, &str, Who, bool, bool, Clause); 7] = [
         Clause::Zones,
     ),
     ('s', "times only", Who::Marked, false, false, Clause::Drop),
-    ('a', "for everyone", Who::All, false, false, Clause::States),
+    ('a', "for everyone", Who::All, false, false, Clause::Both),
 ];
 
 impl Formats {
@@ -217,10 +212,10 @@ fn reference_source(roster: &Roster, marks: &Marks) -> Option<Source> {
         .map(|reference| (reference.location.tz, Vec::new()))
 }
 
-/// The counted places' zones, which only `Clause::Zones` names.
+/// The counted places' zones, which `Clause::Both` and `Clause::Zones` name.
 fn place_sources(roster: &Roster, marks: &Marks, clause: Clause) -> Vec<Source> {
     let places = match clause {
-        Clause::Zones => marks.counted_places(),
+        Clause::Both | Clause::Zones => marks.counted_places(),
         Clause::States | Clause::Drop => Vec::new(),
     };
     places
@@ -335,7 +330,9 @@ fn wrapped(roster: &Roster, marks: &Marks, when: When, variant: Variant, zones: 
         String::new()
     };
     let states = match variant.clause {
-        Clause::States => clause(roster, marks, when).map(|states| format!(", {states}")),
+        Clause::Both | Clause::States => {
+            clause(roster, marks, when).map(|states| format!(", {states}"))
+        }
         Clause::Zones | Clause::Drop => None,
     };
     format!("{prefix}{zones}{}", states.unwrap_or_default())
@@ -465,10 +462,10 @@ mod tests {
     }
 
     #[test]
-    fn while_travelling_a_places_only_line_names_the_axis_alone() {
+    fn while_travelling_a_places_only_line_names_the_axis_then_the_places_clocks() {
         assert_eq!(
             travelling_line("regions 3pm", Variant::default()),
-            "3pm GMT, open in UK and US, closed in AU"
+            "3pm GMT / Tue 2am AEDT / 10am CDT, open in UK and US, closed in AU"
         );
     }
 
@@ -477,11 +474,11 @@ mod tests {
         let roster = Config::parse(FIXTURE).unwrap().roster;
         assert_eq!(
             line(&roster, "apps 3pm"),
-            "3pm AEDT, open in AU, closed in UK and US"
+            "3pm AEDT / 5am BST / Fri 11pm CDT, open in AU, closed in UK and US"
         );
         assert_eq!(
             line(&roster, "regions 2-4pm mon"),
-            "2-4pm AEDT, open in AU and US, closed in UK"
+            "2-4pm AEDT / 3-5am GMT / Sun 10pm-12am CDT, open in AU and US, closed in UK"
         );
     }
 
@@ -628,11 +625,11 @@ mod tests {
         let roster = labelled();
         assert_eq!(
             line(&roster, "regions -@us 5:30pm mon"),
-            "5:30pm AEDT, closed in UK, rush in AU"
+            "5:30pm AEDT / 6:30am GMT, closed in UK, rush in AU"
         );
         assert_eq!(
             line(&roster, "regions 2-4pm mon"),
-            "2-4pm AEDT, trading hours in AU, open in US, closed in UK"
+            "2-4pm AEDT / 3-5am GMT / Sun 10pm-12am CDT, trading hours in AU, open in US, closed in UK"
         );
     }
 }

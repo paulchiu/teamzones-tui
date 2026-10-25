@@ -198,7 +198,10 @@ fn n_n() {
         regions,
         &[left(MouseEventKind::Down, at), left(MouseEventKind::Up, at)],
     );
-    assert_eq!(clicked.say_line(), "8-9:30am AEDT, open in AU, UK and US");
+    assert_eq!(
+        clicked.say_line(),
+        "8-9:30am AEDT / Sun 9-10:30pm GMT / Sun 4-5:30pm CDT, open in AU, UK and US"
+    );
 }
 
 fn esc() {

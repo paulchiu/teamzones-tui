@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ## [Unreleased]
 
+### Added
+
+- `places = "both"` in a `[[copy]]` table names each counted place's clock and its state, and is now the default.
+
+### Changed
+
+- A place you mark now adds its clock to the `times for` line, `y` and `teamzones say`, sorted in with the people's zones, and a place with a trading profile still adds its state after the comma. A place with no trading profile, which has no state, now shows up in the line at all.
+- `--no-clause` (and `c s`) leaves the places out altogether, clocks and states, while `--zones` (and `c z`) keeps their clocks and drops their states.
+- The times box summary counts the places' zones too, as in `4 zones for 5 people, 1 place` or `3 zones for 3 places`.
+
 ## [0.13.0] - 2026-10-25
 
 ### Added

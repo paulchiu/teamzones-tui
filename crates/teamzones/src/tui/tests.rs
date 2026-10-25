@@ -345,11 +345,11 @@ fn switching_groups_never_moves_the_ruler_the_borders_or_the_say_panel() {
     let [regions, deploy] = [&regions, &deploy].map(|app| render(app, 120, 36));
     assert_eq!(
         say_line(&regions),
-        "5-6pm AEDT, closed in UK and US, busy in AU"
+        "5-6pm AEDT / 6-7am GMT / 1-2am CDT, closed in UK and US, busy in AU"
     );
     assert_eq!(
         say_line(&deploy),
-        "5-6pm AEDT / 4-5pm AEST / 8-9am SAST, closed in UK, busy in AU"
+        "5-6pm AEDT / 4-5pm AEST / 8-9am SAST / 6-7am GMT, closed in UK, busy in AU"
     );
 }
 
@@ -383,7 +383,7 @@ fn repeated_n_steps_run_by_run() {
     let app = press(go_to(press(fixture(), &chars("3")), "mon 2pm"), &chars("n"));
     assert_eq!(
         app.say_line(),
-        "9-10pm AEDT, open in AU and UK, closed in US"
+        "9-10pm AEDT / 10-11am GMT / 5-6am CDT, open in AU and UK, closed in US"
     );
 }
 
@@ -392,7 +392,7 @@ fn shift_n_lands_on_the_start_of_the_previous_run() {
     let app = press(go_to(press(fixture(), &chars("3")), "mon 9pm"), &chars("N"));
     assert_eq!(
         app.say_line(),
-        "2-3pm AEDT, open in AU and US, closed in UK"
+        "2-3pm AEDT / 3-4am GMT / Sun 10-11pm CDT, open in AU and US, closed in UK"
     );
 }
 
@@ -411,7 +411,10 @@ fn n_with_nothing_in_seven_days_says_so_and_moves_to_the_best_slot() {
         app.notice.as_ref().unwrap().text,
         "n  no full slot in 7 days, best 2/3 at Sat 3pm AEDT"
     );
-    assert_eq!(app.say_line(), "3pm AEDT, closed in UK and US, open in AU");
+    assert_eq!(
+        app.say_line(),
+        "3pm AEDT / 5am BST / Fri 11pm CDT, closed in UK and US, open in AU"
+    );
 }
 
 /// Moves focus down until it sits on the row named `name`.
@@ -1734,4 +1737,82 @@ fn the_screen_opens_on_the_saved_last_group_and_on_the_first_without_one() {
     }
     let deploy = fixture().on_group(Some("deploy"));
     assert_eq!(deploy.marks, press(fixture(), &chars("4")).marks);
+}
+
+#[test]
+fn marking_a_place_without_trading_adds_its_clock_to_the_times_box_and_the_summary_counts_it() {
+    let clock_only = FIXTURE.replacen(
+        "tz      = \"Europe/London\"\ntrading = \"venue\"\n",
+        "tz      = \"Europe/London\"\n",
+        1,
+    );
+    let team = go_to(
+        App::new(Config::parse(&clock_only).unwrap(), now()),
+        "26 oct 5-6pm",
+    );
+    let marked = press(focus_on(team, "UK"), &chars(" "));
+    let buf = render(&marked, 120, 36);
+    assert_eq!(
+        say_line(&buf),
+        "5-6pm AEDT / 4-5pm AEST / 8-9am SAST / 6-7am GMT"
+    );
+    let bottom = row(&buf, y_of(&buf, " times for ") + 2);
+    assert!(
+        bottom.contains(" 4 zones for 5 people, 1 place "),
+        "{bottom}"
+    );
+}
+
+#[test]
+fn a_places_only_summary_counts_the_zones_its_places_add() {
+    let regions = go_to(press(fixture(), &chars("3")), "26 oct 2-4pm");
+    let buf = render(&regions, 120, 36);
+    let bottom = row(&buf, y_of(&buf, " times for ") + 2);
+    assert!(bottom.contains(" 3 zones for 3 places "), "{bottom}");
+}
+
+const CLI_SPEC: &str = include_str!("../../../../docs/spec/cli.md");
+
+#[test]
+fn the_times_box_shows_what_say_prints_for_every_fixed_time_golden_row() {
+    use super::app::Cursor;
+    use teamzones_core::clock::{Slot, When};
+    use teamzones_core::time::Moment;
+    let rows: Vec<(String, String)> = CLI_SPEC
+        .split_once("## CLI golden table")
+        .unwrap()
+        .1
+        .lines()
+        .skip_while(|line| !line.starts_with('|'))
+        .take_while(|line| line.starts_with('|'))
+        .skip(2)
+        .filter_map(|line| {
+            let cells: Vec<&str> = line.trim_matches('|').split(" | ").collect();
+            let command = unticked(cells[0].trim()).strip_prefix("say ")?;
+            let stdout = cells[1].trim();
+            let plain = stdout.starts_with('`') && stdout.ends_with('`');
+            (plain && !command.contains("--") && !command.ends_with("next"))
+                .then(|| (command.to_owned(), unticked(stdout).to_owned()))
+        })
+        .collect();
+    assert_eq!(rows.len(), 7, "{rows:?}");
+    for (command, stdout) in rows {
+        let app = fixture();
+        let tokens: Vec<&str> = command.split(' ').collect();
+        let expr = teamzones_core::expr::parse_expr(&tokens, app.roster(), now()).unwrap();
+        let Moment::Fixed(when) = expr.moment else {
+            panic!("{command} has no fixed time");
+        };
+        let (cursor, range) = match when {
+            When::At(instant) => (Cursor::At(Slot::containing(instant)), None),
+            When::Over(range) => (Cursor::At(range.start()), Some(range)),
+        };
+        let shown = App {
+            marks: expr.marks,
+            cursor,
+            range,
+            ..app
+        };
+        assert_eq!(say_line(&render(&shown, 160, 36)), stdout, "say {command}");
+    }
 }

@@ -333,7 +333,7 @@ fn the_tui_opens_on_the_group_the_state_file_names_and_saves_the_one_it_quits_on
     let mut session = Session::start(FIXTURE, &dir, &[]);
     // Deploy's summary in the times box's border, which carries no styling inside it.
     session.read_until("deploy", |out| {
-        contains(out, "3 zones for 3 people, 2 places")
+        contains(out, "4 zones for 3 people, 2 places")
     });
     session.send(b"3");
     session.quit();
