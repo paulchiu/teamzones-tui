@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ## [Unreleased]
 
+### Added
+
+- `z` opens map mode while the map is drawn: `h j k l` or the arrows pan the map (all the way round the world east and west), `+` and `-` zoom in and out (out as far as the whole map), `0` goes back to the default view, and `esc` leaves, keeping the view until `0` or a resize. The footer shows a `map` badge and these keys, and in map mode the mouse wheel over the map pans it.
+
+### Changed
+
+- The map keeps its proportions at every size instead of stretching to fill its area. It fills the width and shows the band of latitudes around home and the counted rows, like the macOS Clock app, and when there is height to spare the whole map shows centred, with blank rows above and below.
+
 ## [0.9.0] - 2026-10-25
 
 ### Added
