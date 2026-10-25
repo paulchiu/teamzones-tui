@@ -115,7 +115,7 @@ h/l time  v range  n next fit  space mark  1-9 group  w save  tab groups  y copy
 * **Map hiding**:
   + The map shows only if there are at least 100 columns and at least 12 rows are left after the fixed rows.
   + Recompute on resize only, never on a group switch. `m` flips the automatic choice.
-  + Whenever the map is not drawn in place (hidden by `m`, by `[map] show = "never"`, by this rule, or under `glyphs = "ascii"`), the blocks move up under the header and the spare rows go below the times box, as in the layout above. `m` bringing the map back pushes the blocks down again. Only `m`, a resize and a config reload move the blocks, never a group switch.
+  + Whenever the map is not drawn in place (hidden by `m`, by `[map] show = "never"`, by this rule, or under `glyphs = "ascii"`), the blocks move up under the header and the spare rows go below the times box, as in the layout above. `m` bringing the map back pushes the blocks down again. A group switch never moves the blocks. `m`, a resize, a config reload or a roster edit (`a`, `d`) can.
   + When the map is hidden and there is no room, `m` opens it as an overlay (a centred `Clear` box) until `esc`. The overlay is drawn over the blocks and never moves them.
 * **Folding** (M6), used when the fixed rows exceed the terminal even without the map:
   + Block heights are recomputed per resize, never per group switch. The where block shrinks first, to its borders, the answer row and `min(places, 3)` rows. Then the who block shrinks to whatever is left, with at least home, the answer row and one more row.

@@ -133,6 +133,7 @@ fn with_the_map_off_the_blocks_sit_under_the_header_and_the_spare_rows_above_the
         text(&buf)
     );
     assert!(row(&buf, 35).starts_with("h/l time"), "{}", text(&buf));
+    insta::assert_snapshot!("team_map_off_120x36", text(&buf));
     let back = frame(&press(hidden, &chars("m")));
     assert_eq!(text(&back), text(&frame(&shown)));
     assert_eq!(y_of(&back, "Mon 26 Oct AEDT"), 13);
@@ -163,7 +164,18 @@ fn the_overlay_opens_over_the_blocks_without_moving_them() {
     assert_eq!(open.map_view(), MapView::Overlay);
     let size = Rect::new(0, 0, 120, 30);
     assert_eq!(view::areas(&open, size), view::areas(&closed, size));
-    assert_eq!(y_of(&frame(&open), "Mon 26 Oct AEDT"), 1);
+    let [open, closed] = [&open, &closed].map(frame);
+    let overlay = view::map_overlay_area(size);
+    let outside: Vec<(u16, u16)> = (0..size.height)
+        .flat_map(|y| (0..size.width).map(move |x| (x, y)))
+        .filter(|(x, y)| !overlay.contains(ratatui::layout::Position::new(*x, *y)))
+        .collect();
+    let moved: Vec<&(u16, u16)> = outside
+        .iter()
+        .filter(|cell| open[**cell] != closed[**cell])
+        .collect();
+    assert!(moved.is_empty(), "{moved:?} changed in\n{}", text(&open));
+    assert_eq!(y_of(&open, "Mon 26 Oct AEDT"), 1);
 }
 
 #[test]

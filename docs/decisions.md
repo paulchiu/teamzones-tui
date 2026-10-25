@@ -18,7 +18,7 @@ Decision: The where block's height is fixed by the whole roster, and small termi
 
 Why: Switching groups never moves anything on screen.
 
-Held by: nothing yet
+Held by: `tui::tests::switching_groups_never_moves_the_ruler_the_borders_or_the_say_panel` and `tui::tests::map::with_the_map_off_a_group_switch_never_moves_the_ruler_the_borders_or_the_times_box` in `teamzones`
 
 ## D3: Home counts in every group that asks who (2026-10-24)
 
