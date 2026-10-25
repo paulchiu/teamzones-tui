@@ -3,36 +3,36 @@ source: crates/teamzones/src/tui/tests/edit.rs
 expression: text(&buf)
 ---
 teamzones   now Sat 24 Oct 9:04am AEDT                                                                  ⌂ Melbourne AEDT
-                             ⠈⠙⢣⣇⣀⣀⡤⣶⠤⡇⣤              ⠸⣄                  ⠿⠯⠥⡆       ⢧⣸⡂    ⠈⣞⠢⣤⠬ ⢰⠁⠽⣿⡆
-                                ⠉⠋⣏   ⢸ ⠙⠒⠦⡀           ⠈⠳⠤⠤⠤⠔⠲⡤⣄           ⢀⡜         ⠙⠋    ⣬⣿⣢⠁ ⢀⡎⣣⠐⠙⠇
+                                 ⠋⣇   ⢸ ⠘⠒⠦⡀           ⠈⠳⠤⠤⠤⠔⠲⡤⣄           ⢀⡔         ⠑⠊    ⣤⣿⣢  ⢀⡎⣢⠐⠙⠇
                                  ⣜⠁   ⠈⡆   ⠛⠦⣄⣀                ⣇         ⢀⠔⠁                ⠈⢫⡹⣄⢸⢠⠃⣞⣾⡞⣸⣧⣤⣀⢄⡀  ⣀
                                  ⢧     ⢣       ⠑⢲              ⠈⢦        ⡏                    ⠑⠾⡦⡸⣉⣈⣛⣃⣉⠉⠸⠋⣆⣈⣝⣶⡞⠳⠦⣄⡀
         ☼                         ⢱    ⠘⡄      ⡔⠁               ⡼        ⢸ ⢀⣴⡀                   ⡇ ⠈⠉⢉⣀⡰⠖⣲ ⡼⣄⠉⠉  ⠉⠃⢀
 ⠁                                  ⠉⢢   ⢇     ⢠⠇                ⢧      ⢠⠔⠋⢰⡏⡸⠁                  ⢸ ⢀⣀⡰⠛   ⠈⠓⠃⠸⢄    ⢀⣈⠁  ⠲
                                     ⠸   ⠸⡀  ⡔⠒⠋                 ⠈⡇   ● Johannesburg 12:04am     ⡎ ⡏     ◆ AU open 9:04am
-                  ╭ groups ──────────────────────────────────────────────────────────────────────────╮e 8:04am⢀●
-                  │                          1 team     2 au       3 regions  4 deploy   + new       │:04am⣀⌂⣀⡎      ⠘⡦⣠
-                  │ asks                       who        who        where      both                 │      ⠳⠶     ⢀⣠⣾⠛⠁
-                  │ ⌂ Paul    Melbourne        ⌂          ⌂          ⌂          ⌂                    │             ⠈⠉⠁
-                  │   Priya   Brisbane         ●          ●          ·          ●                    │
-Sat 24 Oct AEDT   │   Sam     Brisbane         ●          ●          ·          ·                    │  ·   9p  ·   ·
-▸ 9:04am AEDT now │   Thandi  Johannesburg     ●          ·          ·          ●                    │──────────────────
- who   1 team  2 a│   Johan   Johannesburg     ●          ·          ·          ·                    │g  ░ night  ╌ off
-⌂ Paul      9:04am│   Ellie   London           ·          ·          ·          ·                    │╌░░░░░░░░░░░░░░░░░
-● Priya     8:04am│   Marcus  Austin           ·          ·          ·          ·                    │░░░░░░░░░░░░░░░░░░
-● Thandi   12:04am│ places                                                                           │╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
-≡ in hours        │   AU      venue profile    ·          ·          ◆          ◆                    │··················
-○ Sam       8:04am│   UK      venue profile    ·          ·          ◆          ◆                    │░░░░░░░░░░░░░░░░░░
-○ Johan    12:04am│   US      venue profile    ·          ·          ◆          ·                    │╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
-○ Ellie     Fri 11│                                                                                  │▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
-○ Marcus Fri 5:04p│ deploy   9:04am AEDT / 8:04am AEST / 12:04am SAST, open in AU, closed in UK      │░░░░░░░░░░░░░░░░░▒
- where  asks open │ cli      teamzones say deploy now                                                │d  ▄ open  █ busy
-◆ AU              │ cursor   space adds the place US to deploy (its state, not its zone)             │██████████▄▄▄▄▁▁▁▁
-◆ UK             c╰───────────────────────────────────────────────── written to config.toml on close ╯▄▄▄▄▄▄▄▄██████████
-≡ open              2/2 ⡇⡇━━━━━━━━━━━━━━⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇━━━━━━━━━━━━━━⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇━━━━━━━━━━━━━━⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇··⡇⡇⡇⡇⡇⡇⡇⡇
+                                    ⡎    ⢇⢀⡜⠁                    ⠙⡄  ⣀⠔⠁                       Brisbane 8:04am⢀●
+                  ╭ groups ──────────────────────────────────────────────────────────────────────────╮:04am⣀⌂⣀⡎      ⠘⡦⣠
+                  │                          1 team     2 au       3 regions  4 deploy   + new       │      ⠳⠶     ⢀⣠⣾⠛⠁
+                  │ asks                       who        who        where      both                 │             ⠈⠉⠁
+                  │ ⌂ Paul    Melbourne        ⌂          ⌂          ⌂          ⌂                    │
+Sat 24 Oct AEDT   │   Priya   Brisbane         ●          ●          ·          ●                    │  ·   9p  ·   ·
+▸ 9:04am AEDT now │   Sam     Brisbane         ●          ●          ·          ·                    │──────────────────
+ who   1 team  2 a│   Thandi  Johannesburg     ●          ·          ·          ●                    │g  ░ night  ╌ off
+⌂ Paul      9:04am│   Johan   Johannesburg     ●          ·          ·          ·                    │╌░░░░░░░░░░░░░░░░░
+● Priya     8:04am│   Ellie   London           ·          ·          ·          ·                    │░░░░░░░░░░░░░░░░░░
+● Thandi   12:04am│   Marcus  Austin           ·          ·          ·          ·                    │╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+≡ in hours        │ places                                                                           │··················
+○ Sam       8:04am│   AU      venue profile    ·          ·          ◆          ◆                    │░░░░░░░░░░░░░░░░░░
+○ Johan    12:04am│   UK      venue profile    ·          ·          ◆          ◆                    │╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+○ Ellie     Fri 11│   US      venue profile    ·          ·          ◆          ·                    │▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
+○ Marcus Fri 5:04p│                                                                                  │░░░░░░░░░░░░░░░░░▒
+ where  asks open │ deploy   9:04am AEDT / 8:04am AEST / 12:04am SAST, open in AU, closed in UK      │d  ▄ open  █ busy
+◆ AU              │ cli      teamzones say deploy now                                                │██████████▄▄▄▄▁▁▁▁
+◆ UK             c│ cursor   space adds the place US to deploy (its state, not its zone)             │▄▄▄▄▄▄▄▄██████████
+≡ open            ╰───────────────────────────────────────────────── written to config.toml on close ╯⡇⡇⡇⡇⡇⡇⡇⡇··⡇⡇⡇⡇⡇⡇⡇⡇
 ◇ US               open ▄▄▄▄▄▄▄▄▄▄▄▄▄▄████████████▄▄▄▄▄▄▄▄▄▄▄▄▄▄████████████████▄▄▄▄▁▁▁▁Sat▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▄▄▄▄
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 ▶ US  Fri 5:04pm open  busy 6-10pm  CDT UTC-5  America/Chicago  venue profile  groups regions
+
 ╭ times for deploy ──────────────────────────────────────────────────────────────────────────────────────────── y copy ╮
 │ 9:04am AEDT / 8:04am AEST / 12:04am SAST, open in AU, closed in UK                                                   │
 ╰────────────────────────────────────────────────────────────────────────────────────── 3 zones for 3 people, 2 places ╯

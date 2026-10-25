@@ -11,12 +11,13 @@ The layout runs top to bottom with no outer frame and a horizontal margin of 0:
 * slider: ruler and track (2)
 * who block: top border holding the lens strip, every person, and the answer row (people + 2)
 * where block: top border, every place, answer row, bottom border (places + 3)
-* say panel (4): the detail line, then the copy box (3)
-* spare rows (rest of the height, while the map is not drawn in place)
+* detail line (1)
+* spare rows (one row while the map is drawn in place, else the rest of the height)
+* times box (3)
 * notice row (1)
 * footer (1)
 
-The fixture has 7 people (home included) and 3 places, so the fixed rows total 24. Block heights come from the whole roster, never from the active group. The rows the fixed rows leave go to the map when it is drawn in place. Otherwise the ruler starts on the row under the header and the spare rows sit together, blank, between the times box and the notice row, so the footer stays on the last row.
+The fixture has 7 people (home included) and 3 places, so the fixed rows total 24. Block heights come from the whole roster, never from the active group. The times box, the notice row and the footer keep to the bottom, with the footer on the last row. The rows the fixed rows leave sit together, blank, between the detail line and the times box, so the box has room to breathe. When the map is drawn in place it takes all of them but one, and that one stays over the times box. Otherwise the ruler starts on the row under the header and every spare row sits over the times box. With no spare rows the detail line sits directly over the times box.
 
 The mockups below predate the hands-on round after M3 ([D17 to D22](../decisions.md)): they still show the old level words (`quiet`, `off-peak`, `peak`), the `say` panel with the detail line inside it and the old footer. They also predate [D39](../decisions.md), so their maps are stretched to the area rather than kept in proportion. Where they disagree with this text, the text wins.
 
@@ -113,9 +114,9 @@ h/l time  v range  n next fit  space mark  1-9 group  w save  tab groups  y copy
   + Labels are drawn only for home and counted rows: `City 4-5pm` for a person (with `·N` after it when N counted people share the city, as in `Brisbane 4-5pm ·2`), and `UK closed 3-5am` for a place, using its profile's label for the state. Try the right of the marker on its row first, then the row above, then the left. Drop the label whole if all three overlap another label or leave the map's area.
   + The night side, its terminator and `☼` use the range midpoint, or the cursor when there is no range.
 * **Map hiding**:
-  + The map shows only if there are at least 100 columns and at least 12 rows are left after the fixed rows.
+  + The map shows only if there are at least 100 columns and at least 12 rows are left after the fixed rows. It is drawn one row shorter than that, leaving the row over the times box blank.
   + Recompute on resize only, never on a group switch. `m` flips the automatic choice.
-  + Whenever the map is not drawn in place (hidden by `m`, by `[map] show = "never"`, by this rule, or under `glyphs = "ascii"`), the blocks move up under the header and the spare rows go below the times box, as in the layout above. `m` bringing the map back pushes the blocks down again. A group switch never moves the blocks. `m`, a resize, a config reload or a roster edit (`a`, `d`) can.
+  + Whenever the map is not drawn in place (hidden by `m`, by `[map] show = "never"`, by this rule, or under `glyphs = "ascii"`), the blocks move up under the header and the spare rows go between the detail line and the times box, as in the layout above. `m` bringing the map back pushes the blocks down again. A group switch never moves the blocks. `m`, a resize, a config reload or a roster edit (`a`, `d`) can.
   + When the map is hidden and there is no room, `m` opens it as an overlay (a centred `Clear` box) until `esc`. The overlay is drawn over the blocks and never moves them.
 * **Folding** (M6), used when the fixed rows exceed the terminal even without the map:
   + Block heights are recomputed per resize, never per group switch. The where block shrinks first, to its borders, the answer row and `min(places, 3)` rows. Then the who block shrinks to whatever is left, with at least home, the answer row and one more row.

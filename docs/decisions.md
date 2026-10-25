@@ -340,6 +340,8 @@ Held by: `tui::map::tests::the_terminator_s_dots_sit_within_one_dot_of_the_compu
 
 ## D42: With the map off, the blocks move up and the spare rows sit above the notice row (2026-10-25)
 
+Superseded by D45, which keeps the blocks under the header and moves the spare rows to sit over the times box.
+
 Decision: Whenever the map is not drawn in place (hidden by `m`, by `[map] show = "never"`, by the hiding rule, or under `glyphs = "ascii"`), the ruler starts on the row under the header and the rows the map would have taken sit together, blank, between the times box and the notice row. The notice row stays directly above the footer, and the footer stays on the last row. `m` bringing the map back pushes the blocks down again, and the overlay is drawn over the blocks without moving them. Spare rows exist only when every block fits whole, so no block is ever cut short while they show and there is no block to hand them to first. See the layout and Map hiding bullets in [screen](spec/screen.md).
 
 Why: Paul found the header sitting alone over a dozen blank rows when `m` hid the map at about 225x50, and expected the rest of the screen to fill the space. Keeping the notice row next to the footer keeps it where the 80x24 frames put it. Group switches still never move a block (D2), since the layout depends only on the size, the roster and the map's place.
@@ -361,3 +363,11 @@ Decision: Folding keeps each block's lines in their usual order and turns the la
 Why: The spec says what folds and in what order, and that `enter` lists the folded rows, but not how focus reaches a row that is not a person or a place, nor how the list closes. Standing for a real row keeps focus a `Row` everywhere, and an overlay keeps `enter`'s keymap row the only binding it needs.
 
 Held by: the `tui::fold::tests` and `tui::layout::tests::at_80_by_20_the_who_block_folds_to_fit_and_everything_else_keeps_its_rows`, `short_of_rows_the_where_block_folds_first_down_to_three_places` and `the_who_block_never_folds_below_home_one_more_row_and_its_answer`, and the `tui::tests::fold` tests (`row_keys_on_the_fold_row_leave_the_roster_and_the_marks_alone` for the row keys) and the `enter` case of `tui::tests::mouse::every_built_mouse_equivalent_in_the_keymap_sends_what_its_key_does` in `teamzones`
+
+## D45: The times box keeps to the bottom, and the spare rows sit over it (2026-10-25)
+
+Decision: The times box, the notice row and the footer keep to the bottom of the screen, with the footer on the last row. The spare rows sit together, blank, between the detail line and the times box. A map drawn in place takes all of them but one, so a blank row separates the detail line from the times box whenever there is any spare row; `[map] show = "always"` therefore needs two. With no spare rows nothing changes: the detail line sits directly over the times box, and folding still decides who gives up rows. The rest of D42 holds: with the map off the ruler starts under the header. This refines D19, whose detail line now sits directly over the box only when there are no spare rows. See the layout and Map hiding bullets in [screen](spec/screen.md).
+
+Why: Paul found the times box jammed against the grid with the free rows under it, between the box and the footer, and asked for room to breathe. Anchoring the box to the bottom puts the space where it reads as a margin. Group switches still never move a block (D2), since the layout depends only on the size, the roster and the map's place.
+
+Held by: `tui::layout::tests::wherever_the_blocks_fit_whole_the_times_box_keeps_to_the_bottom_under_a_blank_row`, `a_hidden_map_moves_the_blocks_up_and_leaves_its_rows_above_the_times_box` and `at_120_by_36_the_map_takes_eleven_of_the_twelve_spare_rows_and_one_sits_over_the_times_box`, and `tui::tests::map::with_the_map_off_the_blocks_sit_under_the_header_and_the_spare_rows_above_the_times_box`, `at_145_by_30_the_spare_rows_collect_over_the_times_box_and_the_footer_takes_the_last_row` and `with_the_map_off_a_group_switch_never_moves_the_ruler_the_borders_or_the_times_box` in `teamzones`

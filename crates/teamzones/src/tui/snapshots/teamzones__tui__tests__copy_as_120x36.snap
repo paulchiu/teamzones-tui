@@ -3,8 +3,7 @@ source: crates/teamzones/src/tui/tests.rs
 expression: text(&buf)
 ---
 teamzones   now Sat 24 Oct 9:04am AEDT   viewing Mon 26 Oct +2d                                         ⌂ Melbourne AEDT
-                             ⠈⠙⢣⣇⣀⣀⡤⣶⠤⣤⣤              ⠸⣄⢸                 ⠿⠯⠥⡆       ⢧⣸⡂    ⠈⣞⠢⣤⠬  ⣠⠽⣿⡆            ⠈⡆
-                                ⠉⠋⣏     ⠙⠒⠦⡀           ⠈⡇⠤⠤⠤⠔⠲⡤⣄           ⢀⡜         ⠙⠋    ⣬⣿⣢⠁ ⢀⡴⣣⠐⠙⠇             ⢣
+                                 ⠋⣇     ⠘⠒⠦⡀           ⠈⡇⠤⠤⠤⠔⠲⡤⣄           ⢀⡔         ⠑⠊    ⣤⣿⣢  ⢀⡴⣢⠐⠙⠇             ⢣
                                  ⣜⠁        ⠛⠦⣄⣀        ⢰⠁      ⣇         ⢀⠔⠁                ⠈⢫⡹⣄⢸⡁⡀⣞⣾⡞⣸⣧⣤⣀⢄⡀  ⣀     ⠘⡄
                                  ⢧             ⠑⢲      ⡎       ⠈⢦        ⡏                    ⠑⠾⡦⣬⣉⣈⣛⣃⣉⠉⠸⠋⣆⣈⣝⣶⡞⠳⠦⣄⡀  ⢇
                                   ⢱            ⡔⠁     ⢠⠃        ⡼        ⢸ ⢀⣴⡀        ☼            ⠈⠉⢉⣀⡰⠖⣲ ⡼⣄⠉⠉  ⠉⠃⢀ ⠸⡀
@@ -14,25 +13,26 @@ teamzones   now Sat 24 Oct 9:04am AEDT   viewing Mon 26 Oct +2d                 
 ⡄                                  ⢠⠃  ⣀⢈⡗⠁         ⢰⠁            ⠙⠉⠉⠁                      Melbourne 5-6pm⣀⌂⣀⡎      ⠘⡦⠘
 ⠱⡀                                 ⣼⠄ ⡰⠏           ⢠⠃                                                       ⠳⠶     ⢀⣠⣾⠛⠁
  ⠱⡀                                ⡗ ⣨⠂ ⢀         ⢠⠃                               ⡤                               ⠈⠉⠁
-  ⠑⢄ ┌ copy as ───────────────────────────────────────────────────────────────────────────────────────────────────┐
-Mon 2│ y  5-6pm AEDT / 4-5pm AEST / 8-9am SAST                                                                    │ ·
-▸ 5-6│    the times                                                                                               │─────
- who │ d  Mon 26 Oct, 5-6pm AEDT / 4-5pm AEST / 8-9am SAST                                                        │ off
-⌂ Pau│    with the date                                                                                           │░░░░░
-● Pri│ w  5-6pm AEDT (Paul) / 4-5pm AEST (Priya, Sam) / 8-9am SAST (Thandi, Johan)                                │░░░░░
-● Sam│    with names                                                                                              │░░░░░
-● Tha│ t  8-9am SAST (5-6pm AEDT)                                                                                 │▓▓▓▓▓
-● Joh│    the focused row's time first (Thandi)                                                                   │▓▓▓▓▓
-≡ in │ a  5-6pm AEDT / 4-5pm AEST / 8-9am SAST / 6-7am GMT / 1-2am CDT, closed in UK and US, busy in AU           │⡆⡆⡆⡆⡆
-○ Ell│    for everyone                                                                                            │▒▒▒▒▒
-○ Mar└───────────────────────────────────────────────────────────────────────────────────────────────── esc close ┘░░░░▒
- where  not asked ──────────────────────────────────────────────────────────────────────────── ▁ closed  ▄ open  █ busy
+  ⠑⢄                               ⠓⠾⠽⠤⠈⠉⠁       ⡠⠃
+Mon 2┌ copy as ───────────────────────────────────────────────────────────────────────────────────────────────────┐ ·
+▸ 5-6│ y  5-6pm AEDT / 4-5pm AEST / 8-9am SAST                                                                    │─────
+ who │    the times                                                                                               │ off
+⌂ Pau│ d  Mon 26 Oct, 5-6pm AEDT / 4-5pm AEST / 8-9am SAST                                                        │░░░░░
+● Pri│    with the date                                                                                           │░░░░░
+● Sam│ w  5-6pm AEDT (Paul) / 4-5pm AEST (Priya, Sam) / 8-9am SAST (Thandi, Johan)                                │░░░░░
+● Tha│    with names                                                                                              │▓▓▓▓▓
+● Joh│ t  8-9am SAST (5-6pm AEDT)                                                                                 │▓▓▓▓▓
+≡ in │    the focused row's time first (Thandi)                                                                   │⡆⡆⡆⡆⡆
+○ Ell│ a  5-6pm AEDT / 4-5pm AEST / 8-9am SAST / 6-7am GMT / 1-2am CDT, closed in UK and US, busy in AU           │▒▒▒▒▒
+○ Mar│    for everyone                                                                                            │░░░░▒
+ wher└───────────────────────────────────────────────────────────────────────────────────────────────── esc close ┘busy
 ≡ where              --  not asked: team has no places (space on a place adds one)
 ◇ AU               busy Mon▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄██████████▄▄▄▄▄▄▄▄▄▄▄▄▄▄██████████████▄▄▄▄▄▄▄▄▁▁▁▁
 ◇ UK             closed ████▄▄▄▄▄▄▄▄▄▄▄▄▄▄██████████████▄▄▄▄▄▄▄▄▁▁▁▁Mon▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄██████
 ◇ US             closed ▄▄▄▄▄▄▄▄▄▄▄▄▄▄██████████▄▄▄▄▄▄▄▄▄▄▄▄▄▄██████████████▄▄▄▄▄▄▄▄▁▁▁▁Mon▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▄▄▄▄
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 ▶ Thandi  Johannesburg  SAST UTC+2  hours 8am-4pm Mon-Fri  groups team, deploy  Mon 26 Oct 8-9am in hours
+
 ╭ times for team ────────────────────────────────────────────────────────────────────────────────────────────── y copy ╮
 │ 5-6pm AEDT / 4-5pm AEST / 8-9am SAST                                                                                 │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────── 3 zones for 5 people ╯

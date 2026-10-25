@@ -38,17 +38,17 @@ fn the_map_labels_home_and_each_counted_place_with_its_state_over_the_range() {
 }
 
 #[test]
-fn at_120_by_36_regions_fills_the_width_and_crops_to_the_band_around_its_markers() {
-    // Melbourne (38S) to the UK (54.5N) centres the band on 8N, and 12 rows at 120 columns
-    // show 72 degrees, so the band runs from about 44N to 28S: AU and the US are in it.
-    let map = map_text(&frame(&sized(regions_monday(), 120, 36)));
+fn at_120_by_37_regions_fills_the_width_and_crops_to_the_band_around_its_markers() {
+    // Melbourne (38S) to the UK (54.5N) centres the band on 8N, and the 12 map rows 37 leave at
+    // 120 columns show 72 degrees, so the band runs from about 44N to 28S: AU and the US are in it.
+    let map = map_text(&frame(&sized(regions_monday(), 120, 37)));
     for label in ["US open 10pm-12am", "AU open 2-4pm"] {
         assert!(map.contains(label), "no {label:?} in\n{map}");
     }
     for cropped in ["UK closed", "Melbourne"] {
         assert!(!map.contains(cropped), "{cropped:?} in\n{map}");
     }
-    insta::assert_snapshot!("regions_map_120x36", map);
+    insta::assert_snapshot!("regions_map_120x37", map);
 }
 
 /// The cell a latitude and longitude falls in on a whole 120-column map one row below the
@@ -113,22 +113,27 @@ fn top_rows(buf: &Buffer, n: u16) -> Vec<String> {
 }
 
 #[test]
-fn with_the_map_off_the_blocks_sit_under_the_header_and_the_spare_rows_above_the_notice() {
+fn with_the_map_off_the_blocks_sit_under_the_header_and_the_spare_rows_above_the_times_box() {
     let shown = sized(team_monday(), 120, 36);
     let hidden = press(shown.clone(), &chars("m"));
     let buf = frame(&hidden);
-    // 120x24 has no spare rows, so its header through times box is the layout with no gap.
+    // 120x24 has no spare rows: its header through detail line sit at the top, and its times
+    // box and notice at the bottom (its footer differs only by the map hint).
     let unmapped = render(&shown, 120, 24);
     assert_eq!(
-        top_rows(&buf, 22),
-        top_rows(&unmapped, 22),
+        top_rows(&buf, 19),
+        top_rows(&unmapped, 19),
         "{}",
         text(&buf)
     );
+    let bottom =
+        |buf: &Buffer, from: u16| (from..from + 4).map(|y| row(buf, y)).collect::<Vec<_>>();
+    assert_eq!(bottom(&buf, 31), bottom(&unmapped, 19), "{}", text(&buf));
     assert_eq!(y_of(&buf, "Mon 26 Oct AEDT"), 1);
-    let times_bottom = y_of(&buf, " times for ") + 2;
+    let (detail, times) = (y_of(&buf, "▶ Paul"), y_of(&buf, " times for "));
+    assert_eq!((detail, times), (18, 31), "{}", text(&buf));
     assert!(
-        (times_bottom + 1..34).all(|y| row(&buf, y).is_empty()),
+        (detail + 1..times).all(|y| row(&buf, y).is_empty()),
         "{}",
         text(&buf)
     );
@@ -136,7 +141,22 @@ fn with_the_map_off_the_blocks_sit_under_the_header_and_the_spare_rows_above_the
     insta::assert_snapshot!("team_map_off_120x36", text(&buf));
     let back = frame(&press(hidden, &chars("m")));
     assert_eq!(text(&back), text(&frame(&shown)));
-    assert_eq!(y_of(&back, "Mon 26 Oct AEDT"), 13);
+    assert_eq!(y_of(&back, "Mon 26 Oct AEDT"), 12);
+}
+
+#[test]
+fn at_145_by_30_the_spare_rows_collect_over_the_times_box_and_the_footer_takes_the_last_row() {
+    let buf = frame(&sized(team_monday(), 145, 30));
+    assert!(!shows_map(&buf), "{}", text(&buf));
+    let (detail, times) = (y_of(&buf, "▶ Paul"), y_of(&buf, " times for "));
+    assert_eq!((detail, times), (18, 25), "{}", text(&buf));
+    assert!(
+        (detail + 1..times).all(|y| row(&buf, y).is_empty()),
+        "{}",
+        text(&buf)
+    );
+    assert!(row(&buf, 29).starts_with("h/l time"), "{}", text(&buf));
+    insta::assert_snapshot!("team_map_off_145x30", text(&buf));
 }
 
 #[test]
@@ -464,8 +484,8 @@ fn the_terminator_draws_in_the_dawn_colour_and_keeps_its_shape_under_mono() {
 #[test]
 fn the_first_k_from_a_band_held_at_the_southern_edge_pans_a_full_step() {
     // Team's markers centre the band on 32S, which the map holds at 58S; a step is a quarter
-    // of the 12 map rows.
-    let mapping = press(sized(team_monday(), 120, 36), &chars("z"));
+    // of the 12 map rows 37 leave.
+    let mapping = press(sized(team_monday(), 120, 37), &chars("z"));
     let home_row = |app: &App| {
         let buf = frame(app);
         (1..13).find(|y| row(&buf, *y).contains('⌂'))

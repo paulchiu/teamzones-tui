@@ -11,7 +11,8 @@ From the top:
 - **The ruler and track** cover one day in home's zone from midnight to midnight. `┃` is the cursor, `┣ ┫` the ends of a range, and `═` marks the times where the group's question is answered (`╌` where it is for part of a cell).
 - **The who block** lists home, then the people the group counts (`●`), then a `≡` answer row, then everyone else dimmed (`○`). Each lane reads `▓` working, `▚` morning or evening, `▒` day, `░` night and `╌` a day off. The answer row's `5/5` counts who qualifies over the range, and its braille cells fill as more of them do.
 - **The where block** does the same for places (`◆` counted, `◇` not), with lanes of `▁` closed, `▄` open and `█` busy.
-- **The times box** holds exactly the line `y` copies, titled with the group, and the dim `▶` line above it describes the focused row.
+- **The `▶` line**, dim, describes the focused row.
+- **The times box** holds exactly the line `y` copies, titled with the group. It sits at the bottom with the notice row and the footer, and any spare rows on a tall terminal collect above it.
 - **The notice row** says what the last key did, such as `y  copied` or `n  next fit for deploy: ...`, and clears on the next key or after ten seconds.
 - **The footer** lists the keys that matter right now, dropping the least useful first when it runs out of room.
 

@@ -164,7 +164,7 @@ Travel holds through the end of `until` in London and then stops by itself, with
 
 ## The map
 
-`[map] show` is `"auto"` (the default: shown when the terminal has at least 100 columns and 12 spare rows), `"always"` (whenever there are spare rows) or `"never"`.
+`[map] show` is `"auto"` (the default: shown when the terminal has at least 100 columns and 12 spare rows), `"always"` (whenever there are at least two spare rows, since one stays over the times box) or `"never"`.
 
 ## Theme
 

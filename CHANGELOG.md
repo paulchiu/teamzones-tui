@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ## [Unreleased]
 
+### Changed
+
+- The times box now sits at the bottom with the notice row and the footer, and spare rows collect above it, so there is a blank row between the grid and the box whenever the terminal has room. With the map shown, the map gives up one row for it.
+
 ## [0.12.0] - 2026-10-25
 
 ### Added

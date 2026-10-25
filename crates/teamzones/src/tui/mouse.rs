@@ -383,7 +383,7 @@ fn pressed(app: &App, look: Look, areas: &Areas, track: &Track, pointer: Pointer
     let (copy_key, copy_label) = view::COPY_HINT;
     let copy_hint =
         u16::try_from(view::width_of(copy_key) + view::width_of(copy_label)).unwrap_or(0);
-    let say_title = areas.say.y + 1;
+    let say_title = areas.say.y;
     let copy_right = areas.say.right().saturating_sub(1);
     if y == say_title && (copy_right.saturating_sub(copy_hint)..copy_right).contains(&x) {
         return vec![key('y')];

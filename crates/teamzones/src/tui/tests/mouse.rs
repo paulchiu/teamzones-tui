@@ -113,7 +113,7 @@ fn team() -> App {
     at_120(team_monday())
 }
 
-const TRACK: u16 = 14;
+const TRACK: u16 = 13;
 const WHEEL: [MouseEventKind; 4] = [
     MouseEventKind::ScrollDown,
     MouseEventKind::ScrollUp,
@@ -367,7 +367,7 @@ fn a_e_d() {
             _ => None,
         })
         .expect("a double click on the map adds at the point");
-    let area = ratatui::layout::Rect::new(0, 1, 120, 12);
+    let area = ratatui::layout::Rect::new(0, 1, 120, 11);
     let projection = crate::tui::map::Projection::new(area, once.camera);
     assert_eq!(Some(added), projection.unproject(map.0, map.1));
     let opened = send(once, &[down_at(map)]);
