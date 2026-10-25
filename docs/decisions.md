@@ -256,4 +256,61 @@ Decision: A pointer event is translated into the messages its keymap row's key s
 
 Why: The mouse then cannot drift from the keys: whatever a key does, its mouse equivalent does by sending it. A test reads the keymap's mouse column, so a new mouse row fails until it is covered.
 
-Held by: `tui::tests::mouse::every_built_mouse_equivalent_in_the_keymap_sends_what_its_key_does` in `teamzones`
+Held by: `tui::tests::mouse::every_built_mouse_equivalent_in_the_keymap_sends_what_its_key_does` and, for the matrix's own list, `every_matrix_mouse_equivalent_in_the_keymap_sends_what_its_key_does` in `teamzones`
+
+## D32: Edits keep every byte they do not touch, and never write over a file changed elsewhere (2026-10-25)
+
+Decision: Every TUI edit (`w`, `+`, `x`, `=`, the matrix, `a`, `e`, `d`) rewrites the config text through `toml_edit` in `write.rs`, touching only the keys whose values change, and is parsed back before it is adopted. The effects layer replaces the file only while it still holds the text the app last read or wrote, so an edit made outside teamzones is never lost; the notice says so and `r` reloads.
+
+Why: The config is the user's own file, with their comments and layout, and the TUI holds its text in memory between reads.
+
+Held by: `tui::tests::edit::space_on_uk_then_w_on_team_writes_its_places_and_nothing_else` and `the_effects_layer_writes_the_bytes_and_refuses_a_file_changed_behind_its_back` in `teamzones`
+
+## D33: Undo is one value holding the whole state before the action, and a close waits out its window unwritten (2026-10-25)
+
+Decision: The single undo holds the config, its text, any pending write, the lens, the marks and the focus as they were, never a diff, and expires 10 s after the action. `x` changes the screen at once but writes only when the window passes or on quit, so `u` before then never touches the file. Any other write inside that window (`w`, `+`, `a`, `e`, `d`, `r`, `E`, or opening the matrix) writes the pending close with it; `u` on that later write puts the file back to the bytes it held before it, and the close waits out its window again. The matrix writes all its changes once, when it closes, with one undo back to how it opened, and `u` inside it steps back one change.
+
+Why: A diff can fail to apply after a later edit, and a whole state cannot. Writing a close only after its window keeps an undone close off the disk entirely.
+
+Held by: `tui::tests::edit::u_within_ten_seconds_writes_the_file_back_to_its_previous_bytes`, `x_on_deploy_leaves_the_strip_at_once_and_writes_only_after_ten_seconds`, `u_after_x_puts_the_group_back_in_its_slot_and_nothing_is_written`, `u_on_a_write_made_while_a_close_waits_puts_the_file_back_and_the_close_still_waits`, `a_close_pending_when_the_matrix_opens_is_written_then_and_never_with_its_changes` and `matrix_changes_are_written_together_on_esc_and_the_old_name_still_says` in `teamzones`
+
+## D34: The editor handoff parks the key reader and drains its input before reading again (2026-10-25)
+
+Decision: `E` runs the editor on the event loop's own thread, so no key is read while it runs. On return the terminal is taken back whatever the editor did, and everything buffered, plus anything arriving within 20 ms, is discarded before the loop reads again. Events, terminal modes and the editor opener are injected, so the handoff is tested without a terminal.
+
+Why: blubat's reader raced the editor for stdin, and late terminal replies read as keys after it exited.
+
+Held by: `tui::tests::edit::capital_e_hands_the_terminal_to_the_editor_and_drops_its_input_then_reloads` and `a_failing_editor_still_gives_the_terminal_back_and_reloads_nothing` in `teamzones`, and the pty test `the_editor_gets_a_released_terminal_and_the_tui_takes_it_back_after` in `crates/teamzones/tests/terminal_restoration.rs`
+
+## D35: `a` asks person or place first, and the picker writes only the fields that changed (2026-10-25)
+
+Decision: `a` opens a two-key menu, `p` person and `l` place, before the picker, since focus alone cannot add the first place. The picker's fields are text prompts stepped through with `enter`. An edit writes only the fields whose text changed, renaming the row in every group when its name changes, and a city typed for a person who had `label`, `tz` and `at` replaces those keys. A new place without a marker takes the first bundled city in its zone. The drift tag's menu has keys too, `w` save and `r` revert, so it acts on its own keys like every modal.
+
+Why: The spec names the picker's fields but not how to choose its kind or move between fields, and text prompts swallow every key but `esc` and `enter`.
+
+Held by: `tui::tests::edit::a_p_adds_a_person_after_the_last_one_through_the_picker`, `a_l_adds_a_place_after_the_last_one_through_the_picker`, `e_edits_the_focused_person_s_hours_and_writes_only_that_line` and `tui::tests::each_modal_context_swallows_the_keys_it_does_not_advertise` in `teamzones`
+
+## D36: A drift in `where` is shown but stays out of the who-expression (2026-10-25)
+
+Decision: A `where` changed with `=` shows as `=closed` (or `=context`, `=open`) in the strip's drift tag and the `w` notice, but the who-expression leaves it out, so `+` offers a name from the members alone and the matrix's CLI line names the group as saved.
+
+Why: `teamzones say` has no syntax for a `where` override, so an expression carrying one could not be pasted into the CLI, and the drift tag is where an unsaved change has to be visible.
+
+Held by: `tui::tests::edit::equals_cycles_where_as_drift_until_w_skipping_context_without_people` in `teamzones`
+
+## D37: A reload drops the undo (2026-10-25)
+
+Decision: A successful `r`, or the reload after `E`, clears the pending undo and any pending close, adopting the file as it now stands.
+
+Why: What the undo would put back predates the file now on disk, so `u` after a reload would write over edits made in the editor or elsewhere.
+
+Held by: `tui::tests::edit::a_reload_drops_the_undo_so_u_never_writes_over_the_file_read` in `teamzones`
+
+## D38: The footer fills gaps, so a short lower-priority hint can outlive a longer higher one (2026-10-25)
+
+Decision: The footer keeps its existing fit: it adds hints from the highest priority down and skips any hint that does not fit in the room left, so a shorter lower-priority hint can still fit after a longer higher-priority one is skipped. At 80x24 on regions this keeps `w save` and `tab groups` while the longer `n next fit` is dropped, which differs from the 80x24 caption in [screen](spec/screen.md) ("drops `v`, `n`, `w` and `c`"). This needs Paul's call: either the caption changes or the fit becomes strict.
+
+Why: The fit predates this milestone and the new `w` and `tab` hints only exposed it. Changing the contract or the ladder is Paul's decision, not a feature PR's.
+
+Held by: the `regions_80x24` snapshot in `teamzones`
+

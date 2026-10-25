@@ -1,0 +1,40 @@
+---
+source: crates/teamzones/src/tui/tests/edit.rs
+expression: text(&buf)
+---
+teamzones   now Sat 24 Oct 9:04am AEDT                                                                  ⌂ Melbourne AEDT
+⣀⡀   ⢀⣀⣀⣀⣀⡀⣀⣀   ⣀⣀⣠⣲⣶⣶⣾⣿⡾⣿⣾⣿⣿⣷⣶⣿⡶⣶⣿⡙⡛⡒⠓⠐⠠⣤⣀⡀       ⣀⣴⠿         ⠉⠚⠓⡛⣛⣊⣀⣀      ⣤⣤⡆⡆⠒⣰⢄⣤⣀⣠⡄⠤⠔⠘⠘⠓⠛⠙⠒⠴⠴⠄⠤⠠⠠⢤⣀⣀⢔⡶⠤⠤⢤⢄ ⣀⡀  ⢀⢀⡀⣀
+⠓⠛⠻⠶⣾⣿⣶⣀⢀⣀⣄⣀⣀⣉⣉⡉  ⠉⠁⠉⠉⠉⠉⠉⠉⠉⠉⢉⡭⠛⠿⠾⢷⡿⠿⢤⣿⣿⡃ ⠈⠻⢥⢀⣠⠖⠒⠐⠉⠈⠘⠒⠶⠖⠂  ⣀⡀ ⢠⣠⣂⠊⢡⡠⣖⣂⣀⠁⠓⠗⠛⠛⠋ ⠈⠁⠉⠁⠉⠉⠐⠋                      ⡀⡀⣀⣀⡀⢤⣩⣥⡉⣉⠤⠰⠿
+     ⠚⠋⠉⠉⠁     ⠘⠓⠶⣤⡀         ⠉⠉⠉⠙⠴⠉ ⣀⣠⣤⣭⣵⣶⣄             ⠰⠟⣿◆⠶UK closed 11:04pm                          ⠐⢒⡳⣶⡀  ⠸⠵⠚⠁
+                  ⠸⢄        ◇     ⣤⠖⠚⠉⠉⠉⠁               ⠰⣏⣉⣩⡖⣊⣻⣗⢿⡷⠦⣴⣶⣛⣛⣛⡛⠓ ⠙⢿⣿⠂                    ⢤⣶⢤⣴⢒⣊⣁⣾⠟⠃
+                    ⠉⠻⢷⣤⣀  ●⠒⠒⠒⠒⣶⣯⡅                   ⢀⡤⠞⠉     ⠉⠉⠓⠚⠉⠉⠒⠱⣿⣄  ⠐⢶⣤⣤⣄⣀⡀⣀⡀      ⡀       ⣀⣨⡗⠈⠉⠛⠉⠁
+      ⠈⠉⠛               ⠈⠓⠲⠬⠶⢾⣽⣭⡍⠙⠛⣛⣓⡒⠂               ⣽                 ⠻⢵⣆⣠⣤⠤⠒⠋  ⠈⠉⢧⡀⢠⠖⠊⠉⠉⠦⢆⣀⡀⢫⡟⠉⠁⢰⣷⣀
+                               ⠉⠙⣻⠏ ⠁⠉⠉⠉⠓⠒⠢⣄⡀          ⠙⠒⠤⠶⠴⠒⠲⠤⡄          ⣉⡥⠊        ⠙⠙⠂   ⠰⢾⣷⣏⠉⣠⠤⢾⣿⣛⣛⣂⢀
+        ☼         ╭ groups ──────────────────────────────────────────────────────────────────────────╮⠏⢋⣻⡻⠭⣵⠦⣶⡛⠲⢤⣤
+⠂                 │                          1 team     2 au       3 regions  4 deploy   + new       │⠉⠁◆⠓AU open 9:04am
+                  │ asks                       who        who        where      both                 │ 8:04am⢀●      ⣀
+                  │ ⌂ Paul    Melbourne        ⌂          ⌂          ⌂          ⌂                    │:04am⠉⌂⠏     ⣠⣴⠾⠛⠃
+                  │   Priya   Brisbane         ●          ●          ·          ●                    │
+Sat 24 Oct AEDT   │   Sam     Brisbane         ●          ●          ·          ·                    │  ·   9p  ·   ·
+▸ 9:04am AEDT now │   Thandi  Johannesburg     ●          ·          ·          ●                    │──────────────────
+ who   1 team  2 a│   Johan   Johannesburg     ●          ·          ·          ·                    │g  ░ night  ╌ off
+⌂ Paul      9:04am│   Ellie   London           ·          ·          ·          ·                    │╌░░░░░░░░░░░░░░░░░
+● Priya     8:04am│   Marcus  Austin           ·          ·          ·          ·                    │░░░░░░░░░░░░░░░░░░
+● Thandi   12:04am│ places                                                                           │╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+≡ in hours        │   AU      venue profile    ·          ·          ◆          ◆                    │··················
+○ Sam       8:04am│   UK      venue profile    ·          ·          ◆          ◆                    │░░░░░░░░░░░░░░░░░░
+○ Johan    12:04am│   US      venue profile    ·          ·          ◆          ·                    │╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+○ Ellie     Fri 11│                                                                                  │▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
+○ Marcus Fri 5:04p│ deploy   9:04am AEDT / 8:04am AEST / 12:04am SAST, open in AU, closed in UK      │░░░░░░░░░░░░░░░░░▒
+ where  asks open │ cli      teamzones say deploy now                                                │d  ▄ open  █ busy
+◆ AU              │ cursor   space adds the place US to deploy (its state, not its zone)             │██████████▄▄▄▄▁▁▁▁
+◆ UK             c╰───────────────────────────────────────────────── written to config.toml on close ╯▄▄▄▄▄▄▄▄██████████
+≡ open              2/2 ⡇⡇━━━━━━━━━━━━━━⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇━━━━━━━━━━━━━━⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇━━━━━━━━━━━━━━⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇⡇··⡇⡇⡇⡇⡇⡇⡇⡇
+◇ US               open ▄▄▄▄▄▄▄▄▄▄▄▄▄▄████████████▄▄▄▄▄▄▄▄▄▄▄▄▄▄████████████████▄▄▄▄▁▁▁▁Sat▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▄▄▄▄
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+▶ US  Fri 5:04pm open  busy 6-10pm  CDT UTC-5  America/Chicago  venue profile  groups regions
+╭ times for deploy ──────────────────────────────────────────────────────────────────────────────────────────── y copy ╮
+│ 9:04am AEDT / 8:04am AEST / 12:04am SAST, open in AU, closed in UK                                                   │
+╰────────────────────────────────────────────────────────────────────────────────────── 3 zones for 3 people, 2 places ╯
+
+space member  enter use  y copy  a new  R rename  </> move  x close  u undo  ? help  esc done

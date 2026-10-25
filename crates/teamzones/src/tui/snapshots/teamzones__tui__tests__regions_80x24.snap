@@ -5,7 +5,7 @@ expression: text(&buf)
 teamzones   now Sat 24 Oct 9:04am AEDT                          ⌂ Melbourne AEDT
 Sat 24 Oct AEDT                 12a · · · · 6a· · · · · 12p · · · · 6p· · · · ·
 ▸ 9:04am AEDT now               ─══════─────────══┃═─────────═══════────────────
- who   1 team  2 au  3 regions  4 deploy  0 all  ───────────────────────────────
+ who   1 team  2 au  3 regions  4 deploy  0 all  +  ⋯  ─────────────────────────
 ⌂ Paul   Melbourne  9:04am AEDT Sat░░░░░░░░░░╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌░░░░░░░░
 ≡ who                        --  not asked: regions has no people
 ○ Priya  Brisbane   8:04am AEST ░░Sat░░░░░░░░╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌░░░░░░░░░░
@@ -25,4 +25,4 @@ Sat 24 Oct AEDT                 12a · · · · 6a· · · · · 12p · · · ·
 │ 9:04am AEDT, open in AU and US, closed in UK                                 │
 ╰───────────────────────────────────────────────────────── home zone, 3 places ╯
 
-h/l time  v range  n next fit  space mark  y copy  m map  ? help  q quit
+h/l time  v range  space mark  w save  tab groups  y copy  m map  ? help  q quit

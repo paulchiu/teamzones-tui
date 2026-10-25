@@ -67,8 +67,16 @@ pub fn read(path: &Path) -> Result<Option<String>, LoadError> {
 /// [`LoadError::Unreadable`] or [`LoadError::Invalid`] when a file is there but cannot be read or
 /// parsed; it never falls back to the defaults.
 pub fn load(path: &Path, system_zone: Tz) -> Result<Config, LoadError> {
-    let text = read(path)?;
-    Config::load(text.as_deref(), system_zone).map_err(|source| LoadError::Invalid {
+    load_text(path, read(path)?.as_deref(), system_zone)
+}
+
+/// The config `text` read from `path` holds, or the defaults with home in `system_zone` for no file.
+///
+/// # Errors
+///
+/// [`LoadError::Invalid`], naming `path`, when the text does not parse.
+pub fn load_text(path: &Path, text: Option<&str>, system_zone: Tz) -> Result<Config, LoadError> {
+    Config::load(text, system_zone).map_err(|source| LoadError::Invalid {
         path: path.to_owned(),
         source,
     })

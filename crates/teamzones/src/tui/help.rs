@@ -95,10 +95,8 @@ mod tests {
 
     #[test]
     fn unbuilt_keys_are_not_listed() {
-        assert!(
-            lines(Context::Main, &FULL)
-                .iter()
-                .all(|line| line.keys != "tab")
-        );
+        let main = lines(Context::Main, &FULL);
+        assert!(main.iter().all(|line| line.keys != "enter"), "{main:?}");
+        assert!(main.iter().any(|line| line.keys == "tab"), "{main:?}");
     }
 }

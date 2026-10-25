@@ -6,9 +6,9 @@ use std::path::Path;
 
 use chrono::NaiveDate;
 use chrono_tz::Tz;
-use teamzones_core::config::{Config, ConfigError};
+use teamzones_core::config::{Config, ConfigError, Rule};
 use thiserror::Error;
-use toml_edit::{DocumentMut, Item, Table, value};
+use toml_edit::{Array, ArrayOfTables, DocumentMut, Item, Table, Value, value};
 
 /// Why an edit to the config was refused; the Display names the path where there is one.
 #[derive(Debug, Error)]
@@ -32,6 +32,8 @@ pub enum WriteError {
         path: std::path::PathBuf,
         source: std::io::Error,
     },
+    #[error("{}: changed outside teamzones since it was read, so it was left alone (r reloads it)", .0.display())]
+    Changed(std::path::PathBuf),
 }
 
 /// The commented template `config init` and `config edit` seed a new file with.
@@ -111,6 +113,365 @@ pub fn edit_config(
         source,
     })?;
     Ok(config)
+}
+
+/// Replaces the config at `path` with `text`, but only while the file still holds `over`, so an
+/// edit made outside the app since it read the file is never written over.
+///
+/// # Errors
+///
+/// [`WriteError::Changed`] when the file no longer holds `over`, or any read or write error.
+pub fn replace_if_unchanged(path: &Path, over: &str, text: &str) -> Result<(), WriteError> {
+    if crate::paths::read(path)?.as_deref() != Some(over) {
+        return Err(WriteError::Changed(path.to_owned()));
+    }
+    replace_atomically(path, text).map_err(|source| WriteError::Io {
+        path: path.to_owned(),
+        source,
+    })
+}
+
+/// `text` after `edit`, with every byte the edit leaves alone kept as it was.
+///
+/// # Errors
+///
+/// The [`toml_edit::TomlError`] when `text` is not TOML.
+pub fn edited(
+    text: &str,
+    edit: impl FnOnce(&mut DocumentMut),
+) -> Result<String, toml_edit::TomlError> {
+    let mut document: DocumentMut = text.parse()?;
+    edit(&mut document);
+    Ok(document.to_string())
+}
+
+/// What a group lists, by name, and its `where` when that changes.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Members {
+    pub people: Vec<String>,
+    pub places: Vec<String>,
+    pub rule: Option<Rule>,
+}
+
+fn groups_mut(document: &mut DocumentMut) -> Option<&mut ArrayOfTables> {
+    document.get_mut("group")?.as_array_of_tables_mut()
+}
+
+/// Whether the list at `key` already names exactly `names`, ignoring case.
+fn lists(table: &Table, key: &str, names: &[String]) -> bool {
+    let listed: Vec<&str> = table
+        .get(key)
+        .and_then(Item::as_array)
+        .map(|array| array.iter().filter_map(Value::as_str).collect())
+        .unwrap_or_default();
+    listed.len() == names.len()
+        && listed
+            .iter()
+            .zip(names)
+            .all(|(listed, name)| listed.eq_ignore_ascii_case(name))
+}
+
+/// Moves `key` to sit directly after the first of `after` the table has, or last without one.
+fn place_after(table: &mut Table, key: &str, after: &[&str]) {
+    let mut order: Vec<String> = table
+        .iter()
+        .map(|(name, _)| name.to_owned())
+        .filter(|name| name != key)
+        .collect();
+    let at = after
+        .iter()
+        .find_map(|after| order.iter().position(|name| name == after))
+        .map_or(order.len(), |index| index + 1);
+    order.insert(at, key.to_owned());
+    let rank = |name: &str| order.iter().position(|known| known == name);
+    table.sort_values_by(|a, _, b, _| rank(a.get()).cmp(&rank(b.get())));
+}
+
+/// Sets `key` to `new`, keeping the decor (spacing and any comment) of the value it replaces,
+/// or adding it directly after the first of `after` the table has.
+fn set_value(table: &mut Table, key: &str, new: Value, after: &[&str]) {
+    match table.get_mut(key).and_then(Item::as_value_mut) {
+        Some(old) => {
+            let decor = old.decor().clone();
+            *old = new;
+            *old.decor_mut() = decor;
+        }
+        None => {
+            table.insert(key, Item::Value(new));
+            place_after(table, key, after);
+        }
+    }
+}
+
+/// Sets the list at `key` to `names` unless it already says so; an empty list removes the key.
+fn set_list(table: &mut Table, key: &str, names: &[String], after: &[&str]) {
+    if lists(table, key, names) {
+        return;
+    }
+    if names.is_empty() {
+        table.remove(key);
+        return;
+    }
+    let array: Array = names.iter().map(String::as_str).collect();
+    set_value(table, key, Value::Array(array), after);
+}
+
+fn set_members(table: &mut Table, members: &Members) {
+    set_list(table, "people", &members.people, &["aliases", "name"]);
+    set_list(
+        table,
+        "places",
+        &members.places,
+        &["people", "aliases", "name"],
+    );
+    if let Some(rule) = members.rule {
+        let after = ["places", "people", "aliases", "name"];
+        set_value(table, "where", Value::from(rule.word()), &after);
+    }
+}
+
+/// Saves the members of the group at `index`, touching only the keys whose value changes.
+pub fn save_group(document: &mut DocumentMut, index: usize, members: &Members) {
+    if let Some(table) = groups_mut(document).and_then(|groups| groups.get_mut(index)) {
+        set_members(table, members);
+    }
+}
+
+/// Removes the group at `index`, with any comment above it.
+pub fn remove_group(document: &mut DocumentMut, index: usize) {
+    let emptied = groups_mut(document).is_some_and(|groups| {
+        if index < groups.len() {
+            groups.remove(index);
+        }
+        groups.is_empty()
+    });
+    if emptied {
+        document.remove("group");
+    }
+}
+
+/// Adds a group after the last one, listing `members`.
+pub fn push_group(document: &mut DocumentMut, name: &str, members: &Members) {
+    let mut table = Table::new();
+    table.decor_mut().set_prefix("\n");
+    table.insert("name", value(name));
+    set_members(&mut table, members);
+    let groups = document
+        .entry("group")
+        .or_insert_with(|| Item::ArrayOfTables(ArrayOfTables::new()));
+    if let Some(groups) = groups.as_array_of_tables_mut() {
+        groups.push(table);
+    }
+}
+
+/// Renames the group at `index` to `name`, keeping its old name as an alias so expressions and
+/// scripts that use it still work.
+pub fn rename_group(document: &mut DocumentMut, index: usize, name: &str) {
+    let Some(table) = groups_mut(document).and_then(|groups| groups.get_mut(index)) else {
+        return;
+    };
+    let Some(old) = table.get("name").and_then(Item::as_str).map(str::to_owned) else {
+        return;
+    };
+    if old == name {
+        return;
+    }
+    set_value(table, "name", Value::from(name), &[]);
+    if old.eq_ignore_ascii_case(name) {
+        return;
+    }
+    let aliases: Vec<String> = table
+        .get("aliases")
+        .and_then(Item::as_array)
+        .map(|array| {
+            array
+                .iter()
+                .filter_map(Value::as_str)
+                .filter(|alias| !alias.eq_ignore_ascii_case(name))
+                .map(str::to_owned)
+                .collect()
+        })
+        .unwrap_or_default();
+    let known = aliases.iter().any(|alias| alias.eq_ignore_ascii_case(&old));
+    let aliases: Vec<String> = aliases.into_iter().chain((!known).then_some(old)).collect();
+    set_list(table, "aliases", &aliases, &["name"]);
+}
+
+/// Moves the group at `from` to `to`, each table taking the place in the file the group there
+/// held, so the file's order is the new order.
+pub fn move_group(document: &mut DocumentMut, from: usize, to: usize) {
+    let Some(groups) = groups_mut(document) else {
+        return;
+    };
+    if from >= groups.len() || to >= groups.len() {
+        return;
+    }
+    let mut tables: Vec<Table> = (0..groups.len()).map(|_| groups.remove(0)).collect();
+    let positions: Vec<Option<isize>> = tables.iter().map(Table::position).collect();
+    let moved = tables.remove(from);
+    tables.insert(to, moved);
+    for (mut table, position) in tables.into_iter().zip(positions) {
+        table.set_position(position);
+        groups.push(table);
+    }
+}
+
+/// The table of the person at `index` in config order, home being 0.
+fn person_mut(document: &mut DocumentMut, index: usize) -> Option<&mut Table> {
+    match index.checked_sub(1) {
+        None => document.get_mut("home")?.as_table_mut(),
+        Some(index) => document
+            .get_mut("person")?
+            .as_array_of_tables_mut()?
+            .get_mut(index),
+    }
+}
+
+fn place_mut(document: &mut DocumentMut, index: usize) -> Option<&mut Table> {
+    document
+        .get_mut("place")?
+        .as_array_of_tables_mut()?
+        .get_mut(index)
+}
+
+/// A row's table, by its kind and index in config order (home is person 0).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Entry {
+    Person(usize),
+    Place(usize),
+}
+
+impl Entry {
+    fn table_mut(self, document: &mut DocumentMut) -> Option<&mut Table> {
+        match self {
+            Self::Person(index) => person_mut(document, index),
+            Self::Place(index) => place_mut(document, index),
+        }
+    }
+
+    /// The group list that names this kind of row.
+    fn list(self) -> &'static str {
+        match self {
+            Self::Person(_) => "people",
+            Self::Place(_) => "places",
+        }
+    }
+}
+
+/// The text of the entry's `key` as config writes it: a string as is, and `at` as `lat, lon`.
+pub fn entry_value(text: &str, entry: Entry, key: &str) -> Option<String> {
+    let mut document: DocumentMut = text.parse().ok()?;
+    let item = entry.table_mut(&mut document)?.get(key)?.clone();
+    match item.as_array() {
+        Some(pair) => Some(
+            pair.iter()
+                .map(|n| {
+                    n.as_float()
+                        .map(|f| f.to_string())
+                        .or_else(|| n.as_integer().map(|i| i.to_string()))
+                        .unwrap_or_else(|| n.to_string().trim().to_owned())
+                })
+                .collect::<Vec<_>>()
+                .join(", "),
+        ),
+        None => item.as_str().map(str::to_owned),
+    }
+}
+
+/// A field to write on an entry: a value, or `None` to remove the key.
+pub type Field = (&'static str, Option<Value>);
+
+fn set_fields(table: &mut Table, fields: &[Field]) {
+    for (key, value) in fields {
+        match value {
+            Some(new) => set_value(table, key, new.clone(), &[]),
+            None => {
+                table.remove(key);
+            }
+        }
+    }
+}
+
+/// Adds a `[[person]]` or `[[place]]` after the last one of its kind, holding `fields`.
+pub fn push_entry(document: &mut DocumentMut, place: bool, fields: &[Field]) {
+    let mut table = Table::new();
+    table.decor_mut().set_prefix("\n");
+    set_fields(&mut table, fields);
+    let key = if place { "place" } else { "person" };
+    let entries = document
+        .entry(key)
+        .or_insert_with(|| Item::ArrayOfTables(ArrayOfTables::new()));
+    if let Some(entries) = entries.as_array_of_tables_mut() {
+        entries.push(table);
+    }
+}
+
+/// Writes `fields` on the entry, renaming it in every group's list when its name changes.
+pub fn edit_entry(document: &mut DocumentMut, entry: Entry, old: &str, fields: &[Field]) {
+    let renamed = fields
+        .iter()
+        .find(|(key, _)| *key == "name")
+        .and_then(|(_, value)| value.as_ref()?.as_str().map(str::to_owned));
+    if let Some(table) = entry.table_mut(document) {
+        set_fields(table, fields);
+    }
+    if let Some(new) = renamed {
+        rename_listed(document, entry.list(), old, Some(&new));
+    }
+}
+
+/// Replaces `old` in every group's `list` with `new`, or removes it with `None`.
+fn rename_listed(document: &mut DocumentMut, list: &str, old: &str, new: Option<&str>) {
+    let Some(groups) = groups_mut(document) else {
+        return;
+    };
+    for table in groups.iter_mut() {
+        let Some(names) = table.get(list).and_then(Item::as_array) else {
+            continue;
+        };
+        let names: Vec<String> = names
+            .iter()
+            .filter_map(Value::as_str)
+            .map(str::to_owned)
+            .collect();
+        if !names.iter().any(|name| name.eq_ignore_ascii_case(old)) {
+            continue;
+        }
+        let names: Vec<String> = names
+            .into_iter()
+            .filter_map(|name| {
+                if name.eq_ignore_ascii_case(old) {
+                    new.map(str::to_owned)
+                } else {
+                    Some(name)
+                }
+            })
+            .collect();
+        let after = ["people", "aliases", "name"];
+        set_list(table, list, &names, &after);
+    }
+}
+
+/// Removes the entry and its name from every group that lists it. Home cannot be removed.
+pub fn remove_entry(document: &mut DocumentMut, entry: Entry, name: &str) {
+    let (key, index) = match entry {
+        Entry::Person(0) => return,
+        Entry::Person(index) => ("person", index - 1),
+        Entry::Place(index) => ("place", index),
+    };
+    let emptied = document
+        .get_mut(key)
+        .and_then(Item::as_array_of_tables_mut)
+        .is_some_and(|entries| {
+            if index < entries.len() {
+                entries.remove(index);
+            }
+            entries.is_empty()
+        });
+    if emptied {
+        document.remove(key);
+    }
+    rename_listed(document, entry.list(), name, None);
 }
 
 /// Writes `text` to a temporary file beside the file `path` resolves to, with that file's
@@ -310,5 +671,31 @@ mod tests {
             document.to_string(),
             "[travel]\nhere = \"Paris\"\nuntil = 2026-12-05\n\n[theme]\nscheme = \"dark\"\n"
         );
+    }
+
+    #[test]
+    fn a_marker_with_whole_numbers_prefills_as_plain_numbers() {
+        let text = "[[place]]\nname = \"US\"\ntz = \"America/Chicago\"\nat = [39, -96]\n";
+        assert_eq!(
+            entry_value(text, Entry::Place(0), "at").as_deref(),
+            Some("39, -96")
+        );
+        let text = "[[place]]\nname = \"US\"\ntz = \"America/Chicago\"\nat = [39.5,   -96.0]\n";
+        assert_eq!(
+            entry_value(text, Entry::Place(0), "at").as_deref(),
+            Some("39.5, -96")
+        );
+    }
+
+    #[test]
+    fn renaming_a_group_to_its_own_name_or_another_case_adds_no_alias() {
+        let text = "[[group]]\nname = \"deploy\"\npeople = []\n";
+        let renamed = |name: &str| {
+            let mut document: DocumentMut = text.parse().unwrap();
+            rename_group(&mut document, 0, name);
+            document.to_string()
+        };
+        assert_eq!(renamed("deploy"), text);
+        assert_eq!(renamed("Deploy"), text.replacen("deploy", "Deploy", 1));
     }
 }

@@ -401,7 +401,7 @@ fn groups(io: &mut Io) -> Result<(), Failure> {
 
 /// The editor program and its arguments for `path`: `$VISUAL`, then `$EDITOR`, then `vi`, split
 /// on whitespace.
-fn editor_command(
+pub fn editor_command(
     visual: Option<&str>,
     editor: Option<&str>,
     path: &std::path::Path,

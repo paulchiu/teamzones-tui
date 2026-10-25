@@ -1,35 +1,11 @@
 //! Mouse capture and every mouse equivalent in the keymap.
 
 use super::*;
-use crate::tui::{Modes, run_effect};
-
-/// Records every mouse capture switch the effects layer asks the terminal for.
-#[derive(Default)]
-struct Recorder {
-    capture: Vec<bool>,
-}
-
-impl Modes for Recorder {
-    fn capture_mouse(&mut self, on: bool) -> std::io::Result<()> {
-        self.capture.push(on);
-        Ok(())
-    }
-}
-
-struct NoClipboard;
-
-impl crate::clipboard::Clipboard for NoClipboard {
-    fn copy(&mut self, _text: &str) -> Result<(), String> {
-        Ok(())
-    }
-}
 
 /// Presses `keys` and runs every effect through `modes`, as the shell does.
 fn press_running(app: App, keys: &[Key], modes: &mut Recorder) -> App {
     let (app, effects) = press_all(app, keys);
-    effects.into_iter().fold(app, |app, effect| {
-        update(app, run_effect(effect, &mut NoClipboard, modes)).0
-    })
+    run_against(app, effects, std::path::Path::new("/nonexistent"), modes)
 }
 
 fn footer(app: &App) -> String {
@@ -79,16 +55,35 @@ fn left(kind: fn(MouseButton) -> MouseEventKind, at: (u16, u16)) -> MouseEvent {
     event(kind(MouseButton::Left), at, KeyModifiers::NONE)
 }
 
-/// What a crossterm mouse event stands for on `app`'s screen.
+/// What a crossterm mouse event stands for on `app`'s screen, leaving out the note of where a
+/// press was, which only spots double clicks.
 fn msgs(app: &App, event: MouseEvent) -> Vec<Msg> {
-    mouse::msgs(app, Pointer::from_crossterm(event))
+    mouse::msgs(
+        app,
+        Pointer::from_crossterm(event, chrono::TimeDelta::zero()),
+    )
+    .into_iter()
+    .filter(|msg| !matches!(msg, Msg::Clicked(..)))
+    .collect()
 }
 
 /// Sends each mouse event through the update, as the shell does.
 fn send(app: App, events: &[MouseEvent]) -> App {
     events.iter().fold(app, |app, event| {
-        update(app, Msg::Mouse(Pointer::from_crossterm(*event))).0
+        update(
+            app,
+            Msg::Mouse(Pointer::from_crossterm(*event, chrono::TimeDelta::zero())),
+        )
+        .0
     })
+}
+
+/// The state a press left, without the note of where it was.
+fn settled(app: App) -> App {
+    App {
+        last_click: None,
+        ..app
+    }
 }
 
 fn key(c: char) -> Msg {
@@ -221,7 +216,10 @@ fn focus_rows() {
     let clicked = msgs(&team(), left(MouseEventKind::Down, sam));
     let focused = focus_on(team(), "Sam");
     assert_eq!(clicked, [Msg::Focus(focused.focus)]);
-    assert_eq!(send(team(), &[left(MouseEventKind::Down, sam)]), focused);
+    assert_eq!(
+        settled(send(team(), &[left(MouseEventKind::Down, sam)])),
+        focused
+    );
 }
 
 fn marks() {
@@ -229,7 +227,7 @@ fn marks() {
     let clicked = msgs(&team(), left(MouseEventKind::Down, (0, y)));
     let sam = focus_on(team(), "Sam").focus;
     assert_eq!(clicked, [Msg::Focus(sam), key(' ')]);
-    let toggled = send(team(), &[left(MouseEventKind::Down, (0, y))]);
+    let toggled = settled(send(team(), &[left(MouseEventKind::Down, (0, y))]));
     assert_eq!(toggled, press(focus_on(team(), "Sam"), &chars(" ")));
     assert!(matches!(sam, Row::Person(_)));
 }
@@ -245,13 +243,10 @@ fn groups() {
 }
 
 #[test]
-fn the_drift_tag_and_the_gap_after_the_last_name_are_inert_until_write_back() {
-    let drifted = press(focus_on(team(), "UK"), &chars(" "));
-    let tag = find(&drifted, "+@UK");
-    assert_eq!(msgs(&drifted, left(MouseEventKind::Down, tag)), []);
-    let (x, y) = find(&team(), "0 all");
-    let gap = (x + 5, y);
-    assert_eq!(msgs(&team(), left(MouseEventKind::Down, gap)), []);
+fn the_gap_after_the_strip_is_inert() {
+    let (x, y) = find(&team(), "⋯");
+    let gap = (x + 2, y);
+    assert_eq!(keys_of(msgs(&team(), left(MouseEventKind::Down, gap))), []);
 }
 
 #[test]
@@ -265,24 +260,16 @@ fn the_wheel_scrubs_under_the_map_overlay_and_a_click_inside_it_does_nothing() {
         ),
         [key('l')]
     );
-    assert_eq!(msgs(&open, left(MouseEventKind::Down, inside)), []);
-}
-
-/// A terminal whose every mouse capture switch fails.
-struct Broken;
-
-impl Modes for Broken {
-    fn capture_mouse(&mut self, _on: bool) -> std::io::Result<()> {
-        Err(std::io::Error::other("no tty"))
-    }
+    assert_eq!(keys_of(msgs(&open, left(MouseEventKind::Down, inside))), []);
 }
 
 #[test]
 fn a_failed_capture_switch_keeps_the_footer_true_to_the_terminal() {
-    let (pressed, effects) = press_all(fixture(), &chars("M"));
-    let failed = effects.into_iter().fold(pressed, |app, effect| {
-        update(app, run_effect(effect, &mut NoClipboard, &mut Broken)).0
-    });
+    let mut broken = Recorder {
+        broken: true,
+        ..Recorder::default()
+    };
+    let failed = press_running(fixture(), &chars("M"), &mut broken);
     assert!(failed.mouse, "the terminal still captures the mouse");
     assert!(
         !footer(&failed).contains("mouse off"),
@@ -320,6 +307,65 @@ fn sort() {
     assert_eq!(msgs(&team(), left(MouseEventKind::Down, place)), [key('s')]);
 }
 
+fn down_at(at: (u16, u16)) -> MouseEvent {
+    left(MouseEventKind::Down, at)
+}
+
+fn w_plus_x_equals() {
+    let drifted = press(focus_on(team(), "UK"), &chars(" "));
+    let tag = find(&drifted, "+@UK");
+    let menu = send(drifted, &[down_at(tag)]);
+    assert_eq!(menu.mode, crate::tui::app::Mode::DriftMenu);
+    let save = find(&menu, "w save");
+    assert_eq!(keys_of(msgs(&menu, down_at(save))), [key('w')]);
+    let revert = find(&menu, "r revert");
+    assert_eq!(keys_of(msgs(&menu, down_at(revert))), [key('r')]);
+    assert!(send(menu, &[down_at(revert)]).drift().is_empty());
+    let plus = find(&team(), "+  ⋯");
+    assert_eq!(keys_of(msgs(&team(), down_at(plus))), [key('+')]);
+    let regions = at_120(go_to(press(fixture(), &chars("3")), "26 oct 2-4pm"));
+    let asks = find(&regions, "asks open");
+    assert_eq!(keys_of(msgs(&regions, down_at(asks))), [key('=')]);
+    let deploy = find(&team(), "deploy");
+    let middle = event(
+        MouseEventKind::Down(MouseButton::Middle),
+        deploy,
+        KeyModifiers::NONE,
+    );
+    assert_eq!(msgs(&team(), middle), [key('4'), key('x')]);
+}
+
+fn tab() {
+    let dots = find(&team(), "⋯");
+    assert_eq!(keys_of(msgs(&team(), down_at(dots))), [Msg::Key(Key::Tab)]);
+}
+
+fn a_e_d() {
+    let map = (30, 6);
+    let once = send(team(), &[down_at(map)]);
+    let twice = msgs(&once, down_at(map));
+    let added = twice
+        .iter()
+        .find_map(|msg| match msg {
+            Msg::AddAt(lat, lon) => Some((*lat, *lon)),
+            _ => None,
+        })
+        .expect("a double click on the map adds at the point");
+    let area = ratatui::layout::Rect::new(0, 1, 120, 12);
+    assert_eq!(added, crate::tui::map::unproject(area, map.0, map.1));
+    let opened = send(once, &[down_at(map)]);
+    assert_eq!(opened.mode, crate::tui::app::Mode::AddMenu(Some(added)));
+    let sam = find(&team(), "Sam");
+    let once = send(team(), &[down_at(sam)]);
+    let focused = focus_on(team(), "Sam").focus;
+    assert_eq!(
+        keys_of(msgs(&once, down_at(sam))),
+        [key('e')],
+        "a double click on a label edits its row"
+    );
+    assert!(msgs(&once, down_at(sam)).contains(&Msg::Focus(focused)));
+}
+
 /// Each keymap row with a mouse equivalent, by its keys cell, and the check that the mouse
 /// sends what the row's key does.
 const CASES: &[(&str, fn())] = &[
@@ -334,11 +380,14 @@ const CASES: &[(&str, fn())] = &[
     ("j k, ↑ ↓, g G", focus_rows),
     ("space, X", marks),
     ("1-9, 0", groups),
+    ("w, +, x, =", w_plus_x_equals),
     ("u", undo),
+    ("tab", tab),
     ("y", copy),
     ("c", copy_as),
     ("b", lanes),
     ("s", sort),
+    ("a e d", a_e_d),
 ];
 
 const KEYS_SPEC: &str = include_str!("../../../../../docs/spec/keys.md");
@@ -365,4 +414,180 @@ fn every_built_mouse_equivalent_in_the_keymap_sends_what_its_key_does() {
     for (_, check) in CASES {
         check();
     }
+}
+
+/// The fixture app reading its config from a file holding the fixture, so the matrix can edit it.
+fn editable() -> App {
+    at_120(App::new(Config::parse(FIXTURE).unwrap(), now()).with_source(Some(FIXTURE.to_owned())))
+}
+
+/// The matrix open on team at 120 by 36.
+fn matrix_open() -> App {
+    press(editable(), &[Key::Tab])
+}
+
+fn group_names(app: &App) -> Vec<String> {
+    app.roster().groups.iter().map(|g| g.name.clone()).collect()
+}
+
+fn in_matrix(app: &App) -> bool {
+    crate::tui::matrix::of(app).is_some()
+}
+
+fn matrix_click_a_cell() {
+    let open = matrix_open();
+    let deploy = find(&open, "4 deploy");
+    let (_, sam) = find(&open, "Sam ");
+    let cell = (deploy.0 + 2, sam);
+    let clicked = send(open.clone(), &[down_at(cell)]);
+    let keyed = press(
+        open,
+        &[
+            Key::Down,
+            Key::Down,
+            Key::Char('l'),
+            Key::Char('l'),
+            Key::Char('l'),
+            Key::Char(' '),
+        ],
+    );
+    assert_eq!(settled(clicked).config, keyed.config);
+    let sam = keyed.roster().person_named("Sam").unwrap();
+    assert!(keyed.roster().groups[3].people.contains(&sam));
+}
+
+fn matrix_click_a_name() {
+    let open = matrix_open();
+    let regions = find(&open, "3 regions");
+    let used = send(
+        open.clone(),
+        &[down_at(regions), left(MouseEventKind::Up, regions)],
+    );
+    let keyed = press(open, &[Key::Char('l'), Key::Char('l'), Key::Enter]);
+    assert!(!in_matrix(&used));
+    assert_eq!(used.lens_name(), "regions");
+    assert_eq!(settled(used).lens, keyed.lens);
+}
+
+fn matrix_drag_a_name() {
+    let open = matrix_open();
+    let deploy = find(&open, "4 deploy");
+    let regions = find(&open, "3 regions");
+    let team = find(&open, "1 team");
+    let held = send(open, &[down_at(deploy)]);
+    let over = |at: (u16, u16)| left(MouseEventKind::Drag, (at.0 + 1, at.1));
+    let dragged = send(held, &[over(regions), over(regions), over(regions)]);
+    assert_eq!(
+        group_names(&dragged),
+        ["team", "au", "deploy", "regions"],
+        "every drag event inside one column moves the group only once"
+    );
+    let further = send(dragged, &[over(team), over(team)]);
+    assert_eq!(group_names(&further), ["deploy", "team", "au", "regions"]);
+    let released = send(further, &[left(MouseEventKind::Up, team)]);
+    assert!(
+        in_matrix(&released),
+        "letting go after a drag does not use the group"
+    );
+}
+
+fn matrix_right_click() {
+    let open = matrix_open();
+    let deploy = find(&open, "4 deploy");
+    let right = event(
+        MouseEventKind::Down(MouseButton::Right),
+        deploy,
+        KeyModifiers::NONE,
+    );
+    let renaming = send(open.clone(), &[right]);
+    let keyed = press(
+        open,
+        &[
+            Key::Char('l'),
+            Key::Char('l'),
+            Key::Char('l'),
+            Key::Char('R'),
+        ],
+    );
+    assert_eq!(
+        crate::tui::matrix::of(&renaming).map(|m| m.naming.clone()),
+        crate::tui::matrix::of(&keyed).map(|m| m.naming.clone())
+    );
+}
+
+fn matrix_middle_click() {
+    let open = matrix_open();
+    let au = find(&open, "2 au");
+    let middle = event(
+        MouseEventKind::Down(MouseButton::Middle),
+        au,
+        KeyModifiers::NONE,
+    );
+    let closed = send(open, &[middle]);
+    assert_eq!(group_names(&closed), ["team", "regions", "deploy"]);
+}
+
+/// Each mouse equivalent the matrix's keymap paragraph lists, and the check that it sends what
+/// its key does.
+const MATRIX_CASES: &[(&str, fn())] = &[
+    (
+        "click a cell to move there and toggle it",
+        matrix_click_a_cell,
+    ),
+    ("click a column name to use that group", matrix_click_a_name),
+    ("drag a column name to reorder", matrix_drag_a_name),
+    ("right-click to rename", matrix_right_click),
+    ("middle-click to close", matrix_middle_click),
+];
+
+/// The clauses of the keymap's `Mouse in the matrix:` sentence.
+fn matrix_mouse_clauses() -> Vec<String> {
+    let (_, after) = KEYS_SPEC
+        .split_once("Mouse in the matrix: ")
+        .expect("keys.md lists the matrix's mouse equivalents");
+    let sentence = after.lines().next().unwrap_or_default();
+    sentence
+        .trim_end_matches('.')
+        .split(", ")
+        .map(str::to_owned)
+        .collect()
+}
+
+#[test]
+fn every_matrix_mouse_equivalent_in_the_keymap_sends_what_its_key_does() {
+    let covered: Vec<&str> = MATRIX_CASES.iter().map(|(clause, _)| *clause).collect();
+    assert_eq!(covered, matrix_mouse_clauses());
+    for (_, check) in MATRIX_CASES {
+        check();
+    }
+}
+
+#[test]
+fn a_click_outside_the_matrix_closes_it() {
+    let closed = send(matrix_open(), &[down_at((0, 0))]);
+    assert!(!in_matrix(&closed));
+}
+
+#[test]
+fn two_presses_on_a_label_far_apart_on_the_loop_s_clock_are_not_a_double_click() {
+    let sam = find(&editable(), "Sam");
+    let press_at = |app: App, ms: i64| {
+        let pointer = Pointer::from_crossterm(
+            left(MouseEventKind::Down, sam),
+            chrono::TimeDelta::milliseconds(ms),
+        );
+        update(app, Msg::Mouse(pointer)).0
+    };
+    let late = press_at(press_at(editable(), 0), 1000);
+    assert_eq!(
+        late.mode,
+        crate::tui::app::Mode::Normal,
+        "the fixed clock never advances"
+    );
+    let quick = press_at(press_at(editable(), 0), 300);
+    assert!(
+        matches!(quick.mode, crate::tui::app::Mode::Picker(_)),
+        "{:?}",
+        quick.mode
+    );
 }

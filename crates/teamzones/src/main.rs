@@ -56,15 +56,25 @@ fn open_tui(
     config_path: &std::path::Path,
     clipboard: &mut dyn clipboard::Clipboard,
 ) -> ExitCode {
-    let config = match paths::load(config_path, paths::system_zone()) {
-        Ok(config) => config,
+    let system_zone = paths::system_zone();
+    let loaded = paths::read(config_path).and_then(|text| {
+        paths::load_text(config_path, text.as_deref(), system_zone).map(|config| (config, text))
+    });
+    let (config, text) = match loaded {
+        Ok(loaded) => loaded,
         Err(error) => {
             eprintln!("{error}");
             return ExitCode::from(2);
         }
     };
+    let file = tui::File {
+        path: config_path,
+        text,
+        system_zone,
+    };
     match tui::run(
         config,
+        file,
         parsed.clock(),
         clipboard,
         tui::TerminalEnv::from_env(),

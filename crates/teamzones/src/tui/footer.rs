@@ -52,7 +52,10 @@ pub fn badge(context: Context) -> Option<&'static str> {
         | Context::Prompt
         | Context::CopyMenu
         | Context::SortMenu
-        | Context::Help => None,
+        | Context::Help
+        | Context::Matrix
+        | Context::AddMenu
+        | Context::DriftMenu => None,
     }
 }
 
@@ -156,6 +159,18 @@ mod tests {
     }
 
     #[test]
+    fn the_matrix_footer_names_its_own_keys_in_the_spec_s_order() {
+        assert_eq!(
+            at(Context::Matrix, AT_NOW, 120),
+            "space member  enter use  y copy  a new  R rename  </> move  x close  u undo  ? help  esc done"
+        );
+        assert_eq!(
+            at(Context::Matrix, AT_NOW, 80),
+            "space member  enter use  y copy  a new  x close  u undo  ? help  esc done"
+        );
+    }
+
+    #[test]
     fn m_is_never_offered_while_it_does_nothing() {
         let inert = Situation {
             map: MapKey::Inert,
@@ -172,11 +187,11 @@ mod tests {
     fn at_now_the_main_footer_has_no_mode_hints_and_no_group_hint() {
         assert_eq!(
             at(Context::Main, AT_NOW, 120),
-            "h/l time  v range  n next fit  space mark  y copy  c copy as  m map  ? help  q quit"
+            "h/l time  v range  n next fit  space mark  w save  tab groups  y copy  c copy as  m map  ? help  q quit"
         );
         assert_eq!(
             at(Context::Main, AT_NOW, 80),
-            "h/l time  v range  n next fit  space mark  y copy  c copy as  ? help  q quit"
+            "h/l time  v range  n next fit  space mark  tab groups  y copy  ? help  q quit"
         );
     }
 
@@ -184,11 +199,11 @@ mod tests {
     fn away_from_now_the_footer_offers_dot_now() {
         assert_eq!(
             at(Context::Main, AWAY, 120),
-            "h/l time  . now  v range  n next fit  space mark  y copy  c copy as  m map  ? help  q quit"
+            "h/l time  . now  v range  n next fit  space mark  w save  tab groups  y copy  c copy as  m map  ? help  q quit"
         );
         assert_eq!(
             at(Context::Main, AWAY, 80),
-            "h/l time  . now  v range  n next fit  space mark  y copy  m map  ? help  q quit"
+            "h/l time  . now  v range  space mark  w save  tab groups  y copy  ? help  q quit"
         );
     }
 
@@ -196,11 +211,11 @@ mod tests {
     fn with_a_committed_range_the_footer_offers_esc_and_keeps_it_last_to_drop() {
         assert_eq!(
             at(Context::Main, RANGED, 120),
-            "h/l time  . now  v range  n next fit  space mark  y copy  c copy as  m map  esc clear range  ? help  q quit"
+            "h/l time  . now  v range  n next fit  space mark  w save  tab groups  y copy  c copy as  esc clear range  ? help  q quit"
         );
         assert_eq!(
             at(Context::Main, RANGED, 80),
-            "h/l time  . now  v range  space mark  y copy  esc clear range  ? help  q quit"
+            "h/l time  . now  space mark  tab groups  y copy  esc clear range  ? help  q quit"
         );
         assert_eq!(
             at(Context::Main, RANGED, 40),
