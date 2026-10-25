@@ -58,6 +58,8 @@ pub enum Context {
     AddMenu,
     /// The drift tag's menu.
     DriftMenu,
+    /// Map mode: the map's own pan, zoom and reset keys.
+    Map,
 }
 
 /// How rows are ordered within each block.
@@ -114,6 +116,14 @@ pub enum Action {
     Submit,
     CycleRangeStyle,
     FlipMap,
+    /// `z`: enter map mode, while the map is drawn.
+    MapMode,
+    /// Pan the map this many steps east and south.
+    Pan(i8, i8),
+    /// Zoom the map this many steps in.
+    Zoom(i8),
+    /// Put the map back on its default view.
+    ResetMap,
     ToggleMouse,
     /// `tab`: open the membership matrix.
     Matrix,
@@ -183,7 +193,7 @@ pub struct Binding {
 
 /// The milestones built so far: M3 to M5 and the hands-on feedback rounds after M3.
 #[cfg(test)]
-pub const BUILT: [&str; 4] = ["M3", "M4", "M5", "FB2"];
+pub const BUILT: [&str; 5] = ["M3", "M4", "M5", "FB2", "FB4"];
 
 /// A footer priority that never drops.
 pub const PINNED: u8 = u8::MAX;
@@ -484,6 +494,15 @@ pub const BINDINGS: &[Binding] = &[
         )
     },
     Binding {
+        chords: &[(Key::Char('z'), Action::MapMode)],
+        ..row(
+            "z",
+            "Map mode, while the map is drawn: pan, zoom and reset its view",
+            "FB4",
+            Context::Main,
+        )
+    },
+    Binding {
         chords: &[(Key::Char('M'), Action::ToggleMouse)],
         ..row("M", "Release or recapture the mouse", "M4", Context::Main)
     },
@@ -585,6 +604,64 @@ pub const BINDINGS: &[Binding] = &[
         priority: PINNED,
         chords: &[(Key::Char('?'), Action::Help)],
         ..row("?", "Help", "", Context::Range)
+    },
+    Binding {
+        hints: &[hint("h/j/k/l", "pan")],
+        priority: MODE + 4,
+        chords: &[
+            (Key::Char('h'), Action::Pan(-1, 0)),
+            (Key::Char('l'), Action::Pan(1, 0)),
+            (Key::Char('k'), Action::Pan(0, -1)),
+            (Key::Char('j'), Action::Pan(0, 1)),
+            (Key::Left, Action::Pan(-1, 0)),
+            (Key::Right, Action::Pan(1, 0)),
+            (Key::Up, Action::Pan(0, -1)),
+            (Key::Down, Action::Pan(0, 1)),
+        ],
+        ..row(
+            "h j k l, arrows",
+            "Pan the map west, south, north or east; longitude wraps",
+            "",
+            Context::Map,
+        )
+    },
+    Binding {
+        hints: &[hint("+/-", "zoom")],
+        priority: MODE + 3,
+        chords: &[
+            (Key::Char('+'), Action::Zoom(1)),
+            (Key::Char('='), Action::Zoom(1)),
+            (Key::Char('-'), Action::Zoom(-1)),
+        ],
+        ..row(
+            "+ =, -",
+            "Zoom in; zoom out, as far as the whole map",
+            "",
+            Context::Map,
+        )
+    },
+    Binding {
+        hints: &[hint("0", "reset")],
+        priority: MODE + 2,
+        chords: &[(Key::Char('0'), Action::ResetMap)],
+        ..row(
+            "0",
+            "Back to the default view: the whole width, on home and the counted rows",
+            "",
+            Context::Map,
+        )
+    },
+    Binding {
+        hints: &[hint("esc", "done")],
+        priority: MODE + 1,
+        chords: &[(Key::Esc, Action::Unwind)],
+        ..row("esc", "Leave map mode, keeping the view", "", Context::Map)
+    },
+    Binding {
+        hints: &[hint("?", "help")],
+        priority: PINNED,
+        chords: &[(Key::Char('?'), Action::Help)],
+        ..row("?", "Help", "", Context::Map)
     },
     Binding {
         hints: &[hint("enter", "go")],
@@ -741,7 +818,8 @@ fn fallbacks(context: Context) -> &'static [Context] {
         | Context::Help
         | Context::Matrix
         | Context::AddMenu
-        | Context::DriftMenu => &[Context::Global],
+        | Context::DriftMenu
+        | Context::Map => &[Context::Global],
         Context::Range => &[Context::Main, Context::Global],
         Context::Prompt => &[],
     }
@@ -757,7 +835,7 @@ fn hints_global(context: Context) -> bool {
         | Context::Help
         | Context::AddMenu
         | Context::DriftMenu => true,
-        Context::Range | Context::Prompt | Context::Matrix => false,
+        Context::Range | Context::Prompt | Context::Matrix | Context::Map => false,
     }
 }
 
@@ -802,7 +880,8 @@ fn unbound(context: Context, key: Key) -> Option<Action> {
         | Context::Help
         | Context::Matrix
         | Context::AddMenu
-        | Context::DriftMenu => None,
+        | Context::DriftMenu
+        | Context::Map => None,
     }
 }
 
@@ -990,6 +1069,113 @@ mod tests {
                 named.contains(key),
                 "{key:?} ({action:?}) is not in the spec"
             );
+        }
+    }
+
+    /// The clauses of the keymap's `Map mode keys:` sentence, each with the keys it names in
+    /// backticks; a clause naming no key (a list of directions) belongs to the one before it.
+    fn map_clauses() -> Vec<(String, Vec<Key>)> {
+        let (_, after) = KEYS_SPEC
+            .split_once("Map mode keys: ")
+            .expect("keys.md lists map mode's keys");
+        let (sentence, _) = after
+            .split_once(". The footer")
+            .expect("the sentence ends before the footer");
+        let clauses = sentence
+            .split(", ")
+            .fold(Vec::<String>::new(), |mut acc, part| {
+                match acc.last_mut() {
+                    Some(last) if !part.contains('`') => *last = format!("{last}, {part}"),
+                    _ => acc.push(part.to_owned()),
+                }
+                acc
+            });
+        clauses
+            .into_iter()
+            .map(|clause| {
+                let named = clause.split('`').skip(1).step_by(2).flat_map(|keys| {
+                    keys.split_whitespace().map(|word| match word {
+                        "esc" => Key::Esc,
+                        other => Key::Char(other.chars().next().unwrap_or(' ')),
+                    })
+                });
+                let arrows = clause
+                    .contains(" arrows ")
+                    .then_some([Key::Left, Key::Down, Key::Up, Key::Right])
+                    .into_iter()
+                    .flatten();
+                let keys = named.chain(arrows).collect();
+                (clause, keys)
+            })
+            .collect()
+    }
+
+    /// The pan each direction word names, east and south positive.
+    fn pan_towards(word: &str) -> Option<Action> {
+        match word {
+            "west" => Some(Action::Pan(-1, 0)),
+            "south" => Some(Action::Pan(0, 1)),
+            "north" => Some(Action::Pan(0, -1)),
+            "east" => Some(Action::Pan(1, 0)),
+            _ => None,
+        }
+    }
+
+    /// What each map clause says its keys do: the pan clause's keys in the order its directions
+    /// are listed (the four letters, then the four arrows).
+    fn map_actions(clause: &str, keys: &[Key]) -> Vec<Action> {
+        let one: [(&str, Action); 5] = [
+            ("zooms in", Action::Zoom(1)),
+            ("zooms out", Action::Zoom(-1)),
+            ("resets", Action::ResetMap),
+            ("opens help", Action::Help),
+            ("leaves map mode", Action::Unwind),
+        ];
+        if clause.contains(" pan ") {
+            let directions: Vec<Action> = clause
+                .split(|c: char| !c.is_alphabetic())
+                .filter_map(pan_towards)
+                .collect();
+            return directions
+                .iter()
+                .cycle()
+                .take(keys.len())
+                .copied()
+                .collect();
+        }
+        one.into_iter()
+            .find(|(verb, _)| clause.contains(verb))
+            .map(|(_, action)| vec![action; keys.len()])
+            .unwrap_or_default()
+    }
+
+    #[test]
+    fn the_map_mode_bindings_are_the_keys_the_spec_s_map_sentence_names() {
+        let clauses = map_clauses();
+        for (clause, keys) in &clauses {
+            let actions = map_actions(clause, keys);
+            assert!(!keys.is_empty() && actions.len() == keys.len(), "{clause}");
+            for (key, expected) in keys.iter().zip(actions) {
+                assert_eq!(
+                    action_for(Context::Map, *key),
+                    Some(expected),
+                    "{clause}: {key:?}"
+                );
+            }
+        }
+        let named: Vec<Key> = clauses.into_iter().flat_map(|(_, keys)| keys).collect();
+        let bound = BINDINGS
+            .iter()
+            .filter(|b| b.context == Context::Map)
+            .flat_map(|b| b.chords.iter());
+        for (key, action) in bound {
+            assert!(
+                named.contains(key),
+                "{key:?} ({action:?}) is not in the spec"
+            );
+        }
+        for key in [Key::Char('q'), Key::Ctrl('c')] {
+            assert_eq!(action_for(Context::Map, key), Some(Action::Quit), "{key:?}");
         }
     }
 

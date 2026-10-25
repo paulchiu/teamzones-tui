@@ -11,8 +11,10 @@ use teamzones_core::time::Moment;
 use super::app::{App, Cursor, Lanes, Lens, Mode, Visual, base_marks, next_style, style_name};
 use super::edit;
 use super::editor::Loaded;
+use super::footer::MapKey;
 use super::keys::{Action, Context, Key, action_for};
 use super::layout::MapView;
+use super::map;
 use super::matrix;
 use super::mouse::{self, Drag, Pointer};
 use super::notice::{Notice, TIMEOUT};
@@ -114,6 +116,7 @@ pub fn context(app: &App) -> Context {
         Mode::Picker(_) => Context::Prompt,
         Mode::AddMenu(_) => Context::AddMenu,
         Mode::DriftMenu => Context::DriftMenu,
+        Mode::Map => Context::Map,
         Mode::CopyMenu => Context::CopyMenu,
         Mode::SortMenu => Context::SortMenu,
         Mode::Help(..) => Context::Help,
@@ -134,14 +137,7 @@ pub fn update(app: App, msg: Msg) -> (App, Vec<Effect>) {
             let now = app.now;
             (with_notice(app, &key, &words, now), Vec::new())
         }
-        Msg::Resize(cols, rows) => (
-            App {
-                size: (cols, rows),
-                map_flipped: false,
-                ..app
-            },
-            Vec::new(),
-        ),
+        Msg::Resize(cols, rows) => (resized(app, cols, rows), Vec::new()),
         Msg::Mouse(pointer) => {
             let msgs = mouse::msgs(&app, pointer);
             msgs.into_iter()
@@ -214,6 +210,22 @@ pub fn update(app: App, msg: Msg) -> (App, Vec<Effect>) {
     };
     next.focus = clamp_focus(&rows_before, &next.focus_rows(), next.focus);
     (next, effects)
+}
+
+/// The app on a `cols` by `rows` terminal: the map's choice and view start afresh, and map mode
+/// ends when the map is no longer drawn.
+fn resized(app: App, cols: u16, rows: u16) -> App {
+    let app = App {
+        size: (cols, rows),
+        map_flipped: false,
+        camera: map::framing(&app),
+        ..app
+    };
+    if app.mode == Mode::Map && !map::is_drawn(&app) {
+        normal(app)
+    } else {
+        app
+    }
 }
 
 /// Keeps focus on its row when that row is still there, else on the row now at its old index.
@@ -343,7 +355,8 @@ fn act(app: App, action: Action, key: Key) -> (App, Vec<Effect>) {
             | Mode::Help(..)
             | Mode::AddMenu(_)
             | Mode::Picker(_)
-            | Mode::DriftMenu => undo(app),
+            | Mode::DriftMenu
+            | Mode::Map => undo(app),
         },
         Action::Save => match app.lens {
             Lens::Group(_) => edit::save(normal(app)),
@@ -390,7 +403,8 @@ fn act(app: App, action: Action, key: Key) -> (App, Vec<Effect>) {
             | Mode::Matrix(_)
             | Mode::AddMenu(_)
             | Mode::Picker(_)
-            | Mode::DriftMenu) => App {
+            | Mode::DriftMenu
+            | Mode::Map) => App {
                 mode: Mode::Help(context(&app), Box::new(mode)),
                 ..app
             },
@@ -420,7 +434,8 @@ fn act(app: App, action: Action, key: Key) -> (App, Vec<Effect>) {
             | Mode::SortMenu
             | Mode::Help(..)
             | Mode::AddMenu(_)
-            | Mode::DriftMenu => only(submit(app)),
+            | Mode::DriftMenu
+            | Mode::Map => only(submit(app)),
         },
         Action::AddMenu => only(App {
             mode: Mode::AddMenu(None),
@@ -437,7 +452,8 @@ fn act(app: App, action: Action, key: Key) -> (App, Vec<Effect>) {
                 | Mode::Help(..)
                 | Mode::Matrix(_)
                 | Mode::Picker(_)
-                | Mode::DriftMenu => None,
+                | Mode::DriftMenu
+                | Mode::Map => None,
             };
             only(picker::open_new(app, place, point))
         }
@@ -496,6 +512,30 @@ fn act(app: App, action: Action, key: Key) -> (App, Vec<Effect>) {
             map_flipped: !app.map_flipped,
             ..app
         }),
+        Action::MapMode if map::is_drawn(&app) => only(App {
+            mode: Mode::Map,
+            ..app
+        }),
+        Action::MapMode => {
+            let text = match app.map_key_at(app.size.0, app.size.1) {
+                MapKey::Inert => "no map with ascii glyphs",
+                MapKey::Opens | MapKey::Flips => "no map on screen: m shows it",
+            };
+            let now = app.now;
+            only(with_notice(app, "z", text, now))
+        }
+        Action::Pan(across, down) => {
+            let camera = map::panned(&app, (across, down));
+            only(App { camera, ..app })
+        }
+        Action::Zoom(by) => {
+            let camera = map::zoomed(&app, by);
+            only(App { camera, ..app })
+        }
+        Action::ResetMap => {
+            let camera = map::framing(&app);
+            only(App { camera, ..app })
+        }
     }
 }
 
@@ -595,7 +635,8 @@ fn unwind(app: App) -> App {
             | Mode::SortMenu
             | Mode::AddMenu(_)
             | Mode::Picker(_)
-            | Mode::DriftMenu,
+            | Mode::DriftMenu
+            | Mode::Map,
             _,
             _,
         ) => normal(app),
@@ -860,7 +901,8 @@ fn edit_prompt(app: App, typed: Option<char>) -> App {
         | Mode::SortMenu
         | Mode::Help(..)
         | Mode::AddMenu(_)
-        | Mode::DriftMenu => return app,
+        | Mode::DriftMenu
+        | Mode::Map => return app,
     };
     App { mode, ..app }
 }

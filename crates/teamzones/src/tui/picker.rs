@@ -137,7 +137,8 @@ pub fn of(app: &App) -> Option<&Picker> {
         | Mode::SortMenu
         | Mode::Help(..)
         | Mode::Matrix(_)
-        | Mode::DriftMenu => None,
+        | Mode::DriftMenu
+        | Mode::Map => None,
     }
 }
 

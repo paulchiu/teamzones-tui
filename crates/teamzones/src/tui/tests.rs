@@ -794,7 +794,9 @@ fn the_prompt_acts_on_the_keys_its_footer_advertises() {
 #[test]
 fn each_modal_context_swallows_the_keys_it_does_not_advertise() {
     let drift_menu = update(fixture(), Msg::DriftMenu).0;
+    let map_mode = press(update(fixture(), Msg::Resize(120, 36)).0, &chars("z"));
     let opened = [
+        map_mode,
         press(fixture(), &chars("c")),
         press(fixture(), &chars("s")),
         press(fixture(), &chars("?")),

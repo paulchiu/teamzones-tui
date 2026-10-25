@@ -110,7 +110,8 @@ pub fn of(app: &App) -> Option<&Matrix> {
         | Mode::Help(..)
         | Mode::AddMenu(_)
         | Mode::Picker(_)
-        | Mode::DriftMenu => None,
+        | Mode::DriftMenu
+        | Mode::Map => None,
     }
 }
 

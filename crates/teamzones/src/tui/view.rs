@@ -232,6 +232,16 @@ pub fn areas(app: &App, size: Rect) -> Areas {
     )
 }
 
+/// Where the map is drawn on a screen of `size`: in place, inside the overlay's border, or
+/// nowhere.
+pub fn map_area(app: &App, size: Rect) -> Option<Rect> {
+    match app.map_view_at(size.width, size.height) {
+        MapView::InPlace => areas(app, size).map.map(|area| size.intersection(area)),
+        MapView::Overlay => Some(map_overlay_area(size).inner(ratatui::layout::Margin::new(1, 1))),
+        MapView::Hidden => None,
+    }
+}
+
 /// The map overlay's box: centred, up to twelve map rows inside its border.
 pub fn map_overlay_area(size: Rect) -> Rect {
     let width = size.width.saturating_sub(4).min(120);
@@ -248,6 +258,11 @@ fn map_overlay(buf: &mut Buffer, size: Rect, app: &App, look: Look) {
     let theme = look.theme;
     let area = map_overlay_area(size);
     Clear.render(area, buf);
+    let esc = if app.mode == Mode::Map {
+        " done "
+    } else {
+        " close "
+    };
     let block = Block::bordered()
         .border_set(look.glyphs.rounded)
         .border_style(theme.fg(Role::Accent))
@@ -258,7 +273,7 @@ fn map_overlay(buf: &mut Buffer, size: Rect, app: &App, look: Look) {
         .title_bottom(
             Line::from(vec![
                 Span::styled(" esc", theme.fg(Role::Accent)),
-                Span::styled(" close ", theme.fg(Role::Dim)),
+                Span::styled(esc, theme.fg(Role::Dim)),
             ])
             .right_aligned(),
         );
@@ -307,7 +322,12 @@ pub fn draw(frame: &mut Frame, app: &App, look: Look) {
         Mode::Picker(picker) => super::picker::draw(buf, size, app, picker, look),
         Mode::CopyMenu => copy_dialog(buf, size, app, look),
         Mode::DriftMenu => drift_menu(buf, size, app, look),
-        Mode::Normal | Mode::Prompt(_) | Mode::NewGroup(_) | Mode::SortMenu | Mode::AddMenu(_) => {}
+        Mode::Normal
+        | Mode::Prompt(_)
+        | Mode::NewGroup(_)
+        | Mode::SortMenu
+        | Mode::AddMenu(_)
+        | Mode::Map => {}
     }
 }
 
@@ -865,7 +885,8 @@ pub fn strip_pieces(app: &App, look: Look) -> Vec<(Piece, Span<'static>)> {
         | Mode::Matrix(_)
         | Mode::AddMenu(_)
         | Mode::Picker(_)
-        | Mode::DriftMenu => Span::styled("  +", theme.fg(Role::Dim)),
+        | Mode::DriftMenu
+        | Mode::Map => Span::styled("  +", theme.fg(Role::Dim)),
     };
     pieces.push((Piece::NewGroup, adding));
     let matrix = format!("  {}", look.glyphs.text("⋯"));
@@ -1302,7 +1323,8 @@ fn notice(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
         | Mode::Help(..)
         | Mode::Matrix(_)
         | Mode::Picker(_)
-        | Mode::DriftMenu => app
+        | Mode::DriftMenu
+        | Mode::Map => app
             .notice
             .as_ref()
             .filter(|notice| notice.visible(app.now))

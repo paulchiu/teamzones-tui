@@ -2,7 +2,7 @@
 
 Seeded from the shared contract of the teamzones build spec (2026-10-24). Where a mockup and the text disagree, the text wins.
 
-One binding table generates the footer and the `?` overlay (context first, then global, then a glyph legend). No hint is a literal string, and unbuilt keys are never advertised. FB2 marks a key from the second hands-on feedback round after M3.
+One binding table generates the footer and the `?` overlay (context first, then global, then a glyph legend). No hint is a literal string, and unbuilt keys are never advertised. FB2 marks a key from the second hands-on feedback round after M3, and FB4 one from the fourth.
 
 | Key | Action | Mouse | Milestone |
 | --- | --- | --- | --- |
@@ -28,9 +28,12 @@ One binding table generates the footer and the `?` overlay (context first, then 
 | R | Cycle the range-marking style for this session (`[theme] range` sets the one it opens with) | none | FB2 |
 | s | Sort menu within each block: `o` offset, `n` name | Click a block title | M3 / M4 |
 | m | Flip the map's automatic choice (overlay when there is no room) | none | M4 |
+| z | Map mode, while the map is drawn: pan, zoom and reset its view | Wheel over the map in map mode pans it (shift-wheel across) | FB4 |
 | M | Release or recapture the mouse | none | M4 |
 | a e d | Add, edit or delete a person or place | Double-click the map (add, with the clicked point), double-click a label (edit) | M5 |
 | E, r | Open config in `$EDITOR` (suspending the TUI); reload config | none | M5 |
 | ?, q, ctrl-c | Help; quit; quit (always, even in prompts) | none | M3 |
 
 Matrix overlay keys: `h j k l` and arrows move, `space` toggles, `enter` uses the group and closes, `y` copies its line, `a` adds a group, `R` renames (the old name becomes an alias), `< >` move the column, `x` closes the group under the cursor, `u` undoes, `esc` finishes. Mouse in the matrix: click a cell to move there and toggle it, click a column name to use that group, drag a column name to reorder, right-click to rename, middle-click to close.
+
+Map mode keys: `h j k l` and arrows pan west, south, north and east (longitude wraps), `+` or `=` zooms in, `-` zooms out as far as the whole map, `0` resets to the default view, `?` opens help, and `esc` leaves map mode, keeping the view until a reset or a resize. The footer leads with a `map` badge and shows only these keys. Every other key is swallowed while map mode is on, apart from `q` and `ctrl-c`, which still quit.
