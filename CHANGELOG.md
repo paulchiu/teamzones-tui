@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-10-25
+
 ### Added
 
 - `teamzones` opens on the group you last quit on, kept in `~/.local/state/teamzones/state.toml`.
