@@ -10,6 +10,7 @@ use thiserror::Error;
 use toml::Spanned;
 
 use crate::cities::{self, CityError};
+use crate::copy::{Clause, DIALOG_KEYS, Format, Formats, Variant, Who};
 use crate::schedule::{
     Daylight, Days, Hours, Labels, Level, LocalSpan, Location, ScheduleError, Trading, TradingDay,
 };
@@ -74,6 +75,26 @@ pub enum Reason {
     EmptyLabel(&'static str),
     #[error("\"{0}\" labels two levels")]
     RepeatedLabel(String),
+    #[error(
+        "copy key \"{0}\" must be one character other than whitespace, esc, ? or q, which the copy-as dialog uses"
+    )]
+    CopyKey(String),
+    #[error("\"{key}\" is already a copy key on line {first}")]
+    RepeatedCopyKey { key: char, first: usize },
+    #[error("copy format \"{0}\" needs a label")]
+    CopyLabel(char),
+    #[error("\"{0}\" is not a built-in copy format, so there is nothing to hide")]
+    NothingToHide(char),
+    #[error("a hidden copy format cannot be the default")]
+    HiddenDefault,
+    #[error("a second default copy format; \"{key}\" on line {first} is already the default")]
+    SecondDefault { key: char, first: usize },
+    #[error("no copy format is the default, so set default = true on one")]
+    NoDefault,
+    #[error(
+        "the default copy format is also what teamzones say prints, which has no focused row, so it cannot be who = \"focused-first\""
+    )]
+    FocusedDefault,
 }
 
 fn fail<T>(line: usize, reason: impl Into<Reason>) -> Result<T, ConfigError> {
@@ -311,6 +332,7 @@ pub struct Config {
     pub map: MapShow,
     pub travel: Option<Travel>,
     pub theme: Theme,
+    pub copy: Formats,
 }
 
 #[derive(Deserialize)]
@@ -329,6 +351,8 @@ struct RawConfig {
     map: Option<RawMap>,
     travel: Option<RawTravel>,
     theme: Option<RawTheme>,
+    #[serde(default)]
+    copy: Vec<RawCopy>,
 }
 
 #[derive(Deserialize)]
@@ -451,6 +475,19 @@ struct RawTheme {
     selection: Option<Spanned<String>>,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawCopy {
+    key: Spanned<String>,
+    label: Option<Spanned<String>>,
+    who: Option<Who>,
+    date: Option<bool>,
+    names: Option<bool>,
+    places: Option<Clause>,
+    default: Option<bool>,
+    hide: Option<bool>,
+}
+
 /// Turns byte offsets into 1-based line numbers.
 struct Lines<'a>(&'a str);
 
@@ -546,6 +583,7 @@ impl Config {
             map: MapShow::default(),
             travel: None,
             theme: Theme::default(),
+            copy: Formats::builtin(),
         }
     }
 }
@@ -568,6 +606,7 @@ fn build(raw: RawConfig, lines: &Lines) -> Result<Config, ConfigError> {
         map,
         travel,
         theme,
+        copy,
     } = raw;
     let home = home.map_or_else(|| fail(1, Reason::MissingHome), Ok)?;
     let daylight = match bands
@@ -609,6 +648,7 @@ fn build(raw: RawConfig, lines: &Lines) -> Result<Config, ConfigError> {
             .map(|raw| resolve_theme(raw, lines))
             .transpose()?
             .unwrap_or_default(),
+        copy: resolve_copy(&copy, lines)?,
     })
 }
 
@@ -1126,6 +1166,106 @@ fn resolve_travel(raw: &RawTravel, lines: &Lines) -> Result<Travel, ConfigError>
         },
         until,
     })
+}
+
+/// A copy key: one character the copy-as dialog does not already use for itself.
+fn copy_key(raw: &Spanned<String>, lines: &Lines) -> Result<char, ConfigError> {
+    let mut chars = raw.get_ref().chars();
+    match (chars.next(), chars.next()) {
+        (Some(key), None) if !key.is_whitespace() && !DIALOG_KEYS.contains(&key) => Ok(key),
+        (Some(_) | None, _) => fail(lines.of(raw), Reason::CopyKey(raw.get_ref().clone())),
+    }
+}
+
+/// The built-in formats with each `[[copy]]` table applied in file order: a built-in key is
+/// replaced in place (or removed by `hide`), a new key is appended.
+///
+/// The built-in `y` stays the default unless a table sets `default = true` elsewhere, or sets
+/// `default = false` on (or hides) `y` itself.
+fn resolve_copy(raw: &[RawCopy], lines: &Lines) -> Result<Formats, ConfigError> {
+    let builtin = Formats::builtin();
+    let mut formats = builtin.formats.clone();
+    let mut seen: Vec<(char, usize)> = Vec::new();
+    let mut chosen: Option<(char, usize)> = None;
+    let mut y_kept = true;
+    for table in raw {
+        let RawCopy {
+            key,
+            label,
+            who,
+            date,
+            names,
+            places,
+            default,
+            hide,
+        } = table;
+        let line = lines.of(key);
+        let key = copy_key(key, lines)?;
+        if let Some(&(_, first)) = seen.iter().find(|(known, _)| *known == key) {
+            return fail(line, Reason::RepeatedCopyKey { key, first });
+        }
+        seen.push((key, line));
+        let at = formats.iter().position(|format| format.key == key);
+        if key == 'y' && *default != Some(true) && (*default == Some(false) || *hide == Some(true))
+        {
+            y_kept = false;
+        }
+        if *hide == Some(true) {
+            if *default == Some(true) {
+                return fail(line, Reason::HiddenDefault);
+            }
+            match at.filter(|_| builtin.get(key).is_some()) {
+                Some(index) => {
+                    formats.remove(index);
+                    continue;
+                }
+                None => return fail(line, Reason::NothingToHide(key)),
+            }
+        }
+        let label = match label {
+            Some(label) if !label.get_ref().trim().is_empty() => label.get_ref().clone(),
+            Some(_) | None => return fail(line, Reason::CopyLabel(key)),
+        };
+        if *default == Some(true) {
+            if let Some((first_key, first)) = chosen {
+                return fail(
+                    line,
+                    Reason::SecondDefault {
+                        key: first_key,
+                        first,
+                    },
+                );
+            }
+            chosen = Some((key, line));
+        }
+        let format = Format {
+            key,
+            label,
+            who: who.unwrap_or_default(),
+            variant: Variant {
+                date: date.unwrap_or_default(),
+                names: names.unwrap_or_default(),
+                clause: places.unwrap_or_default(),
+            },
+        };
+        match at {
+            Some(index) => formats[index] = format,
+            None => formats.push(format),
+        }
+    }
+    let (key, line) = match chosen {
+        Some(choice) => choice,
+        None if y_kept => ('y', 1),
+        None => return fail(seen.first().map_or(1, |(_, line)| *line), Reason::NoDefault),
+    };
+    let default = formats
+        .iter()
+        .position(|format| format.key == key)
+        .map_or_else(|| fail(line, Reason::NoDefault), Ok)?;
+    if formats[default].who == Who::FocusedFirst {
+        return fail(line, Reason::FocusedDefault);
+    }
+    Ok(Formats { formats, default })
 }
 
 fn resolve_theme(raw: RawTheme, lines: &Lines) -> Result<Theme, ConfigError> {
@@ -1682,5 +1822,139 @@ mod tests {
             [Rule::Open, Rule::Open, Rule::Closed, Rule::Closed]
         );
         assert_eq!(Rule::default(), Rule::Open);
+    }
+    fn copy_keys(text: &str) -> String {
+        let config = Config::parse(text).unwrap();
+        config.copy.all().iter().map(|format| format.key).collect()
+    }
+
+    #[test]
+    fn without_copy_tables_the_formats_are_the_built_ins() {
+        assert_eq!(Config::parse(FIXTURE).unwrap().copy, Formats::builtin());
+    }
+
+    #[test]
+    fn a_copy_table_with_a_new_key_joins_the_end_with_its_shape() {
+        let text = format!(
+            "{FIXTURE}\n[[copy]]\nkey = \"k\"\nlabel = \"dated names\"\nwho = \"all\"\ndate = true\nnames = true\nplaces = \"zones\"\n"
+        );
+        assert_eq!(copy_keys(&text), "ydwtzsak");
+        let config = Config::parse(&text).unwrap();
+        assert_eq!(
+            config.copy.get('k'),
+            Some(&Format {
+                key: 'k',
+                label: "dated names".to_owned(),
+                who: Who::All,
+                variant: Variant {
+                    date: true,
+                    names: true,
+                    clause: Clause::Zones,
+                },
+            })
+        );
+        assert_eq!(config.copy.default_format().key, 'y');
+    }
+
+    #[test]
+    fn a_copy_table_with_a_built_in_key_replaces_it_in_place_and_hide_removes_one() {
+        let text = format!(
+            "{FIXTURE}\n[[copy]]\nkey = \"d\"\nlabel = \"just the date\"\nplaces = \"none\"\ndate = true\n\n[[copy]]\nkey = \"z\"\nhide = true\n"
+        );
+        assert_eq!(copy_keys(&text), "ydwtsa");
+        let config = Config::parse(&text).unwrap();
+        let d = config.copy.get('d').unwrap();
+        assert_eq!(
+            (d.label.as_str(), d.variant.clause),
+            ("just the date", Clause::Drop)
+        );
+    }
+
+    #[test]
+    fn default_true_moves_the_default_off_y() {
+        let text = format!(
+            "{FIXTURE}\n[[copy]]\nkey = \"d\"\nlabel = \"dated\"\ndate = true\ndefault = true\n"
+        );
+        assert_eq!(Config::parse(&text).unwrap().copy.default_format().key, 'd');
+    }
+
+    #[test]
+    fn copy_tables_must_leave_exactly_one_default() {
+        let two = format!(
+            "{FIXTURE}\n[[copy]]\nkey = \"d\"\nlabel = \"dated\"\ndefault = true\n\n[[copy]]\nkey = \"w\"\nlabel = \"named\"\ndefault = true\n"
+        );
+        let error = rejection(&two);
+        assert_eq!(
+            (error.line, error.reason.to_string()),
+            (
+                line_of(&two, "key = \"w\""),
+                format!(
+                    "a second default copy format; \"d\" on line {} is already the default",
+                    line_of(&two, "key = \"d\"")
+                )
+            )
+        );
+        for none in [
+            "[[copy]]\nkey = \"y\"\nlabel = \"plain\"\ndefault = false\n",
+            "[[copy]]\nkey = \"y\"\nhide = true\n",
+        ] {
+            let text = format!("{FIXTURE}\n{none}");
+            assert_eq!(
+                rejection(&text).reason.to_string(),
+                "no copy format is the default, so set default = true on one",
+                "{none}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_copy_table_rejects_unknown_fields_values_and_clashing_or_repeated_keys() {
+        let cases = [
+            (
+                "key = \"k\"\nlabel = \"x\"\ncolour = \"red\"",
+                "unknown key \"colour\"",
+            ),
+            (
+                "key = \"k\"\nlabel = \"x\"\nwho = \"some\"",
+                "unknown variant",
+            ),
+            (
+                "key = \"k\"\nlabel = \"x\"\nplaces = \"maybe\"",
+                "unknown variant",
+            ),
+            ("key = \"esc\"\nlabel = \"x\"", "copy key \"esc\""),
+            ("key = \"q\"\nlabel = \"x\"", "copy key \"q\""),
+            ("key = \"?\"\nlabel = \"x\"", "copy key \"?\""),
+            ("key = \" \"\nlabel = \"x\"", "copy key \" \""),
+            ("key = \"k\"", "copy format \"k\" needs a label"),
+            (
+                "key = \"k\"\nhide = true",
+                "\"k\" is not a built-in copy format, so there is nothing to hide",
+            ),
+            (
+                "key = \"d\"\nhide = true\ndefault = true",
+                "a hidden copy format cannot be the default",
+            ),
+        ];
+        for (table, reason) in cases {
+            let text = format!("{FIXTURE}\n[[copy]]\n{table}\n");
+            let error = rejection(&text);
+            assert!(
+                error.reason.to_string().contains(reason),
+                "{table}: {error}"
+            );
+        }
+        let twice = format!(
+            "{FIXTURE}\n[[copy]]\nkey = \"k\"\nlabel = \"x\"\n\n[[copy]]\nkey = \"k\"\nlabel = \"y\"\n"
+        );
+        let error = rejection(&twice);
+        assert_eq!(error.line, twice.lines().count() - 1);
+        assert!(
+            error
+                .reason
+                .to_string()
+                .contains("\"k\" is already a copy key on line"),
+            "{error}"
+        );
     }
 }

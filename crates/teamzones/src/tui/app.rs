@@ -3,10 +3,10 @@
 use chrono::{DateTime, NaiveDate, Offset, Utc};
 use teamzones_core::clock::{Range, Slot, When};
 use teamzones_core::config::{Config, PersonId, Roster};
-use teamzones_core::copy::{Clause, Variant, focus_line, say_line};
+use teamzones_core::copy::{Format, format_line};
 use teamzones_core::question::{Marks, Row};
 
-use super::keys::{Context, CopyAs, Sort};
+use super::keys::{Context, Sort};
 use super::notice::Notice;
 
 /// Where the cursor sits: on exact now, or on a grid slot once anything moves it.
@@ -272,73 +272,31 @@ impl App {
             .join(" ")
     }
 
-    /// The say line: exactly what `y` copies.
+    /// The say line: the default format's line, exactly what `y` copies.
     pub fn say_line(&self) -> String {
-        say_line(self.roster(), &self.marks, self.when(), Variant::default())
+        self.line_of(self.config.copy.default_format())
     }
 
-    /// The line one `c` menu variant copies.
-    pub fn copy_as(&self, variant: CopyAs) -> String {
-        let (roster, when) = (self.roster(), self.when());
-        let shaped = |date, names, clause| Variant {
-            date,
-            names,
-            clause,
-        };
-        match variant {
-            CopyAs::Plain => self.say_line(),
-            CopyAs::Date => say_line(
-                roster,
-                &self.marks,
-                when,
-                shaped(true, false, Clause::States),
-            ),
-            CopyAs::Names => say_line(
-                roster,
-                &self.marks,
-                when,
-                shaped(false, true, Clause::States),
-            ),
-            CopyAs::Zones => say_line(
-                roster,
-                &self.marks,
-                when,
-                shaped(false, false, Clause::Zones),
-            ),
-            CopyAs::Short => say_line(
-                roster,
-                &self.marks,
-                when,
-                shaped(false, false, Clause::Drop),
-            ),
-            CopyAs::ThisRow => focus_line(roster, self.focus, when),
-            CopyAs::All => say_line(roster, &Marks::all(roster), when, Variant::default()),
-        }
+    fn line_of(&self, format: &Format) -> String {
+        format_line(self.roster(), &self.marks, self.focus, self.when(), format)
     }
 
-    /// The copy-as dialog's rows, in key order: each format's key, the exact line it copies now,
-    /// and a short description.
+    /// The line the format with `key` copies, or `None` when no format has that key.
+    pub fn copy_as(&self, key: char) -> Option<String> {
+        self.config.copy.get(key).map(|format| self.line_of(format))
+    }
+
+    /// The copy-as dialog's rows, in format order: each format's key, the exact line it copies
+    /// now, and its label, leaving out a format whose line an earlier row already shows.
     pub fn copy_menu(&self) -> Vec<(char, String, String)> {
-        let focused = match self.focus {
-            Row::Person(id) => self.roster().person(id).name.clone(),
-            Row::Place(id) => self.roster().place(id).name.clone(),
-        };
-        [
-            ('y', CopyAs::Plain, "marked, ttz format".to_owned()),
-            ('d', CopyAs::Date, "with the date".to_owned()),
-            ('w', CopyAs::Names, "with names".to_owned()),
-            (
-                't',
-                CopyAs::ThisRow,
-                format!("for {focused}, their time first"),
-            ),
-            ('z', CopyAs::Zones, "with place zones".to_owned()),
-            ('s', CopyAs::Short, "without the clause".to_owned()),
-            ('a', CopyAs::All, "everyone".to_owned()),
-        ]
-        .into_iter()
-        .map(|(key, variant, about)| (key, self.copy_as(variant), about))
-        .collect()
+        let mut rows: Vec<(char, String, String)> = Vec::new();
+        for format in self.config.copy.all() {
+            let line = self.line_of(format);
+            if rows.iter().all(|(_, shown, _)| *shown != line) {
+                rows.push((format.key, line, format.label.clone()));
+            }
+        }
+        rows
     }
 
     /// Whether `row` sits above its block's line: home when the marks ask who, or a marked row.

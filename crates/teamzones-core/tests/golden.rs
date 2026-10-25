@@ -2,8 +2,8 @@
 
 use chrono::{DateTime, Utc};
 use teamzones_core::clock::When;
-use teamzones_core::config::{Config, Roster};
-use teamzones_core::copy::{Clause, Variant, focus_line, say_line};
+use teamzones_core::config::{Config, PersonId, Roster};
+use teamzones_core::copy::{Clause, Formats, Variant, format_line, say_line};
 use teamzones_core::expr::parse_expr;
 use teamzones_core::fit::resolve;
 use teamzones_core::question::{Marks, Row};
@@ -90,20 +90,17 @@ fn copy_row(index: usize) {
         }
     }
     let when = when.unwrap();
-    let variant = |date, names, clause| Variant {
-        date,
-        names,
-        clause,
+    let key = match backticked(keys)[0] {
+        "y" => 'y',
+        other => other
+            .strip_prefix("c ")
+            .and_then(|letter| letter.chars().next())
+            .unwrap_or_else(|| panic!("no format for keys {other:?}")),
     };
-    let line = match backticked(keys)[0] {
-        "y" => say_line(&roster, &marks, when, Variant::default()),
-        "c d" => say_line(&roster, &marks, when, variant(true, false, Clause::States)),
-        "c w" => say_line(&roster, &marks, when, variant(false, true, Clause::States)),
-        "c z" => say_line(&roster, &marks, when, variant(false, false, Clause::Zones)),
-        "c s" => say_line(&roster, &marks, when, variant(false, false, Clause::Drop)),
-        "c t" => focus_line(&roster, focus.unwrap(), when),
-        other => panic!("no variant for keys {other:?}"),
-    };
+    let formats = Formats::builtin();
+    let format = formats.get(key).unwrap();
+    let focus = focus.unwrap_or(Row::Person(PersonId::HOME));
+    let line = format_line(&roster, &marks, focus, when, format);
     assert_eq!(
         line,
         backticked(clipboard)[0],

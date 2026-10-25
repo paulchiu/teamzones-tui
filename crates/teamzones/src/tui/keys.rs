@@ -56,18 +56,6 @@ pub enum Context {
     Debug,
 }
 
-/// One `c` menu variant.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum CopyAs {
-    Plain,
-    Date,
-    Names,
-    ThisRow,
-    Zones,
-    Short,
-    All,
-}
-
 /// How rows are ordered within each block.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Sort {
@@ -105,7 +93,8 @@ pub enum Action {
     Undo,
     Copy,
     CopyMenu,
-    CopyAs(CopyAs),
+    /// Copy the format with this key, if the config has one.
+    CopyAs(char),
     Lanes,
     SortMenu,
     SortBy(Sort),
@@ -523,28 +512,18 @@ pub const BINDINGS: &[Binding] = &[
         )
     },
     Binding {
-        hints: &[
-            hint("y", "line"),
-            hint("d", "date"),
-            hint("w", "names"),
-            hint("t", "this row"),
-            hint("z", "zones"),
-            hint("s", "no clause"),
-            hint("a", "all"),
-        ],
-        priority: 5,
         chords: &[
-            (Key::Char('y'), Action::CopyAs(CopyAs::Plain)),
-            (Key::Char('d'), Action::CopyAs(CopyAs::Date)),
-            (Key::Char('w'), Action::CopyAs(CopyAs::Names)),
-            (Key::Char('t'), Action::CopyAs(CopyAs::ThisRow)),
-            (Key::Char('z'), Action::CopyAs(CopyAs::Zones)),
-            (Key::Char('s'), Action::CopyAs(CopyAs::Short)),
-            (Key::Char('a'), Action::CopyAs(CopyAs::All)),
+            (Key::Char('y'), Action::CopyAs('y')),
+            (Key::Char('d'), Action::CopyAs('d')),
+            (Key::Char('w'), Action::CopyAs('w')),
+            (Key::Char('t'), Action::CopyAs('t')),
+            (Key::Char('z'), Action::CopyAs('z')),
+            (Key::Char('s'), Action::CopyAs('s')),
+            (Key::Char('a'), Action::CopyAs('a')),
         ],
         ..row(
             "y d w t z s a",
-            "Copy the line; with the date; with names; this row only; with place zones; without the clause; for all",
+            "Copy that format's line and close; a `[[copy]]` table's key copies its own format",
             "",
             Context::CopyMenu,
         )

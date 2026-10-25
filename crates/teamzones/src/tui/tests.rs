@@ -993,19 +993,15 @@ fn c_opens_a_dialog_previewing_every_format_with_its_key_and_description() {
         rows,
         [
             "y  5-6pm AEDT / 4-5pm AEST / 8-9am SAST",
-            "marked, ttz format",
+            "the times",
             "d  Mon 26 Oct, 5-6pm AEDT / 4-5pm AEST / 8-9am SAST",
             "with the date",
             "w  5-6pm AEDT (Paul) / 4-5pm AEST (Priya, Sam) / 8-9am SAST (Thandi, Johan)",
             "with names",
             "t  8-9am SAST (5-6pm AEDT)",
-            "for Thandi, their time first",
-            "z  5-6pm AEDT / 4-5pm AEST / 8-9am SAST",
-            "with place zones",
-            "s  5-6pm AEDT / 4-5pm AEST / 8-9am SAST",
-            "without the clause",
+            "the focused row's time first",
             "a  5-6pm AEDT / 4-5pm AEST / 8-9am SAST / 6-7am GMT / 1-2am CDT, closed in UK and US, busy in AU",
-            "everyone",
+            "for everyone",
         ]
     );
     insta::assert_snapshot!("copy_as_120x36", text(&buf));
@@ -1023,6 +1019,100 @@ fn each_copy_as_key_copies_its_preview_and_closes_the_dialog() {
     }
     let (closed, effects) = press_all(app, &[Key::Esc]);
     assert!(effects.is_empty() && closed.mode == super::app::Mode::Normal);
+}
+
+#[test]
+fn no_dialog_description_uses_an_internal_term() {
+    let app = press(
+        focus_on(copy_setup("deploy, Mon 26 Oct 5-5:30pm"), "UK"),
+        &chars("c"),
+    );
+    let rows = dialog_rows(&render(&app, 120, 36));
+    let descriptions: Vec<&String> = rows.iter().skip(1).step_by(2).collect();
+    assert_eq!(
+        descriptions.len(),
+        7,
+        "deploy has places, so every format differs"
+    );
+    for about in descriptions {
+        for term in ["ttz", "clause", "marked", "variant"] {
+            assert!(!about.contains(term), "{about:?} says {term}");
+        }
+    }
+}
+
+#[test]
+fn a_hidden_duplicate_row_s_key_still_copies_the_same_line() {
+    let app = press(team_monday(), &chars("c"));
+    let rows = dialog_rows(&render(&app, 120, 36));
+    assert!(
+        rows.iter()
+            .all(|row| !row.starts_with("z  ") && !row.starts_with("s  "))
+    );
+    for key in ["z", "s"] {
+        assert_eq!(
+            copied(&press_all(app.clone(), &chars(key)).1),
+            ["5-6pm AEDT / 4-5pm AEST / 8-9am SAST"],
+            "{key}"
+        );
+    }
+}
+
+#[test]
+fn t_with_home_focused_copies_the_time_once() {
+    let app = press(focus_on(team_monday(), "Paul"), &chars("c"));
+    let rows = dialog_rows(&render(&app, 120, 36));
+    assert!(rows.contains(&"t  5-6pm AEDT".to_owned()), "{rows:?}");
+    assert_eq!(copied(&press_all(app, &chars("t")).1), ["5-6pm AEDT"]);
+}
+
+/// The fixture with `tables` appended, opened on team at Mon 26 Oct 5-6pm.
+fn team_monday_with(tables: &str) -> App {
+    go_to(App::new(config(tables), now()), "26 oct 5-6pm")
+}
+
+#[test]
+fn a_copy_table_s_new_key_shows_its_label_and_preview_and_copies_it() {
+    let app = team_monday_with(
+        "\n[[copy]]\nkey = \"k\"\nlabel = \"dated, with names\"\ndate = true\nnames = true\n",
+    );
+    let open = press(app, &chars("c"));
+    let rows = dialog_rows(&render(&open, 120, 36));
+    let line =
+        "Mon 26 Oct, 5-6pm AEDT (Paul) / 4-5pm AEST (Priya, Sam) / 8-9am SAST (Thandi, Johan)";
+    assert_eq!(
+        rows[rows.len() - 2..],
+        [format!("k  {line}"), "dated, with names".to_owned()]
+    );
+    let (after, effects) = press_all(open, &chars("k"));
+    assert_eq!(copied(&effects), [line]);
+    assert_eq!(after.mode, super::app::Mode::Normal);
+}
+
+#[test]
+fn a_copy_table_replaces_a_built_in_and_hide_removes_one_from_the_dialog_and_its_key() {
+    let app = team_monday_with(
+        "\n[[copy]]\nkey = \"d\"\nlabel = \"the day and names\"\ndate = true\nnames = true\n\n[[copy]]\nkey = \"a\"\nhide = true\n",
+    );
+    let open = press(app, &chars("c"));
+    let rows = dialog_rows(&render(&open, 120, 36));
+    assert_eq!(rows[3], "the day and names");
+    assert!(rows.iter().all(|row| !row.starts_with("a  ")), "{rows:?}");
+    let (after, effects) = press_all(open.clone(), &chars("a"));
+    assert!(
+        effects.is_empty() && after == open,
+        "a hidden key is swallowed"
+    );
+}
+
+#[test]
+fn the_default_format_is_the_times_box_line_and_what_y_copies() {
+    let app = team_monday_with(
+        "\n[[copy]]\nkey = \"d\"\nlabel = \"with the date\"\ndate = true\ndefault = true\n",
+    );
+    let line = "Mon 26 Oct, 5-6pm AEDT / 4-5pm AEST / 8-9am SAST";
+    assert_eq!(say_line(&render(&app, 120, 36)), line);
+    assert_eq!(copied(&press_all(app, &chars("y")).1), [line]);
 }
 
 #[test]

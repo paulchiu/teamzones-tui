@@ -105,7 +105,10 @@ fn with_notice(app: App, key: &str, text: &str, now: DateTime<Utc>) -> App {
 
 fn on_key(app: App, key: Key) -> (App, Vec<Effect>) {
     let debug = app.debug.then(|| debug_action_for(key)).flatten();
-    let Some(action) = debug.or_else(|| action_for(context(&app), key)) else {
+    let Some(action) = debug
+        .or_else(|| format_key(&app, key))
+        .or_else(|| action_for(context(&app), key))
+    else {
         return (app, Vec::new());
     };
     let app = App {
@@ -113,6 +116,13 @@ fn on_key(app: App, key: Key) -> (App, Vec<Effect>) {
         ..app
     };
     act(app, action, key)
+}
+
+/// In the copy-as dialog, a key that names one of the config's formats copies that format.
+fn format_key(app: &App, key: Key) -> Option<Action> {
+    let Key::Char(c) = key else { return None };
+    let in_dialog = context(app) == Context::CopyMenu;
+    (in_dialog && app.config.copy.get(c).is_some()).then_some(Action::CopyAs(c))
 }
 
 fn copy(key: &str, text: String) -> Vec<Effect> {
@@ -188,10 +198,10 @@ fn act(app: App, action: Action, key: Key) -> (App, Vec<Effect>) {
             mode: Mode::CopyMenu,
             ..app
         }),
-        Action::CopyAs(variant) => {
-            let text = app.copy_as(variant);
-            (normal(app), copy("c", text))
-        }
+        Action::CopyAs(format) => match app.copy_as(format) {
+            Some(text) => (normal(app), copy("c", text)),
+            None => only(app),
+        },
         Action::Lanes => only(App {
             lanes: match app.lanes {
                 Lanes::Hours => Lanes::Plain,
