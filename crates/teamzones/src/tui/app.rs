@@ -6,10 +6,11 @@ use teamzones_core::config::{Config, MapShow, PersonId, RangeStyle, Roster};
 use teamzones_core::copy::{Format, Who, format_line};
 use teamzones_core::question::{Marks, Row};
 
+use super::fold::{Entry, fold};
 use super::footer::MapKey;
 use super::glyphs::Glyphs;
 use super::keys::{Context, Sort};
-use super::layout::{MapChoice, MapView, map_view, room_for_map};
+use super::layout::{Areas, MapChoice, MapView, layout, map_view, room_for_map};
 use super::map::{Camera, framing};
 use super::matrix::Matrix;
 use super::mouse::Drag;
@@ -158,6 +159,8 @@ pub struct App {
     pub camera: Camera,
     /// Whether the app holds mouse capture; `M` releases it for text selection.
     pub mouse: bool,
+    /// Whether the list of the rows the focused `+N more` line folds is open.
+    pub fold_open: bool,
     /// The left-button drag in progress, if any.
     pub drag: Option<Drag>,
     /// The config file's text the config was parsed from, or `None` when there is no file.
@@ -206,6 +209,7 @@ impl App {
                 zoom: 0,
             },
             mouse: true,
+            fold_open: false,
             drag: None,
             text: None,
             disk: None,
@@ -266,13 +270,25 @@ impl App {
         Glyphs::of(self.config.theme.glyphs).ascii
     }
 
-    /// The whole roster's people and places, which size the blocks.
+    /// The whole roster's people (with home's reference row while travelling) and places,
+    /// which size the blocks.
     fn roster_size(&self) -> (u16, u16) {
         let count = |n: usize| u16::try_from(n).unwrap_or(u16::MAX);
+        let roster = self.roster();
         (
-            count(self.roster().people().count()),
-            count(self.roster().places().count()),
+            count(roster.people().count() + usize::from(roster.reference().is_some())),
+            count(roster.places().count()),
         )
+    }
+
+    /// The screen's areas on a `cols` by `rows` terminal.
+    pub fn areas_at(&self, cols: u16, rows: u16) -> Areas {
+        let choice = match self.map_view_at(cols, rows) {
+            MapView::InPlace => MapChoice::Always,
+            MapView::Hidden | MapView::Overlay => MapChoice::Hidden,
+        };
+        let (people, places) = self.roster_size();
+        layout(cols, rows, people, places, choice)
     }
 
     /// Where the map goes at the size the terminal last reported.
@@ -280,8 +296,18 @@ impl App {
         self.map_view_at(self.size.0, self.size.1)
     }
 
+    /// Home's mark: `✈` while travelling, else `⌂`.
+    pub fn home_mark(&self, glyphs: &Glyphs) -> &'static str {
+        if self.roster().reference().is_some() {
+            glyphs.here
+        } else {
+            glyphs.home
+        }
+    }
+
+    /// The roster as it stands now, with home moved while travel holds.
     pub fn roster(&self) -> &Roster {
-        &self.config.roster
+        self.config.roster_at(self.now)
     }
 
     /// The range on screen: the visual range while drawing one, else the committed range.
@@ -378,7 +404,8 @@ impl App {
     }
 
     fn line_of(&self, format: &Format) -> String {
-        format_line(self.roster(), &self.marks, self.focus, self.when(), format)
+        let focus = self.focused_row().unwrap_or(Row::Person(PersonId::HOME));
+        format_line(self.roster(), &self.marks, focus, self.when(), format)
     }
 
     /// The line the format with `key` copies, or `None` when no format has that key.
@@ -391,7 +418,7 @@ impl App {
     /// format whose line an earlier row already shows.
     pub fn copy_menu(&self) -> Vec<(char, String, String)> {
         let roster = self.roster();
-        let focused = match self.focus {
+        let focused = match self.focused_row().unwrap_or(Row::Person(PersonId::HOME)) {
             Row::Person(id) => &roster.person(id).name,
             Row::Place(id) => &roster.place(id).name,
         };
@@ -468,12 +495,82 @@ impl App {
         }
     }
 
-    /// Every row focus can sit on, top to bottom through both blocks.
-    pub fn focus_rows(&self) -> Vec<Row> {
-        self.who_rows()
-            .iter()
-            .chain(self.where_rows().iter())
+    /// The who block's lines unfolded: home, its reference while travelling, the counted
+    /// people, the answer row, then the rest.
+    fn who_lines(&self) -> Vec<Entry> {
+        let BlockRows { above, below } = self.who_rows();
+        let reference = self.roster().reference().map(|_| Entry::Reference);
+        let mut above = above.into_iter().map(Entry::Row);
+        above
+            .next()
+            .into_iter()
+            .chain(reference)
+            .chain(above)
+            .chain(std::iter::once(Entry::Answer))
+            .chain(below.into_iter().map(Entry::Row))
             .collect()
+    }
+
+    /// The where block's lines unfolded: the counted places, the answer row, then the rest.
+    fn where_lines(&self) -> Vec<Entry> {
+        let BlockRows { above, below } = self.where_rows();
+        above
+            .into_iter()
+            .map(Entry::Row)
+            .chain(std::iter::once(Entry::Answer))
+            .chain(below.into_iter().map(Entry::Row))
+            .collect()
+    }
+
+    /// Each block's lines as drawn on a `cols` by `rows` terminal, folded to fit.
+    pub fn entries_at(&self, cols: u16, rows: u16) -> (Vec<Entry>, Vec<Entry>) {
+        let areas = self.areas_at(cols, rows);
+        let lines = areas.columns.lines().max(1);
+        let room = |height: u16, borders: u16| usize::from(height.saturating_sub(borders) / lines);
+        (
+            fold(self.who_lines(), room(areas.who.height, 1)),
+            fold(self.where_lines(), room(areas.place.height, 2)),
+        )
+    }
+
+    /// Each block's lines at the terminal's last size, unfolded before the first resize.
+    pub fn entries(&self) -> (Vec<Entry>, Vec<Entry>) {
+        match self.size {
+            (0, 0) => (self.who_lines(), self.where_lines()),
+            (cols, rows) => self.entries_at(cols, rows),
+        }
+    }
+
+    /// Every row focus can sit on, top to bottom through both blocks: each row drawn, and for a
+    /// `+N more` line the first row it folds, which stands for it.
+    pub fn focus_rows(&self) -> Vec<Row> {
+        let (who, place) = self.entries();
+        who.iter()
+            .chain(&place)
+            .filter_map(|entry| entry.rows().first().copied())
+            .collect()
+    }
+
+    /// The row focus is on, or none on a `+N more` line, which stands for no single row.
+    pub fn focused_row(&self) -> Option<Row> {
+        self.focused_more().is_none().then_some(self.focus)
+    }
+
+    /// The row standing for the `+N more` line that folds `row`, if a line folds it.
+    pub fn fold_holding(&self, row: Row) -> Option<Row> {
+        let (who, place) = self.entries();
+        who.iter().chain(&place).find_map(|entry| match entry {
+            Entry::More(_) if entry.rows().contains(&row) => entry.rows().first().copied(),
+            Entry::More(_) | Entry::Row(_) | Entry::Reference | Entry::Answer => None,
+        })
+    }
+
+    /// The `+N more` line focus is on, if any.
+    pub fn focused_more(&self) -> Option<Entry> {
+        let (who, place) = self.entries();
+        who.into_iter().chain(place).find(|entry| {
+            matches!(entry, Entry::More(_)) && entry.rows().first() == Some(&self.focus)
+        })
     }
 }
 

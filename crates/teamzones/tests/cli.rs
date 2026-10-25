@@ -329,6 +329,46 @@ fn here_stays_active_late_on_until_in_the_travel_city_after_home_has_moved_on() 
 }
 
 #[test]
+fn while_travelling_say_reads_times_in_the_travel_city_and_still_copies_home_s_zone() {
+    let (path, original) = fixture_copy("travel-say");
+    std::fs::write(&path, format!("{original}{TRAVEL}")).unwrap();
+    // Mon 26 Oct 6am GMT.
+    teamzones_on(&path)
+        .args([
+            "say",
+            "team",
+            "3pm",
+            "--no-copy",
+            "--now",
+            "2026-10-26T06:00:00Z",
+        ])
+        .assert()
+        .success()
+        .stdout("3pm GMT / Tue 2am AEDT / Tue 1am AEST / 5pm SAST\n");
+}
+
+#[test]
+fn the_day_after_until_say_is_back_on_home_s_axis_with_the_file_untouched() {
+    let (path, original) = fixture_copy("travel-over");
+    let travelling = format!("{original}{TRAVEL}");
+    std::fs::write(&path, &travelling).unwrap();
+    // Mon 2 Nov 6am GMT.
+    teamzones_on(&path)
+        .args([
+            "say",
+            "team",
+            "3pm",
+            "--no-copy",
+            "--now",
+            "2026-11-02T06:00:00Z",
+        ])
+        .assert()
+        .success()
+        .stdout("3pm AEDT / 2pm AEST / 6am SAST\n");
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), travelling);
+}
+
+#[test]
 fn here_never_writes_over_a_file_that_does_not_parse() {
     let path = scratch("here-broken").join("config.toml");
     let broken = "[home]\nname = \"Kim\"\ncolour = 1\n";

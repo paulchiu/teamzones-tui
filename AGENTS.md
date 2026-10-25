@@ -12,7 +12,7 @@ The label is semantic. `minor` is for anything a user could not do before, and f
 
 ## The checks a PR gets
 
-A PR gets 7 checks: `Format, Lint, Test & Build (ubuntu-26.04)`, `Format, Lint, Test & Build (macos-latest)`, `MSRV`, `Workflow parse`, `CI`, `Enforce Semantic Versioning` and `dependabot-auto-merge`. The last is skipped on any PR not opened by Dependabot. Green means all 7 registered and every one passed or (for `dependabot-auto-merge` only) was skipped. A wait loop that only checks for nothing pending reports green before the checks exist, so count them. Compare `gh pr view --json headRefOid` with `git rev-parse HEAD` before trusting a run.
+A PR gets 13 checks: `Format, Lint, Test & Build (ubuntu-26.04)`, `Format, Lint, Test & Build (macos-latest)`, `MSRV`, `Workflow parse`, `CI`, `Enforce Semantic Versioning`, `plan`, `build-local-artifacts`, `build-global-artifacts`, `host`, `publish-homebrew-formula`, `announce` and `dependabot-auto-merge`. `plan` is dist checking that the release workflow still matches `dist-workspace.toml`; the five release jobs after it run only on a tag, and `dependabot-auto-merge` only on a PR Dependabot opened, so all six are skipped on any other PR. Green means all 13 registered, the seven others passed and only those six were skipped. A wait loop that only checks for nothing pending reports green before the checks exist, so count them. Compare `gh pr view --json headRefOid` with `git rev-parse HEAD` before trusting a run.
 
 ## What you need to know first
 

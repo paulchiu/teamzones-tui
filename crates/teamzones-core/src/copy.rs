@@ -209,6 +209,14 @@ fn axis_source(roster: &Roster, marks: &Marks) -> Source {
     (roster.axis(), home.into_iter().collect())
 }
 
+/// Home's own zone while travelling, unnamed, whenever the marks ask who.
+fn reference_source(roster: &Roster, marks: &Marks) -> Option<Source> {
+    roster
+        .reference()
+        .filter(|_| marks.asks_who())
+        .map(|reference| (reference.location.tz, Vec::new()))
+}
+
 /// The counted places' zones, which only `Clause::Zones` names.
 fn place_sources(roster: &Roster, marks: &Marks, clause: Clause) -> Vec<Source> {
     let places = match clause {
@@ -235,6 +243,7 @@ fn zone_sources(roster: &Roster, marks: &Marks, when: When, clause: Clause) -> V
         .iter()
         .map(|clock| (clock.tz, vec![clock.name.clone()]));
     let mut sources: Vec<Source> = std::iter::once(axis_source(roster, marks))
+        .chain(reference_source(roster, marks))
         .chain(people)
         .chain(clocks)
         .chain(place_sources(roster, marks, clause))
@@ -419,6 +428,48 @@ mod tests {
             panic!("{words} has no fixed time");
         };
         say_line(roster, &expr.marks, when, Variant::default())
+    }
+
+    /// The say line for `words` on Mon 26 Oct 6am GMT, travelling in London until 1 Nov.
+    fn travelling_line(words: &str, variant: Variant) -> String {
+        let text = format!("{FIXTURE}\n[travel]\nhere = \"London\"\nuntil = 2026-11-01\n");
+        let config = Config::parse(&text).unwrap();
+        let now = "2026-10-26T06:00:00Z".parse().unwrap();
+        let roster = config.roster_at(now);
+        let tokens: Vec<&str> = words.split(' ').collect();
+        let expr = crate::expr::parse_expr(&tokens, roster, now).unwrap();
+        let Moment::Fixed(when) = expr.moment else {
+            panic!("{words} has no fixed time");
+        };
+        say_line(roster, &expr.marks, when, variant)
+    }
+
+    #[test]
+    fn while_travelling_home_s_own_zone_is_copied_in_offset_order_after_the_axis() {
+        assert_eq!(
+            travelling_line("team 3pm", Variant::default()),
+            "3pm GMT / Tue 2am AEDT / Tue 1am AEST / 5pm SAST"
+        );
+    }
+
+    #[test]
+    fn while_travelling_names_go_to_whoever_is_in_each_zone_and_the_reference_has_none() {
+        let names = Variant {
+            names: true,
+            ..Variant::default()
+        };
+        assert_eq!(
+            travelling_line("team 3pm", names),
+            "3pm GMT (Paul) / Tue 2am AEDT / Tue 1am AEST (Priya, Sam) / 5pm SAST (Thandi, Johan)"
+        );
+    }
+
+    #[test]
+    fn while_travelling_a_places_only_line_names_the_axis_alone() {
+        assert_eq!(
+            travelling_line("regions 3pm", Variant::default()),
+            "3pm GMT, open in UK and US, closed in AU"
+        );
     }
 
     #[test]

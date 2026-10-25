@@ -18,7 +18,7 @@ Decision: The where block's height is fixed by the whole roster, and small termi
 
 Why: Switching groups never moves anything on screen.
 
-Held by: `tui::tests::switching_groups_never_moves_the_ruler_the_borders_or_the_say_panel` and `tui::tests::map::with_the_map_off_a_group_switch_never_moves_the_ruler_the_borders_or_the_times_box` in `teamzones`
+Held by: `tui::tests::switching_groups_never_moves_the_ruler_the_borders_or_the_say_panel`, `tui::tests::map::with_the_map_off_a_group_switch_never_moves_the_ruler_the_borders_or_the_times_box` and, folded at 80x20, `tui::tests::fold::at_80_by_20_switching_groups_never_moves_a_block` in `teamzones`
 
 ## D3: Home counts in every group that asks who (2026-10-24)
 
@@ -345,3 +345,19 @@ Decision: Whenever the map is not drawn in place (hidden by `m`, by `[map] show 
 Why: Paul found the header sitting alone over a dozen blank rows when `m` hid the map at about 225x50, and expected the rest of the screen to fill the space. Keeping the notice row next to the footer keeps it where the 80x24 frames put it. Group switches still never move a block (D2), since the layout depends only on the size, the roster and the map's place.
 
 Held by: `tui::layout::tests::a_hidden_map_moves_the_blocks_up_and_leaves_its_rows_above_the_notice`, `tui::tests::map::with_the_map_off_the_blocks_sit_under_the_header_and_the_spare_rows_above_the_notice`, `a_map_shown_never_or_under_ascii_glyphs_leaves_no_gap_under_the_header`, `the_overlay_opens_over_the_blocks_without_moving_them`, `with_the_map_off_a_group_switch_never_moves_the_ruler_the_borders_or_the_times_box` and `tui::tests::mouse::with_the_map_off_a_click_on_a_label_lands_on_the_row_drawn_there` in `teamzones`
+
+## D43: Travel follows the clock, and home's own city is a reference row that is copied but never counted (2026-10-25)
+
+Decision: Whether `[travel]` holds is decided by now, never by the time on screen, so scrubbing past `until` never moves the axis, while a running screen comes home once the clock passes it. While it holds, the roster has home in the travel city with its own hours, and home's own city as a reference: a dim `⌂` row directly under home, never focusable or counted, drawn with plain day and night. Its zone joins every line whose marks ask who, after the axis in offset order like any other zone, with no name under `c w` (it is where home is not). A places-only line names the axis alone, as before. The map marks home `✈` in the travel city and draws nothing at home's own city. See [config](spec/config.md#data-model-and-config).
+
+Why: The milestone card fixed the shape (`3pm GMT / Tue 2am AEDT / Tue 1am AEST / 5pm SAST`, counted home, an uncounted reference) but not where the reference row sits, whether names cover it or what the time on screen does to travel. An axis that changed while scrubbing would redraw the track under the cursor.
+
+Held by: `config::tests::while_travelling_home_moves_to_the_travel_city_and_its_own_city_is_the_reference`, `from_the_day_after_until_in_the_travel_city_home_is_back_without_a_write` and the `copy::tests::while_travelling_*` tests in `teamzones-core`, the `tui::tests::travel` tests in `teamzones` (`scrubbing_past_until_never_moves_the_axis` for the scrubbing clause), and `while_travelling_say_reads_times_in_the_travel_city_and_still_copies_home_s_zone` in `crates/teamzones/tests/cli.rs`
+
+## D44: A fold row stands for the rows it folds, and its list is an overlay, not a modal (2026-10-25)
+
+Decision: Folding keeps each block's lines in their usual order and turns the last line that fits into `+N more`, with the answer row in its usual place unless counted rows are folded, when it follows the fold row. Focus on a fold row is focus on the first row it folds, so `j` and `k` step onto it and a resize that folds the focused row moves focus to the fold row holding it. Row keys act on no row there: `space`, `e` and `d` refuse with a notice, the detail line describes the fold, and a focused-first copy puts home first. `enter` on it opens a list of the folded rows drawn over the screen while the main keys still work, as the map overlay does (D30), and `enter` again, `esc` (before anything else) or moving focus off it closes it. `enter` no longer commits a range outside range mode, where it did nothing. Before the first resize the size is unknown and nothing folds. See the Folding bullets in [screen](spec/screen.md).
+
+Why: The spec says what folds and in what order, and that `enter` lists the folded rows, but not how focus reaches a row that is not a person or a place, nor how the list closes. Standing for a real row keeps focus a `Row` everywhere, and an overlay keeps `enter`'s keymap row the only binding it needs.
+
+Held by: the `tui::fold::tests` and `tui::layout::tests::at_80_by_20_the_who_block_folds_to_fit_and_everything_else_keeps_its_rows`, `short_of_rows_the_where_block_folds_first_down_to_three_places` and `the_who_block_never_folds_below_home_one_more_row_and_its_answer`, and the `tui::tests::fold` tests (`row_keys_on_the_fold_row_leave_the_roster_and_the_marks_alone` for the row keys) and the `enter` case of `tui::tests::mouse::every_built_mouse_equivalent_in_the_keymap_sends_what_its_key_does` in `teamzones`

@@ -94,9 +94,9 @@ mod tests {
     }
 
     #[test]
-    fn unbuilt_keys_are_not_listed() {
+    fn a_row_is_listed_once_its_keys_dispatch() {
         let main = lines(Context::Main, &FULL);
-        assert!(main.iter().all(|line| line.keys != "enter"), "{main:?}");
+        assert!(main.iter().any(|line| line.keys == "enter"), "{main:?}");
         assert!(main.iter().any(|line| line.keys == "tab"), "{main:?}");
     }
 }

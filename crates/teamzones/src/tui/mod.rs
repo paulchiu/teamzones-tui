@@ -6,6 +6,7 @@
 mod app;
 mod edit;
 mod editor;
+mod fold;
 mod footer;
 mod glyphs;
 mod help;

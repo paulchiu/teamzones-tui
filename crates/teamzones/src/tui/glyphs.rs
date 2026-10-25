@@ -7,6 +7,8 @@ use teamzones_core::schedule::{Band, Level};
 #[derive(Debug, PartialEq, Eq)]
 pub struct Glyphs {
     pub home: &'static str,
+    /// Home's mark while travelling.
+    pub here: &'static str,
     pub person: &'static str,
     pub person_other: &'static str,
     pub place: &'static str,
@@ -44,6 +46,7 @@ pub struct Glyphs {
 
 pub const FULL: Glyphs = Glyphs {
     home: "⌂",
+    here: "✈",
     person: "●",
     person_other: "○",
     place: "◆",
@@ -91,6 +94,7 @@ const ASCII_BORDER: border::Set<'static> = border::Set {
 
 pub const ASCII: Glyphs = Glyphs {
     home: "^",
+    here: ">",
     person: "*",
     person_other: "o",
     place: "@",
@@ -230,6 +234,7 @@ mod tests {
     fn the_ascii_set_is_the_one_the_theme_spec_lists() {
         let Glyphs {
             home,
+            here,
             person,
             person_other,
             place,
@@ -272,6 +277,7 @@ mod tests {
         };
         let mut expected = vec![
             ("marks", FULL.home.to_owned(), home.to_owned()),
+            ("marks", FULL.here.to_owned(), here.to_owned()),
             ("marks", FULL.person.to_owned(), person.to_owned()),
             (
                 "marks",

@@ -123,7 +123,7 @@ pub fn context(app: &App) -> Context {
     }
 }
 
-/// Applies `msg`, then re-clamps focus onto a row that is still there.
+/// Applies `msg`, then re-clamps focus onto a row that is still there, or the fold row holding it.
 pub fn update(app: App, msg: Msg) -> (App, Vec<Effect>) {
     let rows_before = app.focus_rows();
     let (mut next, effects) = match msg {
@@ -208,7 +208,10 @@ pub fn update(app: App, msg: Msg) -> (App, Vec<Effect>) {
         }
         Msg::Reloaded { key, result } => (edit::reloaded(app, &key, result), Vec::new()),
     };
-    next.focus = clamp_focus(&rows_before, &next.focus_rows(), next.focus);
+    next.focus = next
+        .fold_holding(next.focus)
+        .unwrap_or_else(|| clamp_focus(&rows_before, &next.focus_rows(), next.focus));
+    next.fold_open = next.fold_open && next.focused_more().is_some();
     (next, effects)
 }
 
@@ -314,6 +317,10 @@ fn act(app: App, action: Action, key: Key) -> (App, Vec<Effect>) {
         }),
         Action::Visual => only(visual(app)),
         Action::Commit => only(commit(app)),
+        Action::Fold => only(App {
+            fold_open: !app.fold_open && app.focused_more().is_some(),
+            ..app
+        }),
         Action::SwapEnd => only(App {
             visual: app.visual.map(|v| Visual {
                 anchor: v.active,
@@ -333,6 +340,17 @@ fn act(app: App, action: Action, key: Key) -> (App, Vec<Effect>) {
         Action::FocusDown => only(focus_by(app, 1)),
         Action::FocusFirst => only(focus_by(app, isize::MIN)),
         Action::FocusLast => only(focus_by(app, isize::MAX)),
+        Action::ToggleMark | Action::EditRow | Action::DeleteRow
+            if app.focused_more().is_some() =>
+        {
+            let now = app.now;
+            only(with_notice(
+                app,
+                &key_text(key),
+                "enter lists the folded rows",
+                now,
+            ))
+        }
         Action::ToggleMark => only(toggle_mark(app)),
         Action::ClearMarks => only(App {
             marks: Marks {
@@ -619,6 +637,12 @@ fn edge(app: App, start: i64, end: i64) -> App {
 }
 
 fn unwind(app: App) -> App {
+    if app.mode == Mode::Normal && app.fold_open {
+        return App {
+            fold_open: false,
+            ..app
+        };
+    }
     if app.mode == Mode::Normal && app.map_view() == MapView::Overlay {
         return App {
             map_flipped: false,
