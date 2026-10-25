@@ -114,6 +114,9 @@ const LIST_BELOW: u16 = 60;
 /// The map needs this many columns, and this many rows left after the fixed rows.
 const MAP_MIN_COLS: u16 = 100;
 const MAP_MIN_ROWS: u16 = 12;
+/// Below this many columns or rows the screen only says it is too small.
+const MIN_COLS: u16 = 40;
+const MIN_ROWS: u16 = 10;
 /// The labels keep at least this many columns beside the track.
 const LABEL_MIN: u16 = 20;
 
@@ -151,14 +154,34 @@ fn shape(cols: u16, rows: u16, people: u16, places: u16) -> Columns {
     }
 }
 
+/// Whether a `cols` by `rows` terminal is too small to draw anything but the notice saying so.
+pub fn too_small(cols: u16, rows: u16) -> bool {
+    cols < MIN_COLS || rows < MIN_ROWS
+}
+
+/// The people and places rows each block shows on `rows` lines with `lines` lines per grid row:
+/// every one when they fit, else the where block folds first, down to three places, then the
+/// who block, down to home and one more.
+fn shown(rows: u16, lines: u16, people: u16, places: u16) -> (u16, u16) {
+    let mut short = rows_needed(lines, people, places)
+        .saturating_sub(rows)
+        .div_ceil(lines.max(1));
+    let places_shown = places - short.min(places - places.min(3));
+    short -= places - places_shown;
+    let people_shown = people - short.min(people.saturating_sub(2));
+    (people_shown, places_shown)
+}
+
 /// Lays out a `cols` by `rows` screen for `roster_len` people (home included) and `places_len` places.
 ///
-/// Block heights come from the whole roster, so switching groups never moves a row. A shown map
-/// takes the spare rows under the header; otherwise they sit between the say panel and the notice.
+/// Block heights come from the whole roster and the size, so switching groups never moves a row.
+/// A shown map takes the spare rows under the header; otherwise they sit between the say panel
+/// and the notice. Short of rows, the blocks fold.
 pub fn layout(cols: u16, rows: u16, roster_len: u16, places_len: u16, map: MapChoice) -> Areas {
     let columns = shape(cols, rows, roster_len, places_len);
     let lines = columns.lines();
     let spare = rows.saturating_sub(rows_needed(lines, roster_len, places_len));
+    let (people_shown, places_shown) = shown(rows, lines, roster_len, places_len);
     let shows_map = match map {
         MapChoice::Auto => cols >= MAP_MIN_COLS && spare >= MAP_MIN_ROWS,
         MapChoice::Always => spare > 0,
@@ -173,8 +196,8 @@ pub fn layout(cols: u16, rows: u16, roster_len: u16, places_len: u16, map: MapCh
     let header = take(1);
     let map = shows_map.then(|| take(spare));
     let slider = take(2 * lines);
-    let who = take(1 + lines * (roster_len + 1));
-    let place = take(2 + lines * (places_len + 1));
+    let who = take(1 + lines * (people_shown + 1));
+    let place = take(2 + lines * (places_shown + 1));
     let say = take(4);
     if !shows_map {
         take(spare);
@@ -326,6 +349,30 @@ mod tests {
         assert_eq!(view(120, 30, MapChoice::Auto, false), MapView::Hidden);
         assert_eq!(view(120, 30, MapChoice::Always, false), MapView::InPlace);
         assert_eq!(view(120, 30, MapChoice::Always, true), MapView::Hidden);
+    }
+
+    #[test]
+    fn at_80_by_20_the_who_block_folds_to_fit_and_everything_else_keeps_its_rows() {
+        let areas = layout(80, 20, 7, 3, MapChoice::Auto);
+        // The who block keeps its border, home, two more rows and the answer row.
+        assert_eq!(
+            rows(&areas),
+            [(0, 1), (1, 2), (3, 5), (8, 6), (14, 4), (18, 1), (19, 1)]
+        );
+    }
+
+    #[test]
+    fn short_of_rows_the_where_block_folds_first_down_to_three_places() {
+        // 27 rows needed for 7 people and 6 places, so 22 leaves 5 to find.
+        let areas = layout(80, 22, 7, 6, MapChoice::Auto);
+        assert_eq!((areas.who.height, areas.place.height), (7, 6));
+        assert_eq!(areas.footer.y, 21);
+    }
+
+    #[test]
+    fn the_who_block_never_folds_below_home_one_more_row_and_its_answer() {
+        let areas = layout(80, 12, 7, 3, MapChoice::Auto);
+        assert_eq!((areas.who.height, areas.place.height), (4, 6));
     }
 
     #[test]

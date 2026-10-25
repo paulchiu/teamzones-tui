@@ -15,8 +15,9 @@ use teamzones_core::question::{Row, evaluate, person_band};
 use teamzones_core::schedule::{Band, Level, band, is_day};
 
 use super::app::{App, Cursor, Lanes, Mode, without_colour};
+use super::fold::Entry;
 use super::glyphs::Glyphs;
-use super::layout::{Areas, MapChoice, MapView, layout};
+use super::layout::{Areas, MapView, too_small};
 use super::say::{detail, duration_text, local_text, summary};
 use super::theme::{Role, Theme};
 use super::update::context;
@@ -218,18 +219,7 @@ impl Track {
 
 /// The screen's areas for this frame size and roster.
 pub fn areas(app: &App, size: Rect) -> Areas {
-    let count = |n: usize| u16::try_from(n).unwrap_or(u16::MAX);
-    let choice = match app.map_view_at(size.width, size.height) {
-        MapView::InPlace => MapChoice::Always,
-        MapView::Hidden | MapView::Overlay => MapChoice::Hidden,
-    };
-    layout(
-        size.width,
-        size.height,
-        count(app.roster().people().count()),
-        count(app.roster().places().count()),
-        choice,
-    )
+    app.areas_at(size.width, size.height)
 }
 
 /// Where the map is drawn on a screen of `size`: in place, inside the overlay's border, or
@@ -298,6 +288,24 @@ pub fn track_for(app: &App, areas: &Areas, look: Look) -> Track {
 /// Draws the whole screen.
 pub fn draw(frame: &mut Frame, app: &App, look: Look) {
     let size = frame.area();
+    if too_small(size.width, size.height) {
+        let text = "terminal too small";
+        let y = size.y + size.height / 2;
+        let x = size.x
+            + size
+                .width
+                .saturating_sub(u16::try_from(width_of(text)).unwrap_or(0))
+                / 2;
+        put(
+            frame.buffer_mut(),
+            size,
+            x,
+            y,
+            text,
+            look.theme.fg(Role::Dim),
+        );
+        return;
+    }
     let areas = areas(app, size);
     let clip = |area: Rect| size.intersection(area);
     let track = track_for(app, &areas, look);
@@ -307,14 +315,27 @@ pub fn draw(frame: &mut Frame, app: &App, look: Look) {
         super::map::draw(buf, clip(area), app, look);
     }
     slider(buf, clip(areas.slider), app, look, &track);
-    who(buf, clip(areas.who), app, look, &track);
-    places(buf, clip(areas.place), app, look, &track);
+    let (who_entries, where_entries) = app.entries_at(size.width, size.height);
+    who(buf, clip(areas.who), app, look, &track, &who_entries);
+    places(buf, clip(areas.place), app, look, &track, &where_entries);
     say_panel(buf, clip(areas.say), app, look);
     notice(buf, clip(areas.notice), app, look);
     let map_key = app.map_key_at(size.width, size.height);
     footer_row(buf, clip(areas.footer), app, look, map_key);
     if app.map_view_at(size.width, size.height) == MapView::Overlay {
         map_overlay(buf, size, app, look);
+    }
+    let folded = who_entries
+        .iter()
+        .chain(&where_entries)
+        .find_map(|entry| match entry {
+            Entry::More(folded) if app.fold_open && entry.rows().first() == Some(&app.focus) => {
+                Some(folded)
+            }
+            Entry::More(_) | Entry::Row(_) | Entry::Reference | Entry::Answer => None,
+        });
+    if let Some(folded) = folded {
+        fold_overlay(buf, size, app, look, folded);
     }
     match &app.mode {
         Mode::Help(from, _) => help_overlay(buf, size, *from, look),
@@ -371,9 +392,13 @@ fn header(buf: &mut Buffer, area: Rect, app: &App, look: Look) {
             Span::styled(format!(" {days:+}d"), theme.fg(Role::Dim)),
         ]);
     }
-    let home = app.roster().person(PersonId::HOME);
+    let roster = app.roster();
+    let home = roster.person(PersonId::HOME);
     let right = vec![
-        Span::styled(format!("{} ", glyphs.home), theme.fg(Role::Marker)),
+        Span::styled(
+            format!("{} ", app.home_mark(glyphs)),
+            theme.fg(Role::Marker),
+        ),
         Span::styled(home.city.clone(), theme.fg(Role::Text)),
         Span::styled(
             format!(" {}", app.when().start().with_timezone(&axis).format("%Z")),
@@ -995,10 +1020,9 @@ fn who_legend_of(lanes: &[(PersonId, Vec<(char, Role)>)], look: Look) -> Line<'s
     legend(&items, look)
 }
 
-fn who(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
+fn who(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track, entries: &[Entry]) {
     let (theme, glyphs) = (look.theme, look.glyphs);
     let roster = app.roster();
-    let rows = app.who_rows();
     let lanes = who_lanes(app, look, track);
     block_with_legend(
         Borders::TOP,
@@ -1010,13 +1034,20 @@ fn who(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
     .render(area, buf);
     let label_width = track.label;
     let wide = label_width >= 32;
-    let names = name_width(roster.people().map(|(_, p)| p.name.as_str()));
+    let reference = roster.reference();
+    let names = name_width(
+        roster
+            .people()
+            .map(|(_, p)| p.name.as_str())
+            .chain(reference.map(|r| r.city.as_str())),
+    );
     let city_width = city_width(app, usize::from(label_width), names);
+    let home_mark = app.home_mark(glyphs);
     let draw_person = |buf: &mut Buffer, y: u16, id: PersonId| {
         let person = roster.person(id);
         let counted = app.is_counted(Row::Person(id));
         let (mark, mark_role) = match (id == PersonId::HOME, counted) {
-            (true, _) => (glyphs.home, Role::Marker),
+            (true, _) => (home_mark, Role::Marker),
             (false, true) => (glyphs.person, Role::Marker),
             (false, false) => (glyphs.person_other, Role::Dim),
         };
@@ -1055,13 +1086,38 @@ fn who(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
             );
         }
     };
-    let mut y = area.y + 1;
-    for row in &rows.above {
-        if let Row::Person(id) = row {
-            draw_person(buf, y, *id);
-        }
-        y += 1 + track.dy;
-    }
+    let draw_reference = |buf: &mut Buffer, y: u16| {
+        let Some(reference) = reference else { return };
+        label(
+            buf,
+            area,
+            y,
+            label_width,
+            look,
+            &Label {
+                mark: glyphs.home,
+                mark_role: Role::Dim,
+                name: &reference.city,
+                name_width: names,
+                middle: wide.then(String::new),
+                middle_width: city_width,
+                right: time_candidates(app, reference.location.tz),
+                right_style: theme.fg(Role::Dim),
+                counted: false,
+                focused: false,
+            },
+        );
+        let cells = clock_cells(track, look, reference.location, roster.daylight);
+        lane(
+            buf,
+            area,
+            y + track.dy,
+            look,
+            track,
+            reference.location.tz,
+            &cells,
+        );
+    };
     let lens = app.lens_name();
     let who = evaluate(roster, &app.marks, app.when()).who;
     let result = match who {
@@ -1083,14 +1139,152 @@ fn who(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
         }
     };
     let word = who.map_or("who", |block| block.rule.label());
-    answer(buf, area, y, look, track, word, result);
-    y += 1 + track.dy;
-    for row in &rows.below {
-        if let Row::Person(id) = row {
-            draw_person(buf, y, *id);
+    let mut y = area.y + 1;
+    for entry in entries {
+        match entry {
+            Entry::Row(Row::Person(id)) => draw_person(buf, y, *id),
+            Entry::Reference => draw_reference(buf, y),
+            Entry::Answer => answer(buf, area, y, look, track, word, result.clone()),
+            Entry::More(folded) => more(buf, area, y, label_width, app, look, folded),
+            Entry::Row(Row::Place(_)) => {}
         }
         y += 1 + track.dy;
     }
+}
+
+/// A lane of plain day and night at `location`, as a clock row without hours draws it.
+fn clock_cells(
+    track: &Track,
+    look: Look,
+    location: teamzones_core::schedule::Location,
+    daylight: teamzones_core::schedule::Daylight,
+) -> Vec<(char, Role)> {
+    track
+        .columns()
+        .map(|(index, _)| {
+            let slot = track
+                .slots(index)
+                .next()
+                .unwrap_or(Slot::containing(track.start));
+            let band = band(location, None, daylight, slot);
+            (look.glyphs.band(band), band_role(band))
+        })
+        .collect()
+}
+
+/// One line of the fold list: the mark, the name, then the local time or the place's state.
+fn entry_text(app: &App, look: Look, entry: &Entry) -> String {
+    let glyphs = look.glyphs;
+    let roster = app.roster();
+    match entry {
+        Entry::Row(row @ Row::Person(id)) => {
+            let person = roster.person(*id);
+            let mark = match (*id == PersonId::HOME, app.is_counted(*row)) {
+                (true, _) => app.home_mark(glyphs),
+                (false, true) => glyphs.person,
+                (false, false) => glyphs.person_other,
+            };
+            let time = &time_candidates(app, person.location.tz)[0];
+            format!("{mark} {}  {time}", person.name)
+        }
+        Entry::Row(row @ Row::Place(id)) => {
+            let place = roster.place(*id);
+            let mark = if app.is_counted(*row) {
+                glyphs.place
+            } else {
+                glyphs.place_other
+            };
+            let state = teamzones_core::question::place_state(roster, *id, app.when()).map_or_else(
+                || time_candidates(app, place.location.tz)[0].clone(),
+                |level| place.labels().word(level).to_owned(),
+            );
+            format!("{mark} {}  {state}", place.name)
+        }
+        Entry::Reference => roster.reference().map_or_else(String::new, |reference| {
+            let time = &time_candidates(app, reference.location.tz)[0];
+            format!("{} {}  {time}", glyphs.home, reference.city)
+        }),
+        Entry::More(folded) => more_text(app, folded),
+        Entry::Answer => String::new(),
+    }
+}
+
+/// The list `enter` opens on a `+N more` line: a centred box with one line per folded row.
+fn fold_overlay(buf: &mut Buffer, size: Rect, app: &App, look: Look, folded: &[Entry]) {
+    let theme = look.theme;
+    let lines: Vec<String> = folded
+        .iter()
+        .map(|entry| entry_text(app, look, entry))
+        .collect();
+    let widest = lines.iter().map(|line| width_of(line)).max().unwrap_or(0);
+    let width = u16::try_from(widest + 4)
+        .unwrap_or(u16::MAX)
+        .min(size.width);
+    let height = u16::try_from(lines.len() + 2)
+        .unwrap_or(u16::MAX)
+        .min(size.height);
+    let area = Rect::new(
+        size.x + (size.width - width) / 2,
+        size.y + (size.height - height) / 2,
+        width,
+        height,
+    );
+    Clear.render(area, buf);
+    let block = Block::bordered()
+        .border_set(look.glyphs.rounded)
+        .border_style(theme.fg(Role::Accent))
+        .title(Span::styled(
+            format!(" {} ", more_text(app, folded)),
+            theme.fg(Role::Text).add_modifier(Modifier::BOLD),
+        ));
+    let inner = block.inner(area);
+    block.render(area, buf);
+    for (y, line) in (inner.y..inner.bottom()).zip(&lines) {
+        put(buf, inner, inner.x + 1, y, line, theme.fg(Role::Text));
+    }
+}
+
+/// The `+N more` text for `folded`, naming how many of its rows are counted.
+pub fn more_text(app: &App, folded: &[Entry]) -> String {
+    let counted = folded
+        .iter()
+        .flat_map(Entry::rows)
+        .filter(|row| app.is_counted(*row))
+        .count();
+    match counted {
+        0 => format!("+{} more", folded.len()),
+        counted => format!("+{} more, {counted} counted", folded.len()),
+    }
+}
+
+/// Draws a `+N more` line, its mark the block's uncounted one.
+fn more(buf: &mut Buffer, area: Rect, y: u16, width: u16, app: &App, look: Look, folded: &[Entry]) {
+    let glyphs = look.glyphs;
+    let first = folded.iter().flat_map(Entry::rows).next();
+    let mark = match first {
+        Some(Row::Place(_)) => glyphs.place_other,
+        Some(Row::Person(_)) | None => glyphs.person_other,
+    };
+    let text = more_text(app, folded);
+    label(
+        buf,
+        area,
+        y,
+        width,
+        look,
+        &Label {
+            mark,
+            mark_role: Role::Dim,
+            name: &text,
+            name_width: width_of(&text),
+            middle: None,
+            middle_width: 0,
+            right: Vec::new(),
+            right_style: look.theme.fg(Role::Dim),
+            counted: false,
+            focused: first == Some(app.focus),
+        },
+    );
 }
 
 /// The where border's question after its title: `asks open`, `context` or `not asked`, which a
@@ -1110,7 +1304,7 @@ pub fn where_question(app: &App, look: Look) -> Vec<Span<'static>> {
     }
 }
 
-fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
+fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track, entries: &[Entry]) {
     let (theme, glyphs) = (look.theme, look.glyphs);
     let roster = app.roster();
     let marks = &app.marks;
@@ -1136,7 +1330,6 @@ fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
     .render(area, buf);
     let label_width = track.label;
     let wide = label_width >= 32;
-    let rows = app.where_rows();
     let names = name_width(roster.places().map(|(_, p)| p.name.as_str()));
     let when = app.when();
     let draw_place = |buf: &mut Buffer, y: u16, row: Row| {
@@ -1199,11 +1392,6 @@ fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
             .collect();
         lane(buf, area, y + track.dy, look, track, tz, &cells);
     };
-    let mut y = area.y + 1;
-    for row in &rows.above {
-        draw_place(buf, y, *row);
-        y += 1 + track.dy;
-    }
     let lens = app.lens_name();
     let answer_now = evaluate(roster, marks, when).place;
     let result = match (answer_now, marks.rule) {
@@ -1226,10 +1414,14 @@ fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
         }
     };
     let word = answer_now.map_or("where", |block| block.rule.word());
-    answer(buf, area, y, look, track, word, result);
-    y += 1 + track.dy;
-    for row in &rows.below {
-        draw_place(buf, y, *row);
+    let mut y = area.y + 1;
+    for entry in entries {
+        match entry {
+            Entry::Row(row) => draw_place(buf, y, *row),
+            Entry::Answer => answer(buf, area, y, look, track, word, result.clone()),
+            Entry::More(folded) => more(buf, area, y, label_width, app, look, folded),
+            Entry::Reference => {}
+        }
         y += 1 + track.dy;
     }
 }

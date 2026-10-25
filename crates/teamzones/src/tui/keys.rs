@@ -81,6 +81,8 @@ pub enum Action {
     Visual,
     SwapEnd,
     Commit,
+    /// `enter`: open or close the list of the rows a focused `+N more` line folds.
+    Fold,
     StartEarlier,
     StartLater,
     EndEarlier,
@@ -191,9 +193,9 @@ pub struct Binding {
     pub chords: &'static [(Key, Action)],
 }
 
-/// The milestones built so far: M3 to M5 and the hands-on feedback rounds after M3.
+/// The milestones built so far: M3 to M6 and the hands-on feedback rounds after M3.
 #[cfg(test)]
-pub const BUILT: [&str; 5] = ["M3", "M4", "M5", "FB2", "FB4"];
+pub const BUILT: [&str; 6] = ["M3", "M4", "M5", "M6", "FB2", "FB4"];
 
 /// A footer priority that never drops.
 pub const PINNED: u8 = u8::MAX;
@@ -312,7 +314,6 @@ pub const BINDINGS: &[Binding] = &[
         chords: &[
             (Key::Char('v'), Action::Visual),
             (Key::Char('o'), Action::SwapEnd),
-            (Key::Enter, Action::Commit),
         ],
         ..row(
             "v, o",
@@ -390,12 +391,15 @@ pub const BINDINGS: &[Binding] = &[
             Context::Main,
         )
     },
-    row(
-        "enter",
-        "Expand or fold a `+N more` row",
-        "M6",
-        Context::Main,
-    ),
+    Binding {
+        chords: &[(Key::Enter, Action::Fold)],
+        ..row(
+            "enter",
+            "Expand or fold a `+N more` row",
+            "M6",
+            Context::Main,
+        )
+    },
     Binding {
         chords: &GROUP_CHORDS,
         ..row(

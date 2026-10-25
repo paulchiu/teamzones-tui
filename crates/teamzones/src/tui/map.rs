@@ -369,7 +369,7 @@ fn pins(app: &App, look: Look) -> Vec<Pin> {
         Row::Person(id) => Some(Pin {
             location: roster.person(id).location,
             glyph: if id == PersonId::HOME {
-                glyphs.home
+                app.home_mark(glyphs)
             } else {
                 glyphs.person
             },

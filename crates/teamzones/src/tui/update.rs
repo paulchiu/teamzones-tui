@@ -209,6 +209,7 @@ pub fn update(app: App, msg: Msg) -> (App, Vec<Effect>) {
         Msg::Reloaded { key, result } => (edit::reloaded(app, &key, result), Vec::new()),
     };
     next.focus = clamp_focus(&rows_before, &next.focus_rows(), next.focus);
+    next.fold_open = next.fold_open && next.focused_more().is_some();
     (next, effects)
 }
 
@@ -314,6 +315,10 @@ fn act(app: App, action: Action, key: Key) -> (App, Vec<Effect>) {
         }),
         Action::Visual => only(visual(app)),
         Action::Commit => only(commit(app)),
+        Action::Fold => only(App {
+            fold_open: !app.fold_open && app.focused_more().is_some(),
+            ..app
+        }),
         Action::SwapEnd => only(App {
             visual: app.visual.map(|v| Visual {
                 anchor: v.active,
@@ -619,6 +624,12 @@ fn edge(app: App, start: i64, end: i64) -> App {
 }
 
 fn unwind(app: App) -> App {
+    if app.mode == Mode::Normal && app.fold_open {
+        return App {
+            fold_open: false,
+            ..app
+        };
+    }
     if app.mode == Mode::Normal && app.map_view() == MapView::Overlay {
         return App {
             map_flipped: false,

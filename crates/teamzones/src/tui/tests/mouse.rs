@@ -232,6 +232,22 @@ fn marks() {
     assert!(matches!(sam, Row::Person(_)));
 }
 
+fn more() {
+    let folded = update(team_monday(), Msg::Resize(80, 20)).0;
+    let buf = render(&folded, 80, 20);
+    let at = (2, y_of(&buf, "○ +5 more"));
+    let fold_row = press(folded.clone(), &chars("jj")).focus;
+    assert_eq!(
+        msgs(&folded, left(MouseEventKind::Down, at)),
+        [Msg::Focus(fold_row), Msg::Key(Key::Enter)]
+    );
+    let clicked = settled(send(folded.clone(), &[left(MouseEventKind::Down, at)]));
+    assert_eq!(
+        clicked,
+        press(folded, &[Key::Char('j'), Key::Char('j'), Key::Enter])
+    );
+}
+
 fn groups() {
     let regions = find(&team(), "regions");
     assert_eq!(
@@ -380,6 +396,7 @@ const CASES: &[(&str, fn())] = &[
     ("esc", esc),
     ("j k, ↑ ↓, g G", focus_rows),
     ("space, X", marks),
+    ("enter", more),
     ("1-9, 0", groups),
     ("w, +, x, =", w_plus_x_equals),
     ("u", undo),

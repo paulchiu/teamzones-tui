@@ -4,9 +4,9 @@
 use ratatui::layout::{Position, Rect};
 use teamzones_core::clock::Slot;
 use teamzones_core::fit::slot_fits;
-use teamzones_core::question::Row;
 
 use super::app::{App, Mode};
+use super::fold::Entry;
 use super::glyphs::Glyphs;
 use super::keys::Key;
 use super::layout::{Areas, MapView};
@@ -217,23 +217,18 @@ fn nearest_cell(track: &Track, x: u16) -> u16 {
     x.clamp(track.x, track.x + track.cells.saturating_sub(1)) - track.x
 }
 
-/// The row whose label line is screen line `y`, in either block.
-fn row_at(app: &App, areas: &Areas, track: &Track, y: u16) -> Option<Row> {
+/// The line drawn on screen line `y` in either block, as the view folded it.
+fn entry_at(app: &App, areas: &Areas, track: &Track, y: u16) -> Option<Entry> {
     let lines = track.dy + 1;
-    let block = |top: u16, rows: super::app::BlockRows| {
-        let above = rows.above.len();
-        rows.above
-            .into_iter()
-            .map(Some)
-            .chain(std::iter::once(None))
-            .chain(rows.below.into_iter().map(Some))
-            .enumerate()
-            .find(|(index, _)| {
-                u16::try_from(*index).is_ok_and(|index| top + 1 + index * lines == y)
-            })
-            .and_then(|(index, row)| (index != above).then_some(row).flatten())
+    let (who, place) = app.entries();
+    let block = |top: u16, entries: Vec<Entry>| {
+        entries.into_iter().enumerate().find_map(|(index, entry)| {
+            u16::try_from(index)
+                .is_ok_and(|index| top + 1 + index * lines == y)
+                .then_some(entry)
+        })
     };
-    block(areas.who.y, app.who_rows()).or_else(|| block(areas.place.y, app.where_rows()))
+    block(areas.who.y, who).or_else(|| block(areas.place.y, place))
 }
 
 /// Whether screen line `y` is a lane: a row's or answer row's lane, or the ruler's.
@@ -394,7 +389,14 @@ fn pressed(app: &App, look: Look, areas: &Areas, track: &Track, pointer: Pointer
         return vec![key('u')];
     }
     let in_label = track.dy == 1 || x < track.label;
-    if let Some(row) = row_at(app, areas, track, y).filter(|_| in_label) {
+    let entry = entry_at(app, areas, track, y).filter(|_| in_label);
+    if let Some(more @ Entry::More(_)) = &entry {
+        return more
+            .rows()
+            .first()
+            .map_or_else(Vec::new, |row| vec![Msg::Focus(*row), Msg::Key(Key::Enter)]);
+    }
+    if let Some(Entry::Row(row)) = entry {
         let focus = Msg::Focus(row);
         return if x == areas.who.x {
             vec![focus, key(' ')]

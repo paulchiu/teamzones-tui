@@ -23,7 +23,7 @@ pub fn reparse(app: &App, edit: impl FnOnce(&mut DocumentMut)) -> Result<(String
         .as_deref()
         .ok_or_else(|| "no config file: E creates one".to_owned())?;
     let text = write::edited(text, edit).map_err(|error| error.to_string())?;
-    let home = app.roster().person(PersonId::HOME).location.tz;
+    let home = app.config.roster.person(PersonId::HOME).location.tz;
     let config = Config::load(Some(&text), home).map_err(|error| error.to_string())?;
     Ok((text, config))
 }

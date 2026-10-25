@@ -1676,5 +1676,7 @@ fn below_60_columns_without_the_height_to_stack_the_screen_is_a_plain_list() {
 }
 
 mod edit;
+mod fold;
 mod map;
 mod mouse;
+mod travel;
