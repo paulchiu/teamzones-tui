@@ -49,6 +49,9 @@ enum Command {
     /// Show, set or clear a dated travel override.
     Here(HereArgs),
     /// Find, create, edit or validate the config file.
+    #[command(
+        after_help = "To have a coding agent write the config, point it at llms.txt: https://github.com/paulchiu/teamzones-tui/blob/main/llms.txt"
+    )]
     Config {
         #[command(subcommand)]
         action: ConfigAction,

@@ -2007,4 +2007,97 @@ mod tests {
             "{error}"
         );
     }
+
+    /// A deserializer that records the field names serde derives for a struct, then stops.
+    struct FieldProbe<'a>(&'a mut &'static [&'static str]);
+
+    impl<'de> serde::Deserializer<'de> for FieldProbe<'_> {
+        type Error = serde::de::value::Error;
+
+        fn deserialize_any<V: serde::de::Visitor<'de>>(
+            self,
+            _: V,
+        ) -> Result<V::Value, Self::Error> {
+            Err(serde::de::Error::custom("only structs are probed"))
+        }
+
+        fn deserialize_struct<V: serde::de::Visitor<'de>>(
+            self,
+            _: &'static str,
+            fields: &'static [&'static str],
+            _: V,
+        ) -> Result<V::Value, Self::Error> {
+            *self.0 = fields;
+            Err(serde::de::Error::custom("probed"))
+        }
+
+        serde::forward_to_deserialize_any! {
+            bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string bytes byte_buf
+            option unit unit_struct newtype_struct seq tuple tuple_struct map enum identifier
+            ignored_any
+        }
+    }
+
+    fn fields_of<T: for<'de> Deserialize<'de>>() -> &'static [&'static str] {
+        let mut fields: &'static [&'static str] = &[];
+        let _ = T::deserialize(FieldProbe(&mut fields));
+        fields
+    }
+
+    #[test]
+    fn llms_txt_names_every_field_the_config_accepts() {
+        const LLMS: &str = include_str!("../../../llms.txt");
+        let tables = [
+            fields_of::<RawConfig>(),
+            fields_of::<RawBands>(),
+            fields_of::<RawPerson>(),
+            fields_of::<RawPlace>(),
+            fields_of::<RawProfile>(),
+            fields_of::<RawLabels>(),
+            fields_of::<RawProfileOn>(),
+            fields_of::<RawGroup>(),
+            fields_of::<RawMap>(),
+            fields_of::<RawTravel>(),
+            fields_of::<RawTheme>(),
+            fields_of::<RawCopy>(),
+        ];
+        assert!(
+            tables.iter().all(|fields| !fields.is_empty()),
+            "every probe found fields"
+        );
+        let missing: Vec<&str> = tables
+            .iter()
+            .flat_map(|fields| fields.iter().copied())
+            .filter(|field| {
+                let named = [
+                    format!("{field} ="),
+                    format!("`{field}`"),
+                    format!("[{field}]"),
+                    format!(".{field}]"),
+                ];
+                let assigned = LLMS.lines().any(|line| {
+                    line.trim_start()
+                        .strip_prefix(field)
+                        .is_some_and(|rest| rest.trim_start().starts_with('='))
+                });
+                !assigned && !named.iter().any(|form| LLMS.contains(form.as_str()))
+            })
+            .collect();
+        assert!(missing.is_empty(), "llms.txt never names {missing:?}");
+    }
+
+    #[test]
+    fn llms_txt_has_the_llmstxt_shape_and_its_examples_form_a_valid_config() {
+        const LLMS: &str = include_str!("../../../llms.txt");
+        let mut lines = LLMS.lines().filter(|line| !line.is_empty());
+        assert_eq!(lines.next(), Some("# teamzones"));
+        assert!(lines.next().is_some_and(|line| line.starts_with("> ")));
+        assert!(LLMS.contains("\n## Gathering colleague details\n"));
+        let examples: String = LLMS
+            .split("```toml\n")
+            .skip(1)
+            .filter_map(|block| block.split_once("```").map(|(toml, _)| toml))
+            .collect();
+        Config::parse(&examples).unwrap();
+    }
 }

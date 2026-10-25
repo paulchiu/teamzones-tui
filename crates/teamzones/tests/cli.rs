@@ -541,3 +541,10 @@ fn config_check_rejects_a_second_default_copy_format() {
             line("key = \"d\""),
         ));
 }
+
+#[test]
+fn config_help_points_agents_at_llms_txt() {
+    let assert = teamzones().args(["config", "--help"]).assert().success();
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+    assert!(stdout.contains("llms.txt"), "{stdout}");
+}

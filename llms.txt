@@ -1,0 +1,170 @@
+# teamzones
+
+> teamzones is a terminal tool (a TUI plus a headless CLI) that shows the people you tell by their availability and the regions you operate in by their trading load, on one home-time axis, and copies a line such as `5-5:30pm AEDT / 4-4:30pm AEST / 8-8:30am SAST, open in AU, closed in UK`. This file tells a coding agent how to write its config for a user: where the file lives, every table and field, how to gather colleagues' details from real sources, and how to check the result.
+
+## Where the config lives
+
+- The file is `config.toml` in `$XDG_CONFIG_HOME/teamzones/`, falling back to `~/.config/teamzones/config.toml`. The `TEAMZONES_CONFIG` environment variable overrides the path.
+- `teamzones config path` prints the path in use. `teamzones config init` writes a fully commented template there (and refuses to overwrite an existing file). `teamzones config edit` opens it in `$VISUAL`, then `$EDITOR`, then `vi`.
+- The config is optional. Without one, home is the system time zone with no hours, and there are no people, places or groups. Once any table is present, `[home]` is required.
+- Parsing is strict: an unknown key, a bad value or a name used twice fails with the line and the reason.
+
+## Gathering colleague details
+
+Most of the work is collecting each colleague's city, time zone and working hours. Get them from real sources, never guess.
+
+- Ask the user to connect, or use, whatever connector or MCP server they already have. Slack profiles carry each person's time zone. Google Calendar or Outlook carry working hours and the calendar's time zone. HR, people or directory tools (an HRIS, an org chart, a staff directory) carry office locations.
+- Prefer `city` over a raw `tz`. `city` resolves against a bundled list of capitals and cities of a million or more people, and gives the zone and the coordinates for sunrise and sunset. If the list lacks the city, use `label`, `tz` and `at = [lat, lon]` together. A source that only gives a zone (`Australia/Brisbane`) usually implies a city in that zone: confirm which with the user.
+- Confirm anything inferred with the user before writing it: a city taken from a time zone, hours read off one calendar week, or a guess at who belongs in which group.
+- Never invent hours. Leave `hours` out for someone whose hours you do not know: they then count as reachable in daylight.
+- Use the names people go by, and keep each name unique across people, groups and aliases.
+
+## Tables and fields
+
+Every table below shows each of its fields once, with an example value.
+
+### [bands]
+
+```toml
+[bands]
+source = "sun"   # "sun" (local sunrise and sunset, the default) or "clock" (a fixed 6am-6pm)
+```
+
+### [home]
+
+The user. Home is the axis zone, the zone typed times are read in, and the first entry in every copied line. It takes the same fields as `[[person]]`.
+
+```toml
+[home]
+name  = "Kim"
+city  = "Melbourne"
+hours = "9am-6pm"
+days  = "Mon-Fri"
+```
+
+### [[person]]
+
+Someone the user tells. `hours` is a range or the name of an hours profile, and `days` defaults to `Mon-Fri` (a range such as `Fri-Mon`, a comma list such as `Mon,Wed,Fri`, or one day). A person's own `days` overrides the profile's.
+
+```toml
+[[person]]
+name  = "Alex"
+city  = "Johannesburg"
+hours = "office"
+
+[[person]]
+name  = "Sam"
+label = "Austin"            # for a city the bundled list lacks: label, tz and at together
+tz    = "America/Chicago"
+at    = [30.27, -97.74]
+hours = "8am-4pm"
+days  = "Mon-Thu"
+```
+
+### [[place]]
+
+A region the user operates in, with one zone, map coordinates and an optional trading profile. A place without `trading` is a plain clock row.
+
+```toml
+[[place]]
+name    = "UK"
+tz      = "Europe/London"
+trading = "venue"
+at      = [54.5, -2.5]
+```
+
+### [[profile]]
+
+A named weekly schedule on a local clock. `kind = "hours"` is office hours (`hours`, `days`). `kind = "trading"` is open hours and busy peaks (`open`, `peak`), with optional `labels` renaming its three levels (`closed`, `open`, `busy`) and `[[profile.on]]` entries overriding some days. For a weekday, the `on` entry covering the fewest days wins. Ranges never cross midnight, but `"midnight"` is allowed as an end.
+
+```toml
+[[profile]]
+name  = "office"
+kind  = "hours"
+hours = "8am-4pm"
+days  = "Mon-Fri"
+
+[[profile]]
+name   = "venue"
+kind   = "trading"
+open   = "7am-11pm"
+peak   = ["11:30am-2pm", "5:30-9pm"]
+labels = { closed = "closed", open = "trading hours", busy = "rush" }
+[[profile.on]]
+days   = "Fri-Sat"
+peak   = ["11:30am-2:30pm", "6-10pm"]
+[[profile.on]]
+days   = "Sun"
+closed = true
+```
+
+The fields of a `[[profile.on]]` entry are `days` plus any of `open`, `peak` and `closed = true`.
+
+### [[group]]
+
+A named, ordered list of people and places, numbered 1-9 in file order. It asks who is reachable when it lists `people`, and whether places are free when it lists `places`. `where` is `"open"` (count a place that is not busy, the default), `"closed"` (count a place only while closed) or `"context"` (show places but never count them, only in a group with people).
+
+```toml
+[[group]]
+name    = "crew"
+aliases = ["c"]
+people  = ["Alex", "Sam"]
+places  = ["UK"]
+where   = "open"
+```
+
+### [map]
+
+```toml
+[map]
+show = "auto"   # "auto" (hidden on small terminals), "always" or "never"
+```
+
+### [travel]
+
+A dated travel override, usually written by `teamzones here London --until 2026-11-01`. It is active through the end of `until` in that city's local date.
+
+```toml
+[travel]
+here  = "London"
+until = 2026-11-01
+```
+
+### [theme]
+
+`scheme` is `"dark"`, `"light"` or `"mono"`, `glyphs` is `"full"` or `"ascii"`, and `range` is how the selected range is marked (`"columns"`, `"edges"`, `"lines"`, `"underline"` or `"focus"`). Any colour role can be overridden as `#rrggbb`: `text`, `dim`, `accent`, `marker`, `ok`, `warn`, `danger`, `day`, `night`, `dawn`, `work`, `quiet`, `night_tint` and `selection`.
+
+```toml
+[theme]
+scheme = "dark"
+glyphs = "full"
+range  = "columns"
+accent = "#0969da"
+```
+
+### [[copy]]
+
+A copy-as format in the `c` dialog. The built-ins are `y d w t z s a`. A `[[copy]]` with a built-in key replaces it, `hide = true` removes it, and a new key adds a format. `who` is `"marked"`, `"all"` or `"focused-first"`, and `places` is `"states"`, `"zones"` or `"none"`. Exactly one format is the default (`y` unless one sets `default = true`): its line is the times box, what `y` copies and what `teamzones say` prints. `key` is one character other than `?` or `q`.
+
+```toml
+[[copy]]
+key     = "k"
+label   = "dated, with names"
+who     = "marked"
+date    = true
+names   = true
+places  = "states"
+default = false
+
+[[copy]]
+key  = "z"
+hide = true
+```
+
+## Checking the work
+
+- `teamzones config check` validates the file and exits 2 with the line and the reason when something is wrong. Run it after every edit.
+- `teamzones groups` lists each group with its members and the question it asks.
+- `teamzones say <group> <time>`, such as `teamzones say crew 3pm tue --no-copy`, prints the line for a group at a time, so you can confirm each person's zone came out right.
+- `teamzones status <group>` prints each person's local time and band (working, day off, night) and each place's state, which is the quickest check that hours and zones are right.
+- Show the user the output of `groups` and `status` and ask them to confirm it before you finish.
