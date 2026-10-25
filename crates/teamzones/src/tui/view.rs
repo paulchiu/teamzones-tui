@@ -188,6 +188,14 @@ impl Track {
         }
     }
 
+    /// Hours between ruler labels: the fewest that keep labels at least ten columns apart.
+    fn label_every(&self) -> u32 {
+        [1, 2, 3, 4, 6, 12]
+            .into_iter()
+            .find(|hours| u32::from(self.cells) * hours >= 24 * 10)
+            .unwrap_or(12)
+    }
+
     fn columns(&self) -> impl Iterator<Item = (u16, u16)> + '_ {
         (0..self.cells).map(|index| (index, self.x + index))
     }
@@ -327,7 +335,7 @@ fn slider(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
         &viewed.format("%Z").to_string(),
         theme.fg(Role::Dim),
     );
-    let every = if track.cells >= 96 { 3 } else { 6 };
+    let every = track.label_every();
     for (index, column) in track.columns() {
         set_char(buf, area, column, ruler_y, ' ', Style::new());
         let fitting = track

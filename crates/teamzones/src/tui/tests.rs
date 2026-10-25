@@ -741,6 +741,40 @@ fn at_250_columns_every_grid_row_marks_the_range_on_the_same_columns() {
     assert_eq!(buf[(201, y_of(&buf, "≡ in hours"))].symbol(), "━");
 }
 
+/// The ruler's hour labels with the column each starts at.
+fn ruler_labels(buf: &Buffer) -> Vec<(u16, String)> {
+    let y = y_of(buf, "Mon 26 Oct AEDT");
+    let mut labels = Vec::new();
+    let mut x = 16;
+    while x < buf.area.width {
+        let symbol = buf[(x, y)].symbol();
+        if symbol.chars().all(|c| c.is_ascii_digit()) && !symbol.trim().is_empty() {
+            let label: String = (x..buf.area.width)
+                .map(|x| buf[(x, y)].symbol().to_owned())
+                .take_while(|s| s != " " && s != "·")
+                .collect();
+            labels.push((x, label.clone()));
+            x += u16::try_from(label.len()).unwrap();
+        } else {
+            x += 1;
+        }
+    }
+    labels
+}
+
+#[test]
+fn ruler_labels_space_out_with_the_cell_size() {
+    // Two hours apart once an hour gets at least five columns, so labels sit ten or more apart.
+    let wide = ruler_labels(&render(&team_monday(), 250, 36));
+    assert_eq!(
+        &wide[..3],
+        &[(82, "12a".into()), (96, "2a".into()), (110, "4a".into())]
+    );
+    assert_eq!(wide.len(), 12);
+    let narrow = ruler_labels(&render(&team_monday(), 120, 36));
+    assert_eq!(&narrow[..2], &[(24, "12a".into()), (36, "3a".into())]);
+}
+
 #[test]
 fn small_terminals_draw_without_panicking_until_folding_lands() {
     for (cols, rows) in [(1, 1), (30, 8), (44, 12), (60, 20), (200, 60)] {
