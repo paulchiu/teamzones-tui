@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-25
+
 ### Changed
 
 - On wide terminals the timeline takes the spare width, with finer columns, so the names column stays at most about a third of the screen and the ruler labels space out to match.
