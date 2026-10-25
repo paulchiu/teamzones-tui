@@ -33,7 +33,7 @@ pub struct Look<'a> {
 }
 
 /// The display width of `text`, in terminal columns.
-fn width_of(text: &str) -> usize {
+pub fn width_of(text: &str) -> usize {
     Span::raw(text).width()
 }
 
@@ -240,6 +240,9 @@ pub fn draw(frame: &mut Frame, app: &App, look: Look) {
     };
     let buf = frame.buffer_mut();
     header(buf, clip(areas.header), app, look);
+    if let Some(area) = areas.map {
+        super::map::draw(buf, clip(area), app, look);
+    }
     slider(buf, clip(areas.slider), app, look, &track);
     who(buf, clip(areas.who), app, look, &track);
     places(buf, clip(areas.place), app, look, &track);

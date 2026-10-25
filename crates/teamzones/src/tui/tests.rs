@@ -115,9 +115,10 @@ fn the_team_frame_at_120_by_36_sits_on_the_row_budget() {
     assert!(
         row(&buf, 0).starts_with("teamzones   now Sat 24 Oct 9:04am AEDT   viewing Mon 26 Oct +2d")
     );
+    let braille = |y: u16| row(&buf, y).chars().any(|c| ('⠁'..='⣿').contains(&c));
     assert!(
-        (1..13).all(|y| row(&buf, y).is_empty()),
-        "the map area is blank until the map lands"
+        (1..13).all(braille),
+        "the map takes the twelve rows under the header"
     );
     assert!(row(&buf, 13).starts_with("Mon 26 Oct AEDT"));
     assert!(row(&buf, 14).starts_with("▸ 5-6pm AEDT 1h"));
@@ -1447,3 +1448,5 @@ fn below_60_columns_without_the_height_to_stack_the_screen_is_a_plain_list() {
     assert!(row(&buf, y_of(&buf, "≡ in hours")).ends_with("5/5"));
     assert_eq!(say_line(&buf), "5-6pm AEDT / 4-5pm AEST / 8-9am SAST");
 }
+
+mod map;

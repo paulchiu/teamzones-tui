@@ -9,6 +9,7 @@ mod glyphs;
 mod help;
 mod keys;
 mod layout;
+mod map;
 mod notice;
 mod prompt;
 mod say;

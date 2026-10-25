@@ -24,7 +24,6 @@ pub enum Role {
     Dawn,
     Work,
     Quiet,
-    #[expect(dead_code, reason = "the map paints the night tint")]
     NightTint,
 }
 
