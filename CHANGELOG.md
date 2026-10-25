@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ## [Unreleased]
 
+### Added
+
+- `w` saves the marks into the active group, `+` saves them as a new group (offering a name such as `team_uk`), `=` cycles a group's `where`, and `x` closes the active group. Every change is written to `config.toml` keeping your comments and layout, and `u` within 10 seconds undoes it.
+- A closed group disappears at once but is written only after 10 seconds or on quit, so `u` puts it back without touching the file.
+- `tab` opens the groups matrix: people and places against every group, where `space` adds or removes a member, `R` renames a group (keeping the old name as an alias), `<` and `>` move it, `a` adds one and `x` closes one. The changes are written together when the matrix closes, and `u` steps back one change while it is open.
+- `a` adds a person or a place through a short form, `e` edits the focused row (its name, city, hours, zone, trading profile or marker), and `d` deletes it from the config and every group, all with the same undo.
+- `r` reloads the config, keeping the last good one and showing the error when the file does not load. `E` opens the config in `$VISUAL` or `$EDITOR`, creating it from the template when there is none, and reloads it when the editor exits.
+- Without a config file, the TUI says `no config: E creates one`.
+- Mouse: click the drift tag for a save or revert menu, click `+`, `⋯` or `asks open` for their keys, middle-click a group name to close it, double-click a row to edit it, and double-click the map to add someone or somewhere at that point. In the matrix, click a cell to toggle it, click a group to use it, drag it to move it, right-click to rename and middle-click to close.
+
+### Changed
+
+- The footer offers `w save` and `tab groups`, and the who strip ends in `+  ⋯`.
+- An edit is never written over a config file changed outside teamzones since it was read; the notice says so and `r` reloads it.
+
 ## [0.8.0] - 2026-10-25
 
 ### Added

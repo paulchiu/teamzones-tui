@@ -257,3 +257,35 @@ Decision: A pointer event is translated into the messages its keymap row's key s
 Why: The mouse then cannot drift from the keys: whatever a key does, its mouse equivalent does by sending it. A test reads the keymap's mouse column, so a new mouse row fails until it is covered.
 
 Held by: `tui::tests::mouse::every_built_mouse_equivalent_in_the_keymap_sends_what_its_key_does` in `teamzones`
+
+## D32: Edits keep every byte they do not touch, and never write over a file changed elsewhere (2026-10-25)
+
+Decision: Every TUI edit (`w`, `+`, `x`, `=`, the matrix, `a`, `e`, `d`) rewrites the config text through `toml_edit` in `write.rs`, touching only the keys whose values change, and is parsed back before it is adopted. The effects layer replaces the file only while it still holds the text the app last read or wrote, so an edit made outside teamzones is never lost; the notice says so and `r` reloads.
+
+Why: The config is the user's own file, with their comments and layout, and the TUI holds its text in memory between reads.
+
+Held by: `tui::tests::edit::space_on_uk_then_w_on_team_writes_its_places_and_nothing_else` and `the_effects_layer_writes_the_bytes_and_refuses_a_file_changed_behind_its_back` in `teamzones`
+
+## D33: Undo is one value holding the whole state before the action, and a close waits out its window unwritten (2026-10-25)
+
+Decision: The single undo holds the config, its text, any pending write, the lens, the marks and the focus as they were, never a diff, and expires 10 s after the action. `x` changes the screen at once but writes only when the window passes or on quit, so `u` before then never touches the file. The matrix writes all its changes once, when it closes, with one undo back to how it opened, and `u` inside it steps back one change.
+
+Why: A diff can fail to apply after a later edit, and a whole state cannot. Writing a close only after its window keeps an undone close off the disk entirely.
+
+Held by: `tui::tests::edit::u_within_ten_seconds_writes_the_file_back_to_its_previous_bytes`, `x_on_deploy_leaves_the_strip_at_once_and_writes_only_after_ten_seconds`, `u_after_x_puts_the_group_back_in_its_slot_and_nothing_is_written` and `matrix_changes_are_written_together_on_esc_and_the_old_name_still_says` in `teamzones`
+
+## D34: The editor handoff parks the key reader and drains its input before reading again (2026-10-25)
+
+Decision: `E` runs the editor on the event loop's own thread, so no key is read while it runs. On return the terminal is taken back whatever the editor did, and everything buffered, plus anything arriving within 20 ms, is discarded before the loop reads again. Events, terminal modes and the editor opener are injected, so the handoff is tested without a terminal.
+
+Why: blubat's reader raced the editor for stdin, and late terminal replies read as keys after it exited.
+
+Held by: `tui::tests::edit::capital_e_hands_the_terminal_to_the_editor_and_drops_its_input_then_reloads` and `a_failing_editor_still_gives_the_terminal_back_and_reloads_nothing` in `teamzones`
+
+## D35: `a` asks person or place first, and the picker writes only the fields that changed (2026-10-25)
+
+Decision: `a` opens a two-key menu, `p` person and `l` place, before the picker, since focus alone cannot add the first place. The picker's fields are text prompts stepped through with `enter`. An edit writes only the fields whose text changed, renaming the row in every group when its name changes, and a city typed for a person who had `label`, `tz` and `at` replaces those keys. A new place without a marker takes the first bundled city in its zone. The drift tag's menu has keys too, `w` save and `r` revert, so it acts on its own keys like every modal.
+
+Why: The spec names the picker's fields but not how to choose its kind or move between fields, and text prompts swallow every key but `esc` and `enter`.
+
+Held by: `tui::tests::edit::a_p_adds_a_person_after_the_last_one_through_the_picker`, `a_l_adds_a_place_after_the_last_one_through_the_picker`, `e_edits_the_focused_person_s_hours_and_writes_only_that_line` and `tui::tests::each_modal_context_swallows_the_keys_it_does_not_advertise` in `teamzones`
