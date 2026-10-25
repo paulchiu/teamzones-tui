@@ -1388,3 +1388,34 @@ fn under_no_color_the_styles_that_need_colour_fall_back_to_edge_lines() {
     assert!(grids[3].contains('u'));
     insta::assert_snapshot!("range_style_no_color", lines);
 }
+
+#[test]
+fn below_80_columns_each_row_stacks_its_label_over_a_full_width_lane() {
+    let buf = render(&team_monday(), 60, 40);
+    let below = |label: &str| y_of(&buf, label) + 1;
+    assert!(row(&buf, below("Mon 26 Oct AEDT")).starts_with("12a"));
+    // Sixty columns of 24 minutes each: 5-6pm covers columns 42 to 44.
+    let track = below("▸ 5-6pm AEDT 1h");
+    assert_eq!(
+        (buf[(42, track)].symbol(), buf[(44, track)].symbol()),
+        ("┣", "┫")
+    );
+    let range: Vec<u16> = (42..=44).collect();
+    for label in ["⌂ Paul", "● Priya", "≡ in hours", "○ Ellie"] {
+        let y = below(label);
+        assert_eq!(shaded(&buf, y, 0), range, "{}", row(&buf, y));
+    }
+    assert!(row(&buf, y_of(&buf, "≡ in hours")).ends_with("5/5"));
+    assert!(row(&buf, y_of(&buf, "⌂ Paul")).ends_with("5-6pm AEDT"));
+    assert_eq!(say_line(&buf), "5-6pm AEDT / 4-5pm AEST / 8-9am SAST");
+}
+
+#[test]
+fn below_80_columns_without_the_height_to_stack_the_screen_is_a_plain_list() {
+    let buf = render(&team_monday(), 60, 24);
+    let frame = text(&buf);
+    assert!(!frame.contains('▓') && !frame.contains('┣'), "{frame}");
+    assert!(row(&buf, y_of(&buf, "⌂ Paul")).ends_with("5-6pm AEDT"));
+    assert!(row(&buf, y_of(&buf, "≡ in hours")).ends_with("5/5"));
+    assert_eq!(say_line(&buf), "5-6pm AEDT / 4-5pm AEST / 8-9am SAST");
+}

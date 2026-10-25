@@ -10,10 +10,26 @@ pub enum MapChoice {
 }
 
 /// The label and track widths; the track's columns split the viewed day evenly.
+///
+/// Side by side, the track starts after the label. Stacked, each row's label takes a line of its
+/// own and the track fills the line under it. A track of no columns is the plain list.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Columns {
     pub label: u16,
     pub track: u16,
+    pub stacked: bool,
+}
+
+impl Columns {
+    /// The column the track starts at.
+    pub fn track_x(self) -> u16 {
+        if self.stacked { 0 } else { self.label }
+    }
+
+    /// The screen lines one grid row takes: its label line, plus a lane line when stacked.
+    pub fn lines(self) -> u16 {
+        1 + u16::from(self.stacked)
+    }
 }
 
 /// Every area of the screen, top to bottom; `map` is `None` while the map is hidden.
@@ -30,9 +46,11 @@ pub struct Areas {
     pub columns: Columns,
 }
 
-/// The header, slider, block borders, answer rows, say panel, notice and footer: everything but
-/// the people and places themselves.
-const FIXED_ROWS: u16 = 1 + 2 + 2 + 3 + 4 + 1 + 1;
+/// The header, the block borders, the say panel, the notice and the footer: the rows that never
+/// stack.
+const FLAT_ROWS: u16 = 1 + 1 + 2 + 4 + 1 + 1;
+/// Below this width rows stack, or become the plain list when stacking does not fit the height.
+const STACK_BELOW: u16 = 80;
 /// The map needs this many columns, and this many rows left after the fixed rows.
 const MAP_MIN_COLS: u16 = 100;
 const MAP_MIN_ROWS: u16 = 12;
@@ -54,6 +72,33 @@ fn columns(cols: u16) -> Columns {
     Columns {
         label: cols - track,
         track,
+        stacked: false,
+    }
+}
+
+/// The rows a screen needs with `lines` lines per grid row: the slider's two, each block's
+/// answer row, and every person and place.
+fn rows_needed(lines: u16, people: u16, places: u16) -> u16 {
+    FLAT_ROWS + lines * (2 + 2 + people + places)
+}
+
+/// The columns for a `cols` by `rows` screen: side by side from 80 columns, stacked below that
+/// when the height allows, and otherwise the plain list.
+fn shape(cols: u16, rows: u16, people: u16, places: u16) -> Columns {
+    let stacked = Columns {
+        label: cols,
+        track: cols,
+        stacked: true,
+    };
+    let list = Columns {
+        label: cols,
+        track: 0,
+        stacked: false,
+    };
+    match (cols >= STACK_BELOW, rows >= rows_needed(2, people, places)) {
+        (true, _) => columns(cols),
+        (false, true) => stacked,
+        (false, false) => list,
     }
 }
 
@@ -61,8 +106,9 @@ fn columns(cols: u16) -> Columns {
 ///
 /// Block heights come from the whole roster, so switching groups never moves a row.
 pub fn layout(cols: u16, rows: u16, roster_len: u16, places_len: u16, map: MapChoice) -> Areas {
-    let fixed = FIXED_ROWS + roster_len + places_len;
-    let spare = rows.saturating_sub(fixed);
+    let columns = shape(cols, rows, roster_len, places_len);
+    let lines = columns.lines();
+    let spare = rows.saturating_sub(rows_needed(lines, roster_len, places_len));
     let shows_map = match map {
         MapChoice::Auto => cols >= MAP_MIN_COLS && spare >= MAP_MIN_ROWS,
         MapChoice::Hidden => false,
@@ -78,13 +124,13 @@ pub fn layout(cols: u16, rows: u16, roster_len: u16, places_len: u16, map: MapCh
     Areas {
         header,
         map: shows_map.then_some(spare_area),
-        slider: take(2),
-        who: take(roster_len + 2),
-        place: take(places_len + 3),
+        slider: take(2 * lines),
+        who: take(1 + lines * (roster_len + 1)),
+        place: take(2 + lines * (places_len + 1)),
         say: take(4),
         notice: take(1),
         footer: take(1),
-        columns: columns(cols),
+        columns,
     }
 }
 
@@ -120,7 +166,8 @@ mod tests {
             areas.columns,
             Columns {
                 label: 24,
-                track: 96
+                track: 96,
+                stacked: false
             }
         );
     }
@@ -143,7 +190,8 @@ mod tests {
             areas.columns,
             Columns {
                 label: 32,
-                track: 48
+                track: 48,
+                stacked: false
             }
         );
         assert_eq!(areas.footer, Rect::new(0, 23, 80, 1));

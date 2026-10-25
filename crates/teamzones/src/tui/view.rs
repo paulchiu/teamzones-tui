@@ -85,6 +85,10 @@ fn set_char(buf: &mut Buffer, area: Rect, x: u16, y: u16, c: char, style: Style)
 struct Track {
     x: u16,
     cells: u16,
+    /// The label's width: the columns before the track, or the whole line when stacked.
+    label: u16,
+    /// How far below a row's label line its lane sits: 0 side by side, 1 stacked.
+    dy: u16,
     start: DateTime<Utc>,
     when: When,
     /// How the range is marked, already fallen back for a theme without colour.
@@ -226,8 +230,10 @@ pub fn draw(frame: &mut Frame, app: &App, look: Look) {
     let areas = areas(app, look.glyphs, size);
     let clip = |area: Rect| size.intersection(area);
     let track = Track {
-        x: areas.columns.label,
+        x: areas.columns.track_x(),
         cells: areas.columns.track,
+        label: areas.columns.label,
+        dy: areas.columns.lines() - 1,
         start: day_start(app.day(), app.roster().axis()),
         when: app.when(),
         marking: without_colour(app.range_style, look.theme.is_mono()),
@@ -317,13 +323,14 @@ fn hour_label(hour: u32) -> String {
 fn slider(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
     let (theme, glyphs) = (look.theme, look.glyphs);
     let axis = app.roster().axis();
-    let (ruler_y, track_y) = (area.y, area.y + 1);
+    let (ruler_label_y, ruler_y) = (area.y, area.y + track.dy);
+    let (track_label_y, track_y) = (ruler_y + 1, ruler_y + 1 + track.dy);
     let viewed = app.when().start().with_timezone(&axis);
     let x = put(
         buf,
         area,
         area.x,
-        ruler_y,
+        ruler_label_y,
         &viewed.format("%a %-d %b").to_string(),
         theme.fg(Role::Text).add_modifier(Modifier::BOLD),
     );
@@ -331,7 +338,7 @@ fn slider(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
         buf,
         area,
         x + 1,
-        ruler_y,
+        ruler_label_y,
         &viewed.format("%Z").to_string(),
         theme.fg(Role::Dim),
     );
@@ -415,7 +422,7 @@ fn slider(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
         buf,
         area,
         area.x,
-        track_y,
+        track_label_y,
         &format!("{} ", glyphs.pointer),
         theme.fg(Role::Accent),
     );
@@ -423,17 +430,24 @@ fn slider(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
         buf,
         area,
         x,
-        track_y,
+        track_label_y,
         &format!("{} {}", label.0, viewed.format("%Z")),
         theme.fg(Role::Accent).add_modifier(Modifier::BOLD),
     );
-    put(buf, area, x + 1, track_y, &label.1, theme.fg(Role::Dim));
-    if app.day() != app.today() && track.x > 0 {
+    put(
+        buf,
+        area,
+        x + 1,
+        track_label_y,
+        &label.1,
+        theme.fg(Role::Dim),
+    );
+    if app.day() != app.today() && track.label > 0 {
         put(
             buf,
             area,
-            track.x - 1,
-            track_y,
+            area.x + track.label - 1,
+            track_label_y,
             glyphs.back,
             theme.fg(Role::Dim),
         );
@@ -628,7 +642,7 @@ fn answer(
     result: Result<(usize, usize, Vec<usize>), String>,
 ) {
     let (theme, glyphs) = (look.theme, look.glyphs);
-    let label_width = track.x.saturating_sub(area.x);
+    let label_width = track.label;
     put(buf, area, area.x, y, glyphs.answer, theme.fg(Role::Accent));
     put(buf, area, area.x + 2, y, word, theme.fg(Role::Dim));
     match result {
@@ -646,7 +660,7 @@ fn answer(
                 buf,
                 area,
                 track.x + 1,
-                y,
+                y + track.dy,
                 &truncate_with_mark(&why, room, ""),
                 theme.fg(Role::Dim),
             );
@@ -674,9 +688,9 @@ fn answer(
                 .collect();
             for ((index, column), (glyph, role)) in track.columns().zip(cell_glyphs) {
                 let style = track.marked(theme, Surface::Answer, index, theme.fg(role));
-                set_char(buf, area, column, y, glyph, style);
+                set_char(buf, area, column, y + track.dy, glyph, style);
             }
-            track.edges(buf, area, y, look, Surface::Answer);
+            track.edges(buf, area, y + track.dy, look, Surface::Answer);
         }
     }
 }
@@ -817,7 +831,7 @@ fn who(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
         look,
     )
     .render(area, buf);
-    let label_width = track.x.saturating_sub(area.x);
+    let label_width = track.label;
     let wide = label_width >= 32;
     let names = name_width(roster.people().map(|(_, p)| p.name.as_str()));
     let city_width = city_width(app, usize::from(label_width), names);
@@ -853,7 +867,15 @@ fn who(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
             },
         );
         if let Some((_, cells)) = lanes.iter().find(|(lane_id, _)| *lane_id == id) {
-            lane(buf, area, y, look, track, person.location.tz, cells);
+            lane(
+                buf,
+                area,
+                y + track.dy,
+                look,
+                track,
+                person.location.tz,
+                cells,
+            );
         }
     };
     let mut y = area.y + 1;
@@ -861,7 +883,7 @@ fn who(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
         if let Row::Person(id) = row {
             draw_person(buf, y, *id);
         }
-        y += 1;
+        y += 1 + track.dy;
     }
     let lens = app.lens_name();
     let who = evaluate(roster, &app.marks, app.when()).who;
@@ -885,12 +907,12 @@ fn who(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
     };
     let word = who.map_or("who", |block| block.rule.label());
     answer(buf, area, y, look, track, word, result);
-    y += 1;
+    y += 1 + track.dy;
     for row in &rows.below {
         if let Row::Person(id) = row {
             draw_person(buf, y, *id);
         }
-        y += 1;
+        y += 1 + track.dy;
     }
 }
 
@@ -927,7 +949,7 @@ fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
         look,
     )
     .render(area, buf);
-    let label_width = track.x.saturating_sub(area.x);
+    let label_width = track.label;
     let wide = label_width >= 32;
     let rows = app.where_rows();
     let names = name_width(roster.places().map(|(_, p)| p.name.as_str()));
@@ -990,12 +1012,12 @@ fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
                 }
             })
             .collect();
-        lane(buf, area, y, look, track, tz, &cells);
+        lane(buf, area, y + track.dy, look, track, tz, &cells);
     };
     let mut y = area.y + 1;
     for row in &rows.above {
         draw_place(buf, y, *row);
-        y += 1;
+        y += 1 + track.dy;
     }
     let lens = app.lens_name();
     let answer_now = evaluate(roster, marks, when).place;
@@ -1020,10 +1042,10 @@ fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, track: &Track) {
     };
     let word = answer_now.map_or("where", |block| block.rule.word());
     answer(buf, area, y, look, track, word, result);
-    y += 1;
+    y += 1 + track.dy;
     for row in &rows.below {
         draw_place(buf, y, *row);
-        y += 1;
+        y += 1 + track.dy;
     }
 }
 
