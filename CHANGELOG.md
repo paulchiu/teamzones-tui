@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-25
+
 ### Added
 
 - `z` opens map mode while the map is drawn, with a `map` badge and its keys in the footer. `esc` leaves it, and the view stays until `0` or a resize.
