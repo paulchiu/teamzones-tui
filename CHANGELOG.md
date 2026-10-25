@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-25
+
 ### Added
 
 - While `[travel]` is set, home moves to the travel city: the header, the axis, typed times and the start of every copied line use its zone, and your row there is marked `✈`, keeps your hours on its clock and still counts.
