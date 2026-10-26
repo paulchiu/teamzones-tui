@@ -11,10 +11,10 @@ use ratatui::widgets::{Block, Borders, Clear, Widget};
 use teamzones_core::clock::{Range, Slot, When};
 use teamzones_core::config::{PersonId, Rule};
 use teamzones_core::fit::{day_start, slot_fits};
-use teamzones_core::question::{Row, evaluate, person_band};
-use teamzones_core::schedule::{Band, Level, band, is_day};
+use teamzones_core::question::{Row, evaluate};
+use teamzones_core::schedule::{Band, Level, band};
 
-use super::app::{App, Cursor, Lanes, Mode, without_colour};
+use super::app::{App, Cursor, Mode, without_colour};
 use super::fold::Entry;
 use super::glyphs::Glyphs;
 use super::layout::{Areas, MapView, too_small};
@@ -717,8 +717,6 @@ fn time_candidates(app: &App, tz: Tz) -> Vec<String> {
 }
 
 fn person_cells(app: &App, track: &Track, look: Look, id: PersonId) -> Vec<(char, Role)> {
-    let roster = app.roster();
-    let person = roster.person(id);
     track
         .columns()
         .map(|(index, _)| {
@@ -726,11 +724,7 @@ fn person_cells(app: &App, track: &Track, look: Look, id: PersonId) -> Vec<(char
                 .slots(index)
                 .next()
                 .unwrap_or(Slot::containing(track.start));
-            let band = match app.lanes {
-                Lanes::Hours => person_band(roster, id, slot),
-                Lanes::Plain if is_day(person.location, roster.daylight, slot) => Band::Day,
-                Lanes::Plain => Band::Night,
-            };
+            let band = app.lane_band(id, slot);
             (look.glyphs.band(band), band_role(band))
         })
         .collect()

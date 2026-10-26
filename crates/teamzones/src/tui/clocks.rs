@@ -6,13 +6,12 @@ use chrono_tz::Tz;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
-use teamzones_core::config::{PersonId, Roster};
-use teamzones_core::question::{Row, evaluate, person_band, place_state};
+use teamzones_core::config::{PersonId, PlaceId, Roster};
+use teamzones_core::question::{Row, evaluate, place_state};
 use teamzones_core::schedule::{Band, Level, band};
 
-use super::app::{App, Cursor, Lanes, Lens};
+use super::app::{App, Cursor, Lens};
 use super::fold::Entry;
-use super::keys::Sort;
 use super::layout::{Areas, Columns};
 use super::say::{duration_text, local_text};
 use super::theme::Role;
@@ -75,18 +74,12 @@ pub fn who_lines(app: &App) -> Vec<Entry> {
         .collect()
 }
 
-/// `cities` east to west by offset from the axis zone (or by city name under `s`), keeping config
-/// order between ties.
+/// `cities` in the grid's row order, keyed by each city's zone and name.
 fn sorted(app: &App, mut cities: Vec<Vec<Entry>>) -> Vec<Vec<Entry>> {
-    let start = app.when().start();
-    match app.sort {
-        Sort::Offset => {
-            cities.sort_by_key(|members| -offset_seconds(location_of(app, members).1, start));
-        }
-        Sort::Name => {
-            cities.sort_by_key(|members| location_of(app, members).0.to_lowercase());
-        }
-    }
+    cities.sort_by_key(|members| {
+        let (city, tz) = location_of(app, members);
+        app.order_key(tz, &city)
+    });
     cities
 }
 
@@ -198,25 +191,13 @@ fn zone_city(tz: Tz) -> String {
         .replace('_', " ")
 }
 
-/// The word for a band in a city row.
-fn band_word(band: Band) -> &'static str {
-    match band {
-        Band::Night => "night",
-        Band::Day => "day",
-        Band::Morning => "morning",
-        Band::Working => "working",
-        Band::Evening => "evening",
-        Band::Off => "off",
-    }
-}
-
 /// The word for the one band `bands` share, or `mixed`.
 fn shared_word(mut bands: impl Iterator<Item = Band>) -> &'static str {
     let Some(first) = bands.next() else {
         return "mixed";
     };
     if bands.all(|band| band == first) {
-        band_word(first)
+        first.name()
     } else {
         "mixed"
     }
@@ -228,13 +209,7 @@ fn city_word(app: &App, members: &[Entry]) -> &'static str {
     let roster = app.roster();
     let slot = app.start_slot();
     let bands = members.iter().filter_map(|member| match member {
-        Entry::Row(Row::Person(id)) => {
-            let person = roster.person(*id);
-            Some(match app.lanes {
-                Lanes::Hours => person_band(roster, *id, slot),
-                Lanes::Plain => band(person.location, None, roster.daylight, slot),
-            })
-        }
+        Entry::Row(Row::Person(id)) => Some(app.lane_band(*id, slot)),
         Entry::Reference => roster
             .reference()
             .map(|reference| band(reference.location, None, roster.daylight, slot)),
@@ -509,9 +484,7 @@ pub fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, entries: &[En
     let score = place.map(|block| (block.score.qualifying, block.score.counted));
     for (y, line) in placed(entries, area.y + 1, false) {
         match line {
-            Placed::Entry(Entry::Row(row @ Row::Place(_))) => {
-                place_row(buf, area, y, app, look, *row);
-            }
+            Placed::Entry(Entry::Row(Row::Place(id))) => place_row(buf, area, y, app, look, *id),
             Placed::Entry(Entry::Answer) => answer(buf, area, y, look, word, score),
             Placed::Entry(Entry::More(folded)) => more(buf, area, y, area.width, app, look, folded),
             Placed::Rule
@@ -524,9 +497,9 @@ pub fn places(buf: &mut Buffer, area: Rect, app: &App, look: Look, entries: &[En
 
 /// Draws a place row: the day, offset, mark, zone city and state on the small line, then the
 /// place and its time on the big line. A place the group does not ask is dim.
-fn place_row(buf: &mut Buffer, area: Rect, y: u16, app: &App, look: Look, row: Row) {
+fn place_row(buf: &mut Buffer, area: Rect, y: u16, app: &App, look: Look, id: PlaceId) {
     let (theme, glyphs) = (look.theme, look.glyphs);
-    let Row::Place(id) = row else { return };
+    let row = Row::Place(id);
     let roster = app.roster();
     let place = roster.place(id);
     let tz = place.location.tz;
@@ -542,13 +515,9 @@ fn place_row(buf: &mut Buffer, area: Rect, y: u16, app: &App, look: Look, row: R
             (place.labels().word(level).to_owned(), theme.fg(role))
         }
         None => (
-            band_word(band(
-                place.location,
-                None,
-                roster.daylight,
-                app.start_slot(),
-            ))
-            .to_owned(),
+            band(place.location, None, roster.daylight, app.start_slot())
+                .name()
+                .to_owned(),
             theme.fg(role),
         ),
     };

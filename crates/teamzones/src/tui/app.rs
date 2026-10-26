@@ -1,10 +1,12 @@
 //! The TUI's state, and the pure queries the update and the view both read.
 
 use chrono::{DateTime, NaiveDate, Offset, Utc};
+use chrono_tz::Tz;
 use teamzones_core::clock::{Range, Slot, When};
 use teamzones_core::config::{Config, MapShow, PersonId, RangeStyle, Roster};
 use teamzones_core::copy::{Format, Who, format_line};
-use teamzones_core::question::{Marks, Row};
+use teamzones_core::question::{Marks, Row, person_band};
+use teamzones_core::schedule::{Band, band};
 
 use super::clocks;
 use super::fold::{Entry, fold};
@@ -516,25 +518,41 @@ impl App {
         }
     }
 
+    /// The key rows and clock list cities sort by: east to west by offset at the view's start, or
+    /// by `name` under name sort. A stable sort on it keeps config order between ties.
+    pub fn order_key(&self, tz: Tz, name: &str) -> (i32, String) {
+        match self.sort {
+            Sort::Offset => {
+                let offset = self.when().start().with_timezone(&tz).offset().fix();
+                (-offset.local_minus_utc(), String::new())
+            }
+            Sort::Name => (0, name.to_lowercase()),
+        }
+    }
+
     fn ordered(&self, mut rows: Vec<Row>) -> Vec<Row> {
         let roster = self.roster();
-        let start = self.when().start();
-        let offset = |row: &Row| {
-            let tz = match *row {
-                Row::Person(id) => roster.person(id).location.tz,
-                Row::Place(id) => roster.place(id).location.tz,
-            };
-            -start.with_timezone(&tz).offset().fix().local_minus_utc()
-        };
-        let name = |row: &Row| match *row {
-            Row::Person(id) => roster.person(id).name.to_lowercase(),
-            Row::Place(id) => roster.place(id).name.to_lowercase(),
-        };
-        match self.sort {
-            Sort::Offset => rows.sort_by_key(offset),
-            Sort::Name => rows.sort_by_key(name),
-        }
+        rows.sort_by_key(|row| match *row {
+            Row::Person(id) => {
+                let person = roster.person(id);
+                self.order_key(person.location.tz, &person.name)
+            }
+            Row::Place(id) => {
+                let place = roster.place(id);
+                self.order_key(place.location.tz, &place.name)
+            }
+        });
         rows
+    }
+
+    /// A person's lane band at `slot`: from their hours under hours lanes, else day or night. The
+    /// lanes and the clock list's state words both read it.
+    pub fn lane_band(&self, id: PersonId, slot: Slot) -> Band {
+        let roster = self.roster();
+        match self.lanes {
+            Lanes::Hours => person_band(roster, id, slot),
+            Lanes::Plain => band(roster.person(id).location, None, roster.daylight, slot),
+        }
     }
 
     /// The who block's rows: home, the counted people, then the rest.

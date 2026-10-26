@@ -180,6 +180,95 @@ fn home_comes_first_then_counted_cities_east_to_west_then_the_rest_under_a_not_i
     assert_eq!(cell("Brisbane", 0), text_role);
 }
 
+/// Aroha in Auckland and Kenji in Tokyo, listed after everyone else, so config order is not east
+/// to west in either section.
+const FAR: &str = "\n[[person]]\nname = \"Aroha\"\ncity = \"Auckland\"\nhours = \"9am-5pm\"\n\n[[person]]\nname = \"Kenji\"\ncity = \"Tokyo\"\n";
+
+/// The team on Mon 26 Oct 5-6pm at 44 by 40, with Aroha counted and Kenji not.
+fn far_team() -> App {
+    let app = sized(go_to(App::new(config(FAR), now()), "26 oct 5-6pm"), 44, 40);
+    press(focus_on(app, "Aroha"), &chars(" "))
+}
+
+/// The y of each needle in `buf`, asserting they run top to bottom.
+fn assert_in_order(buf: &Buffer, needles: &[&str]) {
+    let ys: Vec<u16> = needles.iter().map(|needle| y_of(buf, needle)).collect();
+    assert!(
+        ys.windows(2).all(|pair| pair[0] < pair[1]),
+        "{needles:?} at {ys:?}:\n{}",
+        text(buf)
+    );
+}
+
+#[test]
+fn cities_run_east_to_west_in_each_section_whatever_their_config_order() {
+    let buf = render(&far_team(), 44, 40);
+    assert_in_order(
+        &buf,
+        &[
+            "⌂ Paul",
+            "● Aroha",
+            "● Priya",
+            "● Thandi",
+            "≡ in hours",
+            " not in team ",
+            "○ Kenji",
+            "○ Ellie",
+            "○ Marcus",
+        ],
+    );
+}
+
+#[test]
+fn under_name_sort_cities_run_by_city_name_in_each_section_after_home() {
+    let buf = render(&press(far_team(), &chars("sn")), 44, 40);
+    assert_in_order(
+        &buf,
+        &[
+            "⌂ Paul",
+            "Auckland",
+            "Brisbane",
+            "Johannesburg",
+            "≡ in hours",
+            " not in team ",
+            "Austin",
+            "London",
+            "Tokyo",
+        ],
+    );
+}
+
+#[test]
+fn with_rules_drawn_a_click_lands_on_the_city_row_under_it() {
+    let app = sized(team_monday(), 44, 31);
+    let buf = render(&app, 44, 31);
+    for (needle, below, name) in [("● Thandi", 1, "Thandi"), ("○ Marcus", 0, "Marcus")] {
+        let y = y_of(&buf, needle) + below;
+        let clicked = click(app.clone(), (20, y));
+        assert_eq!(focus_name(&clicked), name, "line {y}:\n{}", text(&buf));
+    }
+}
+
+#[test]
+fn a_place_with_no_trading_profile_reads_day_or_night() {
+    let plain = "\n[[place]]\nname = \"IN\"\ntz = \"Asia/Kolkata\"\nat = [20.0, 77.0]\n\n[[place]]\nname = \"HI\"\ntz = \"Pacific/Honolulu\"\nat = [21.3, -157.8]\n";
+    let app = sized(
+        go_to(App::new(config(plain), now()), "26 oct 5-6pm"),
+        44,
+        40,
+    );
+    let buf = render(&app, 44, 40);
+    // 06:00 UTC is 11:30am in Kolkata and 8pm the evening before in Honolulu.
+    let kolkata = row(&buf, y_of(&buf, "◇ Kolkata"));
+    assert!(kolkata.ends_with(" day"), "{}", text(&buf));
+    let honolulu = row(&buf, y_of(&buf, "◇ Honolulu"));
+    assert!(
+        honolulu.starts_with("Sun, -21h") && honolulu.ends_with(" night"),
+        "{}",
+        text(&buf)
+    );
+}
+
 #[test]
 fn each_city_row_reads_its_day_offset_people_and_state_over_its_city_and_time() {
     let buf = render(&team_44(), 44, 30);
@@ -219,7 +308,7 @@ fn a_row_whose_people_differ_reads_mixed_and_a_day_off_reads_off() {
     let today = render(&sized(fixture(), 44, 40), 44, 40);
     let paul = row(&today, y_of(&today, "⌂ Paul"));
     assert!(
-        paul.starts_with("Sat, +0h") && paul.ends_with("off"),
+        paul.starts_with("Sat, +0h") && paul.ends_with("  off"),
         "{paul}"
     );
 }

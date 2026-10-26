@@ -565,9 +565,8 @@ mod tests {
     fn below_60_columns_at_any_height_the_blocks_are_the_clock_list_with_rules_given_room() {
         for (cols, rows) in (40..60).flat_map(|cols| (10..=80).map(move |rows| (cols, rows))) {
             let columns = layout(cols, rows, FIXTURE, MapChoice::Auto).columns;
-            // Header, slider, titles, times box, notice and footer, then three lines a city
-            // with rules, and two a place plus the answer row.
-            let rules = rows > 9 + 3 * 5 + 2 * 3;
+            // The fixture's frame has room for rules from 31 rows.
+            let rules = rows >= 31;
             assert_eq!(
                 columns,
                 Columns::Clocks { width: cols, rules },

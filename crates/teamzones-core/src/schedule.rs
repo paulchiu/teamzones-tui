@@ -197,15 +197,24 @@ pub enum Band {
 }
 
 impl Band {
-    /// The word status lines and labels use.
-    pub fn word(self) -> &'static str {
+    /// The band's own name, as a lane state reads it: `off` for a day off.
+    pub fn name(self) -> &'static str {
         match self {
             Self::Night => "night",
             Self::Day => "day",
             Self::Morning => "morning",
             Self::Working => "working",
             Self::Evening => "evening",
-            Self::Off => "day off",
+            Self::Off => "off",
+        }
+    }
+
+    /// The word status lines and labels use: the name, with `off` spelt out as `day off`.
+    pub fn word(self) -> &'static str {
+        if self == Self::Off {
+            "day off"
+        } else {
+            self.name()
         }
     }
 }
@@ -326,6 +335,15 @@ pub fn sun_up(lat: f64, lon: f64, instant: DateTime<Utc>) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_day_off_is_named_off_and_spelt_day_off_in_words() {
+        assert_eq!((Band::Off.name(), Band::Off.word()), ("off", "day off"));
+        assert_eq!(
+            (Band::Working.name(), Band::Working.word()),
+            ("working", "working")
+        );
+    }
 
     fn slot(text: &str) -> Slot {
         Slot::containing(text.parse().unwrap())
