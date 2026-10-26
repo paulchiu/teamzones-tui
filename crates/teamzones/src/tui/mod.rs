@@ -4,6 +4,7 @@
 //! and runs effects.
 
 mod app;
+mod clocks;
 mod edit;
 mod editor;
 mod fold;

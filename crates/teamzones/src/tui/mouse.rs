@@ -200,6 +200,14 @@ struct Slider {
 }
 
 fn slider(areas: &Areas, track: &Track) -> Slider {
+    if areas.columns.clocks() {
+        let line = areas.slider.y;
+        return Slider {
+            ruler: line,
+            label: line,
+            track: line,
+        };
+    }
     let ruler = areas.slider.y + track.dy;
     Slider {
         ruler,
@@ -222,6 +230,9 @@ fn nearest_cell(track: &Track, x: u16) -> u16 {
 
 /// The line drawn on screen line `y` in either block, as the view folded it.
 fn entry_at(app: &App, areas: &Areas, track: &Track, y: u16) -> Option<Entry> {
+    if areas.columns.clocks() {
+        return super::clocks::entry_at(app, areas, y);
+    }
     let lines = track.dy + 1;
     let (who, place) = app.entries();
     let block = |top: u16, entries: Vec<Entry>| {
@@ -260,7 +271,7 @@ fn main(app: &App, look: Look, size: Rect, pointer: Pointer) -> Vec<Msg> {
             .drag
             .map_or_else(Vec::new, |drag| dragged(&track, drag, pointer)),
         Kind::Up => released(app, &areas, &track, pointer),
-        Kind::Middle if pointer.y == areas.who.y => {
+        Kind::Middle if pointer.y == areas.who.y && !areas.columns.clocks() => {
             match strip_piece(app, look, &areas, &track, pointer.x) {
                 Some(Piece::Group(digit)) if digit != '0' => vec![key(digit), key('x')],
                 Some(_) | None => Vec::new(),
@@ -366,7 +377,11 @@ fn pressed(app: &App, look: Look, areas: &Areas, track: &Track, pointer: Pointer
         return vec![key('.')];
     }
     if y == areas.who.y {
-        return strip_click(app, look, areas, track, x);
+        return if areas.columns.clocks() {
+            Vec::new()
+        } else {
+            strip_click(app, look, areas, track, x)
+        };
     }
     let where_width = u16::try_from(view::width_of(view::WHERE_TITLE)).unwrap_or(0);
     if y == areas.place.y && x < areas.place.x + where_width {
@@ -400,9 +415,15 @@ fn pressed(app: &App, look: Look, areas: &Areas, track: &Track, pointer: Pointer
             std::iter::once(Msg::Focus(*row)).chain(list).collect()
         });
     }
-    if let Some(Entry::Row(row)) = entry {
+    let city_person = |members: &[Entry]| members.iter().flat_map(Entry::rows).next();
+    let row = match &entry {
+        Some(Entry::Row(row)) => Some(*row),
+        Some(Entry::City(members)) => city_person(members),
+        Some(Entry::Reference | Entry::Answer | Entry::Outside | Entry::More(_)) | None => None,
+    };
+    if let Some(row) = row {
         let focus = Msg::Focus(row);
-        return if x == areas.who.x {
+        return if x == areas.who.x && !areas.columns.clocks() {
             vec![focus, key(' ')]
         } else if is_double(app, pointer) {
             vec![focus, key('e')]

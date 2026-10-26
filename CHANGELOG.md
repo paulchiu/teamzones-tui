@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ## [Unreleased]
 
+### Changed
+
+- Below 60 columns the screen is now a clock list, like a phone's world clock: a two-line row per city with the local day, the offset from home, the people there and what they are doing, over the city name and its time in bold, and a row the same way for each place. People who share a city share a row, home's city comes first, and the cities nobody in the group is in sit dimmed under a `not in team` rule.
+- Below 60 columns the group bar is a title line, such as `team +@UK` with `1 of 5` on the right, so it is no longer cut off after `0`; `1` to `9` and `0` still switch groups.
+- Below 60 columns `j` and `k` still step person by person, with the focused name highlighted inside its city's row, and a click on a city row focuses its first person.
+
+### Removed
+
+- The plain list below 60 columns and the stacked lanes below 60 columns, which the clock list replaces.
+
 ## [0.14.0] - 2026-10-25
 
 ### Added

@@ -1686,16 +1686,7 @@ fn from_60_to_79_columns_without_the_height_to_stack_lanes_sit_beside_the_labels
     }
 }
 
-#[test]
-fn below_60_columns_without_the_height_to_stack_the_screen_is_a_plain_list() {
-    let buf = render(&team_monday(), 59, 24);
-    let frame = text(&buf);
-    assert!(!frame.contains('▓') && !frame.contains('┣'), "{frame}");
-    assert!(row(&buf, y_of(&buf, "⌂ Paul")).ends_with("5-6pm AEDT"));
-    assert!(row(&buf, y_of(&buf, "≡ in hours")).ends_with("5/5"));
-    assert_eq!(say_line(&buf), "5-6pm AEDT / 4-5pm AEST / 8-9am SAST");
-}
-
+mod clocks;
 mod edit;
 mod fold;
 mod map;

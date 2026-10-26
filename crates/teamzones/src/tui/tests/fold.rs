@@ -78,17 +78,6 @@ fn a_resize_that_folds_the_focused_row_moves_focus_onto_the_fold_row_holding_it(
 }
 
 #[test]
-fn at_50_columns_the_screen_is_the_plain_list() {
-    let buf = render(&team_monday(), 50, 24);
-    assert!(
-        row(&buf, y_of(&buf, "⌂ Paul")).ends_with("5-6pm AEDT"),
-        "{}",
-        text(&buf)
-    );
-    assert!(!text(&buf).contains('▓'), "{}", text(&buf));
-}
-
-#[test]
 fn at_30_by_8_the_screen_says_terminal_too_small_and_q_still_quits() {
     let app = sized(fixture(), 30, 8);
     let buf = render(&app, 30, 8);
