@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog v1.1.0](https://keepachangelog.com/en/1
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-10-26
+
 ### Changed
 
 - Below 60 columns the screen is now a clock list, like a phone's world clock: a two-line row per city with the local day, the offset from home, the people there and what they are doing, over the city name and its time in bold, and a row the same way for each place. People who share a city share a row, home's city comes first, and the cities nobody in the group is in sit dimmed under a `not in team` rule.
