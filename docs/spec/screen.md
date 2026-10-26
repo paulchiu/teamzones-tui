@@ -63,7 +63,7 @@ h/l time  v range  n next fit  space mark  1-9 group  w save  tab groups  y copy
 120x36, a real ratatui `TestBackend` render. Now is Sat 24 Oct 9:04am AEDT; the view is scrubbed to Mon 26 Oct, 5-6pm AEDT (London is on GMT by then). The team group is active and focus is on Priya. Team lists no places, so the where block is all `◇`, its answer row says "not asked", and the clipboard is the v2 line unchanged: `5-6pm AEDT / 4-5pm AEST / 8-9am SAST`.
 
 * **Header**: the app name in bold accent, then `now <day date time zone>` (dim) and `viewing <day date> +Nd` when the view is not today. `⌂ City ZONE` (or `✈ City ZONE`) is right-aligned. Pieces drop whole from the right when there is no room.
-* **Columns**: label width `L` plus track width `T`. From 80 columns the label sits beside the track, which takes a whole number of columns per hour: the fewest that make `T` at least twice `L` (`cols / 36`, rounded up), cut back one at a time while `L` would fall under 20. Then `T = 24 × columns per hour` and `L = cols - T`, so the label is never wider than the track and from 120 columns is at most half of it. The examples are `80 columns: 32 + 48` (30 minutes a column), `100 columns: 28 + 72` (20 minutes), `120 columns: 24 + 96` (15 minutes), `160 columns: 40 + 120`, `200 columns: 56 + 144`, `250 columns: 82 + 168` and `320 columns: 104 + 216`. Below 80 columns rows stack (see Folding), and the track is the full width. From 60 to 79 columns, when the terminal is too short to stack, the label sits beside the track by the same rule. The track always shows the viewed axis-zone day from 12am to 12am, split evenly across its columns, and column i is the same instant in every row, the ruler and the track. A column's state is the grid slot it starts in, and the track marks a column `═` or `╌` by the slots it overlaps.
+* **Columns**: label width `L` plus track width `T`. From 80 columns the label sits beside the track, which takes a whole number of columns per hour: the fewest that make `T` at least twice `L` (`cols / 36`, rounded up), cut back one at a time while `L` would fall under 20. Then `T = 24 × columns per hour` and `L = cols - T`, so the label is never wider than the track and from 120 columns is at most half of it. The examples are `80 columns: 32 + 48` (30 minutes a column), `100 columns: 28 + 72` (20 minutes), `120 columns: 24 + 96` (15 minutes), `160 columns: 40 + 120`, `200 columns: 56 + 144`, `250 columns: 82 + 168` and `320 columns: 104 + 216`. From 60 to 79 columns rows stack (see Folding), and the track is the full width; when the terminal is too short to stack, the label sits beside the track by the same rule. Below 60 columns there is no track: the blocks are the clock list (see Clock list). The track always shows the viewed axis-zone day from 12am to 12am, split evenly across its columns, and column i is the same instant in every row, the ruler and the track. A column's state is the grid slot it starts in, and the track marks a column `═` or `╌` by the slots it overlaps.
 * **Ruler**: the label reads `Mon 26 Oct AEDT`. The ruler shows hour labels (`12a`, `3a` … `9p`) every 1, 2, 3, 4, 6 or 12 hours, the fewest that keep labels at least 10 columns apart, with `·` on each other hour. So 15 minutes a column labels every 3 hours, 30 minutes every 6, and 250 columns (seven columns an hour) every 2.
 * **Track**:
   + The label reads `▸ 5-6pm AEDT 1h`, or `▸ 9:04am AEDT now` when the cursor is at now.
@@ -122,8 +122,54 @@ h/l time  v range  n next fit  space mark  1-9 group  w save  tab groups  y copy
   + Block heights are recomputed per resize, never per group switch. The where block shrinks first, to its borders, the answer row and `min(places, 3)` rows. Then the who block shrinks to whatever is left, with at least home, the answer row and one more row.
   + Inside a block, rows fill in their usual order. The last row becomes `○ +N more` or `◇ +N more` when rows remain, listing how many of them are counted (`○ +3 more, 1 counted`). `enter` on it opens an overlay listing the folded rows.
   + Answer rows and the say panel never fold.
-  + Below 80 columns each who and where row stacks: its label (mark, name, city when it fits, time or state) on one line, and its lane on the full-width line under it. The ruler, the track and each answer row stack the same way, so the cursor and range line up over the lanes. Stacking needs two lines per row, so it applies only when the terminal is tall enough for every stacked row. Otherwise, from 60 columns the label sits beside the track as in Columns, and below 60 the screen is a plain list: the label and state per row, without lanes or track cells.
-  + Below 40 columns or 10 rows it shows `terminal too small`, and `q` still quits. The plain list is one line per row: mark, name, then the time or state label.
+  + From 60 to 79 columns each who and where row stacks: its label (mark, name, city when it fits, time or state) on one line, and its lane on the full-width line under it. The ruler, the track and each answer row stack the same way, so the cursor and range line up over the lanes. Stacking needs two lines per row, so it applies only when the terminal is tall enough for every stacked row. Otherwise the label sits beside the track as in Columns.
+  + Below 60 columns, at any height, the who and where blocks are the clock list (below). It folds the same way, in screen lines: a city or place row takes two lines and an answer, `not in` or `+N more` line one. The rule lines between city rows go first, then the where block shrinks to its heading, its answer row and `min(places, 3)` rows, then the who block to home's city, a `+N more` line and the answer row.
+  + Below 40 columns or 10 rows it shows `terminal too small`, and `q` still quits.
+* **Clock list** (FB8), below 60 columns, modelled on a phone's world clock list. From 60 columns nothing here applies.
+  + The slider is one line, `▸ Mon 26 Oct 5-6pm AEDT 1h`: the viewed day, the cursor's time or the range, the axis zone and the length (or `now`), with `◂` at the right edge while the view is away from today. There is no ruler, track or detail line, and the where block has no bottom border.
+  + The who strip becomes a title line: the active group's name in bold, any drift after it in the warn colour (`team +@UK`), and `N of M` right-aligned, counting the groups in file order and then `all` (`1 of 5`, and `5 of 5` on `0 all`). `1` to `9` and `0` still switch groups. A click on the title line does nothing.
+  + One two-line row per city: people who share a city name and zone share a row, in config order, and home's reference row joins its own city's row, right after home's. The small line is the local weekday at the cursor or range start, a comma and the offset from the axis zone (`Mon, -9h`, `Mon, +5:30h`), two spaces, then the people with their marks (`⌂ ● ○`), comma separated, with home's reference shown as a dim `⌂ home`. On the right is the lane state word at the cursor or the range's first slot (`working`, `morning`, `evening`, `day`, `night`, `off`, following `b`) when everyone in the row shares it, and `mixed` when they do not. The big line is the city name in bold on the left and the local time or range in bold on the right, without a zone abbreviation. A line too narrow for its people ends in `.`.
+  + Home's city comes first, then home's reference city while travelling, then the other cities with a counted person, east to west by offset from the axis zone at the cursor or range start (by city name under `s` name sort), keeping config order between ties. A city with both counted and uncounted people counts, and its uncounted names are dim. Then the who answer row, then a `not in <group>` rule (only when any city is left) and the remaining cities, dimmed, in the same order.
+  + A rule line sits between every two city rows when the height allows every row with its rule, which comes to three lines a city whichever cities count. The who block always keeps the lines for that many, so a group switch never moves the where block.
+  + Answer rows keep their place and are one line each: `≡ in hours` and its word on the left, `5/5` (or `--` when the block is not asked) right-aligned. They never fold.
+  + The where block keeps its heading (` where  not asked`, and the other questions). Each place is a two-line row: the small line is the weekday and offset, the place mark (`◆` counted, dim `◇` not) and its zone's city (`Europe/London` reads `London`), with the place's state word on the right (`busy` in warn bold, `open` and `closed` in its profile's words, and `day` or `night` for a place without a trading profile). The big line is the place name on the left and its local time or range on the right. Places the group does not ask are dim rows, so `space` can still add them.
+  + `j` and `k` (and the arrows, `g`, `G`) move the focus through the people in row order, then through the places. The focused person's mark and name are drawn in the focus style inside its row's people line, and `space`, `e`, `d` and `enter` act on that person as on a person row at 60 columns. A click on either line of a city row focuses its first person, a click on a place row focuses that place, and a double click edits it.
+  + The times box, the notice row and the footer are unchanged and keep to the bottom, with any spare rows above the times box; `y` copies the same line as at 60 columns. The ascii glyph set draws the marks, rules and `not in` rule from the glyphs it already has.
+
+```
+teamzones   now Sat 24 Oct 9:04am AEDT
+▸ Mon 26 Oct 5-6pm AEDT 1h                 ◂
+team                                  1 of 5
+Mon, +0h  ⌂ Paul                     working
+Melbourne                              5-6pm
+Mon, -1h  ● Priya, ● Sam             working
+Brisbane                               4-5pm
+Mon, -9h  ● Thandi, ● Johan          working
+Johannesburg                           8-9am
+≡ in hours                               5/5
+──────────────────────────── not in team ───
+Mon, -11h  ○ Ellie                     night
+London                                 6-7am
+Mon, -16h  ○ Marcus                    night
+Austin                                 1-2am
+ where  not asked ──────────────────────────
+≡ where                                   --
+Mon, +0h  ◇ Melbourne                   busy
+AU                                     5-6pm
+Mon, -11h  ◇ London                   closed
+UK                                     6-7am
+Mon, -16h  ◇ Chicago                  closed
+US                                     1-2am
+
+
+╭ times for team ────────────────── y copy ╮
+│ 5-6pm AEDT / 4-5pm AEST / 8-9am SAST     │
+╰──────────────────── 3 zones for 5 people ╯
+
+. now  esc clear range  ? help  q quit
+```
+
+The clock list at 44x30, team, Mon 26 Oct 5-6pm AEDT, from the fixture. Thirty rows are one short of room for the rules between city rows, so none show; at 31 rows a rule sits between Melbourne and Brisbane, Brisbane and Johannesburg, and London and Austin.
 
 ```
 teamzones   now Sat 24 Oct 9:04am AEDT   viewing Mon 26 Oct +2d                                         ⌂ Melbourne AEDT

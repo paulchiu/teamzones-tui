@@ -1,16 +1,19 @@
 //! The TUI's state, and the pure queries the update and the view both read.
 
 use chrono::{DateTime, NaiveDate, Offset, Utc};
+use chrono_tz::Tz;
 use teamzones_core::clock::{Range, Slot, When};
 use teamzones_core::config::{Config, MapShow, PersonId, RangeStyle, Roster};
 use teamzones_core::copy::{Format, Who, format_line};
-use teamzones_core::question::{Marks, Row};
+use teamzones_core::question::{Marks, Row, person_band};
+use teamzones_core::schedule::{Band, band};
 
+use super::clocks;
 use super::fold::{Entry, fold};
 use super::footer::MapKey;
 use super::glyphs::Glyphs;
 use super::keys::{Context, Sort};
-use super::layout::{Areas, MapChoice, MapView, layout, map_view, room_for_map};
+use super::layout::{Areas, MapChoice, MapView, Sizes, layout, map_view, room_for_map};
 use super::map::{Camera, framing};
 use super::matrix::Matrix;
 use super::mouse::Drag;
@@ -321,18 +324,12 @@ impl App {
             (false, MapShow::Auto) => MapChoice::Auto,
             (false, MapShow::Always) => MapChoice::Always,
         };
-        map_view(
-            cols,
-            rows,
-            self.roster_size(),
-            base,
-            self.map_flipped && !ascii,
-        )
+        map_view(cols, rows, self.sizes(), base, self.map_flipped && !ascii)
     }
 
     /// What `m` does on a `cols` by `rows` screen, which decides the footer's `m` hint.
     pub fn map_key_at(&self, cols: u16, rows: u16) -> MapKey {
-        let room = room_for_map(cols, rows, self.roster_size());
+        let room = room_for_map(cols, rows, self.sizes());
         match (self.ascii(), self.map_view_at(cols, rows), room) {
             (true, _, _) => MapKey::Inert,
             (false, MapView::InPlace, _) | (false, MapView::Hidden | MapView::Overlay, true) => {
@@ -346,15 +343,16 @@ impl App {
         Glyphs::of(self.config.theme.glyphs).ascii
     }
 
-    /// The whole roster's people (with home's reference row while travelling) and places,
-    /// which size the blocks.
-    fn roster_size(&self) -> (u16, u16) {
+    /// The whole roster's people (with home's reference row while travelling), places and
+    /// cities, which size the blocks.
+    fn sizes(&self) -> Sizes {
         let count = |n: usize| u16::try_from(n).unwrap_or(u16::MAX);
         let roster = self.roster();
-        (
-            count(roster.people().count() + usize::from(roster.reference().is_some())),
-            count(roster.places().count()),
-        )
+        Sizes {
+            people: count(roster.people().count() + usize::from(roster.reference().is_some())),
+            places: count(roster.places().count()),
+            cities: count(super::clocks::cities(roster).len()),
+        }
     }
 
     /// The screen's areas on a `cols` by `rows` terminal.
@@ -363,8 +361,7 @@ impl App {
             MapView::InPlace => MapChoice::Always,
             MapView::Hidden | MapView::Overlay => MapChoice::Hidden,
         };
-        let (people, places) = self.roster_size();
-        layout(cols, rows, people, places, choice)
+        layout(cols, rows, self.sizes(), choice)
     }
 
     /// Where the map goes at the size the terminal last reported.
@@ -521,25 +518,41 @@ impl App {
         }
     }
 
+    /// The key rows and clock list cities sort by: east to west by offset at the view's start, or
+    /// by `name` under name sort. A stable sort on it keeps config order between ties.
+    pub fn order_key(&self, tz: Tz, name: &str) -> (i32, String) {
+        match self.sort {
+            Sort::Offset => {
+                let offset = self.when().start().with_timezone(&tz).offset().fix();
+                (-offset.local_minus_utc(), String::new())
+            }
+            Sort::Name => (0, name.to_lowercase()),
+        }
+    }
+
     fn ordered(&self, mut rows: Vec<Row>) -> Vec<Row> {
         let roster = self.roster();
-        let start = self.when().start();
-        let offset = |row: &Row| {
-            let tz = match *row {
-                Row::Person(id) => roster.person(id).location.tz,
-                Row::Place(id) => roster.place(id).location.tz,
-            };
-            -start.with_timezone(&tz).offset().fix().local_minus_utc()
-        };
-        let name = |row: &Row| match *row {
-            Row::Person(id) => roster.person(id).name.to_lowercase(),
-            Row::Place(id) => roster.place(id).name.to_lowercase(),
-        };
-        match self.sort {
-            Sort::Offset => rows.sort_by_key(offset),
-            Sort::Name => rows.sort_by_key(name),
-        }
+        rows.sort_by_key(|row| match *row {
+            Row::Person(id) => {
+                let person = roster.person(id);
+                self.order_key(person.location.tz, &person.name)
+            }
+            Row::Place(id) => {
+                let place = roster.place(id);
+                self.order_key(place.location.tz, &place.name)
+            }
+        });
         rows
+    }
+
+    /// A person's lane band at `slot`: from their hours under hours lanes, else day or night. The
+    /// lanes and the clock list's state words both read it.
+    pub fn lane_band(&self, id: PersonId, slot: Slot) -> Band {
+        let roster = self.roster();
+        match self.lanes {
+            Lanes::Hours => person_band(roster, id, slot),
+            Lanes::Plain => band(roster.person(id).location, None, roster.daylight, slot),
+        }
     }
 
     /// The who block's rows: home, the counted people, then the rest.
@@ -598,14 +611,25 @@ impl App {
             .collect()
     }
 
-    /// Each block's lines as drawn on a `cols` by `rows` terminal, folded to fit.
+    /// Each block's lines as drawn on a `cols` by `rows` terminal, folded to fit: the grid's
+    /// rows, or the clock list's below 60 columns.
     pub fn entries_at(&self, cols: u16, rows: u16) -> (Vec<Entry>, Vec<Entry>) {
         let areas = self.areas_at(cols, rows);
-        let lines = areas.columns.lines().max(1);
-        let room = |height: u16, borders: u16| usize::from(height.saturating_sub(borders) / lines);
+        let (who, place) = (areas.who.height, areas.place.height);
+        if areas.columns.clocks() {
+            return (
+                fold(
+                    clocks::who_lines(self),
+                    who.saturating_sub(1),
+                    clocks::height,
+                ),
+                fold(self.where_lines(), place.saturating_sub(1), clocks::height),
+            );
+        }
+        let lines = areas.columns.lines();
         (
-            fold(self.who_lines(), room(areas.who.height, 1)),
-            fold(self.where_lines(), room(areas.place.height, 2)),
+            fold(self.who_lines(), who.saturating_sub(1), |_| lines),
+            fold(self.where_lines(), place.saturating_sub(2), |_| lines),
         )
     }
 
@@ -617,13 +641,13 @@ impl App {
         }
     }
 
-    /// Every row focus can sit on, top to bottom through both blocks: each row drawn, and for a
-    /// `+N more` line the first row it folds, which stands for it.
+    /// Every row focus can sit on, top to bottom through both blocks: each row drawn, each
+    /// person of a city row, and for a `+N more` line the first row it folds, which stands for it.
     pub fn focus_rows(&self) -> Vec<Row> {
         let (who, place) = self.entries();
         who.iter()
             .chain(&place)
-            .filter_map(|entry| entry.rows().first().copied())
+            .flat_map(Entry::focusable)
             .collect()
     }
 
@@ -637,7 +661,12 @@ impl App {
         let (who, place) = self.entries();
         who.iter().chain(&place).find_map(|entry| match entry {
             Entry::More(_) if entry.rows().contains(&row) => entry.rows().first().copied(),
-            Entry::More(_) | Entry::Row(_) | Entry::Reference | Entry::Answer => None,
+            Entry::More(_)
+            | Entry::Row(_)
+            | Entry::Reference
+            | Entry::Answer
+            | Entry::City(_)
+            | Entry::Outside => None,
         })
     }
 
